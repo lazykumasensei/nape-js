@@ -87,6 +87,8 @@ export default {
   _pendingGrab: null,
   _pendingRelease: false,
   _isDragging: false,
+  _angleDragBody: null,  // set when dragging the AngleJoint bar
+  _angleJoint: null,     // ref to the AngleJoint (to temporarily adjust limits during drag)
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 300);
@@ -149,14 +151,15 @@ export default {
     // ── AngleJoint (col=2, row=0) — rotation-limited pendulum ───────────────
     {
       const { x, top } = cellCenter(2, 0, W, H);
-      const ay = top + 28;
+      const ax = x - 50;   // 1 grid cell left
+      const ay = top + 128; // 2 grid cells down from original (+100)
       const limits = { min: -Math.PI / 3, max: Math.PI / 3 };
 
-      const anchor = new Body(BodyType.STATIC, new Vec2(x, ay));
+      const anchor = new Body(BodyType.STATIC, new Vec2(ax, ay));
       anchor.shapes.add(new Circle(4));
       anchor.space = space;
 
-      const bar = new Body(BodyType.DYNAMIC, new Vec2(x + 40, ay));
+      const bar = new Body(BodyType.DYNAMIC, new Vec2(ax + 40, ay));
       bar.shapes.add(new Polygon(Polygon.box(80, 10)));
       try { bar.userData._colorIdx = 2; } catch (_) {}
       bar.angularVel = 2;
@@ -165,14 +168,13 @@ export default {
       new PivotJoint(anchor, bar, new Vec2(0, 0), new Vec2(-40, 0)).space = space;
 
       const aj = new AngleJoint(anchor, bar, limits.min, limits.max);
-      aj.stiff = false;
-      aj.frequency = 4;
-      aj.damping = 0.4;
+      aj.stiff = true;
       aj.space = space;
 
       this._aAnchor = anchor;
       this._aBar = bar;
       this._aLimits = limits;
+      this._angleJoint = aj;
     }
 
     // ── WeldJoint (col=0, row=1) — two bodies glued as one ──────────────────
@@ -250,7 +252,7 @@ export default {
     }
     // Handle pending grab — create the joint inside step to avoid timing issues
     if (this._pendingGrab) {
-      const { body, localPt, freq, damp } = this._pendingGrab;
+      const { body, localPt, freq, damp, stiff, maxForce } = this._pendingGrab;
       this._pendingGrab = null;
       if (this._mouseJoint) { this._mouseJoint.space = null; this._mouseJoint = null; }
       this._mouseBody.position.setxy(this._dragX, this._dragY);
@@ -258,10 +260,28 @@ export default {
         this._mouseBody, body,
         new Vec2(0, 0), localPt,
       );
-      this._mouseJoint.stiff = false;
-      this._mouseJoint.frequency = freq;
-      this._mouseJoint.damping = damp;
+      this._mouseJoint.stiff = stiff;
+      if (!stiff) {
+        this._mouseJoint.frequency = freq;
+        this._mouseJoint.damping = damp;
+      }
+      if (maxForce !== Infinity) this._mouseJoint.maxForce = maxForce;
       this._mouseJoint.space = space;
+    }
+    // AngleJoint drag: temporarily narrow joint limits to the target angle
+    // so the stiff solver itself drives the bar there
+    if (this._angleDragBody && this._isDragging && this._aAnchor && this._angleJoint) {
+      const pivotX = this._aAnchor.position.x;
+      const pivotY = this._aAnchor.position.y;
+      const targetAngle = Math.atan2(this._dragY - pivotY, this._dragX - pivotX);
+      // Clamp to original limits
+      const { min, max } = this._aLimits;
+      const clamped = Math.max(min, Math.min(max, targetAngle));
+      // Set both min/max to the clamped target — solver drives bar to that angle
+      this._angleJoint.jointMin = clamped;
+      this._angleJoint.jointMax = clamped;
+      // Wake the bar — changing joint limits may not auto-wake sleeping bodies
+      if (this._angleDragBody.isSleeping) this._angleDragBody.isSleeping = false;
     }
     // Move mouse body smoothly toward cursor — capped speed prevents sudden forces
     if (this._mouseJoint) {
@@ -290,31 +310,33 @@ export default {
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d < 80 && d < minDist) { minDist = d; closest = body; }
     }
-    if (!closest) return;
 
-    this._isDragging = true;
-
-    // Convert click position to body-local anchor
-    const cos = Math.cos(-closest.rotation), sin = Math.sin(-closest.rotation);
-    const rx = x - closest.position.x, ry = y - closest.position.y;
-    const localPt = new Vec2(rx * cos - ry * sin, rx * sin + ry * cos);
-
-    // Detect which cell we're in to tune mouse joint strength
+    // Detect which cell we're in
     const cw = (W - 2 * T) / 3;
     const ch = (H - 2 * T) / 2;
     const col = Math.floor((x - T) / cw);
     const row = Math.floor((y - T) / ch);
 
+    if (!closest) return;
+
+    this._isDragging = true;
+
+    // Convert click position to body-local anchor
+    const localPt = closest.worldPointToLocal(new Vec2(x, y));
+
     let freq = 15, damp = 0.9;
     if (col === 2 && row === 0) {
-      // AngleJoint cell — softer drag so rotation limits are felt
-      freq = 4; damp = 0.6;
+      // AngleJoint cell — drive rotation by temporarily narrowing joint limits
+      // (PivotJoint mouse drag can't compete with the stiff pivot+angle constraints)
+      this._isDragging = true;
+      this._angleDragBody = closest;
+      return;
     } else if (col === 2 && row === 1) {
       // LineJoint cell — moderate drag to prevent spin
       freq = 6; damp = 0.9;
     }
 
-    this._pendingGrab = { body: closest, localPt, freq, damp };
+    this._pendingGrab = { body: closest, localPt, freq, damp, stiff: false, maxForce: Infinity };
   },
 
   drag(x, y) {
@@ -325,7 +347,13 @@ export default {
   },
 
   release() {
+    // Restore AngleJoint original limits if we were angle-dragging
+    if (this._angleDragBody && this._angleJoint && this._aLimits) {
+      this._angleJoint.jointMin = this._aLimits.min;
+      this._angleJoint.jointMax = this._aLimits.max;
+    }
     this._isDragging = false;
+    this._angleDragBody = null;
     this._pendingRelease = true;
   },
 
@@ -469,14 +497,19 @@ export default {
       drawBody(ctx, body, debugDraw);
     }
 
-    // ── Drag indicator: dashed line from cursor to grabbed body ──────────────
+    // ── Drag indicator: dashed line from cursor to grabbed anchor point ─────
     if (this._isDragging && this._mouseJoint) {
       const mx = this._dragX, my = this._dragY;
       const grabbed = this._mouseJoint.body2;
       if (grabbed) {
+        // Compute world position of the local anchor on the grabbed body
+        const lp = this._mouseJoint.anchor2;
+        const cos = Math.cos(grabbed.rotation), sin = Math.sin(grabbed.rotation);
+        const ax = grabbed.position.x + lp.x * cos - lp.y * sin;
+        const ay = grabbed.position.y + lp.x * sin + lp.y * cos;
         ctx.beginPath();
         ctx.moveTo(mx, my);
-        ctx.lineTo(grabbed.position.x, grabbed.position.y);
+        ctx.lineTo(ax, ay);
         ctx.strokeStyle = '#ffffff44';
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 4]);
@@ -485,6 +518,11 @@ export default {
         ctx.beginPath();
         ctx.arc(mx, my, 6, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff66';
+        ctx.fill();
+        // Small dot at the anchor point on the body
+        ctx.beginPath();
+        ctx.arc(ax, ay, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff44';
         ctx.fill();
       }
     }
