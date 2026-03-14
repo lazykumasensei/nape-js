@@ -82,11 +82,23 @@ export default {
   // Mouse-drag state
   _mouseBody: null,
   _mouseJoint: null,
-  _dragTarget: null,
+  _dragX: 0,
+  _dragY: 0,
+  _pendingGrab: null,
+  _pendingRelease: false,
+  _isDragging: false,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 300);
     addWalls(space, W, H);
+
+    // Kinematic mouse anchor — lives in space, position freely settable
+    this._mouseBody = new Body(BodyType.KINEMATIC, new Vec2(-1000, -1000));
+    this._mouseBody.space = space;
+    this._mouseJoint = null;
+    this._pendingGrab = null;
+    this._pendingRelease = false;
+    this._isDragging = false;
 
     // ── PivotJoint (col=0, row=0) — pendulum bar ────────────────────────────
     {
@@ -228,55 +240,93 @@ export default {
     }
   },
 
-  // Drive the kinematic cursor body toward the drag target each step
-  step(_space) {
-    if (this._mouseBody && this._dragTarget) {
-      this._mouseBody.kinematicVel.x = (this._dragTarget.x - this._mouseBody.position.x) * 60;
-      this._mouseBody.kinematicVel.y = (this._dragTarget.y - this._mouseBody.position.y) * 60;
+  step(space, W, H) {
+    // Handle pending release
+    if (this._pendingRelease) {
+      this._pendingRelease = false;
+      if (this._mouseJoint) { this._mouseJoint.space = null; this._mouseJoint = null; }
+      this._mouseBody.position.setxy(-1000, -1000);
+      this._mouseBody.velocity.setxy(0, 0);
+    }
+    // Handle pending grab — create the joint inside step to avoid timing issues
+    if (this._pendingGrab) {
+      const { body, localPt, freq, damp } = this._pendingGrab;
+      this._pendingGrab = null;
+      if (this._mouseJoint) { this._mouseJoint.space = null; this._mouseJoint = null; }
+      this._mouseBody.position.setxy(this._dragX, this._dragY);
+      this._mouseJoint = new PivotJoint(
+        this._mouseBody, body,
+        new Vec2(0, 0), localPt,
+      );
+      this._mouseJoint.stiff = false;
+      this._mouseJoint.frequency = freq;
+      this._mouseJoint.damping = damp;
+      this._mouseJoint.space = space;
+    }
+    // Move mouse body smoothly toward cursor — capped speed prevents sudden forces
+    if (this._mouseJoint) {
+      const dx = this._dragX - this._mouseBody.position.x;
+      const dy = this._dragY - this._mouseBody.position.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const maxSpeed = 800;
+      if (dist > 1) {
+        const speed = Math.min(dist * 60, maxSpeed);
+        this._mouseBody.velocity.setxy(dx / dist * speed, dy / dist * speed);
+      } else {
+        this._mouseBody.velocity.setxy(0, 0);
+      }
     }
   },
 
-  // Pointerdown: find nearest dynamic body, create a mouse joint
-  click(x, y, space) {
+  // Pointerdown: find nearest dynamic body, queue a mouse joint
+  click(x, y, space, W, H) {
+    this._dragX = x;
+    this._dragY = y;
+
     let closest = null, minDist = Infinity;
     for (const body of space.bodies) {
-      if (body.isStatic()) continue;
+      if (body.isStatic() || body === this._mouseBody) continue;
       const dx = body.position.x - x, dy = body.position.y - y;
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d < 80 && d < minDist) { minDist = d; closest = body; }
     }
     if (!closest) return;
 
-    this._mouseBody = new Body(BodyType.KINEMATIC, new Vec2(x, y));
-    this._mouseBody.space = space;
-    this._dragTarget = { x, y };
+    this._isDragging = true;
 
     // Convert click position to body-local anchor
     const cos = Math.cos(-closest.rotation), sin = Math.sin(-closest.rotation);
     const rx = x - closest.position.x, ry = y - closest.position.y;
+    const localPt = new Vec2(rx * cos - ry * sin, rx * sin + ry * cos);
 
-    this._mouseJoint = new PivotJoint(
-      this._mouseBody, closest,
-      new Vec2(0, 0),
-      new Vec2(rx * cos - ry * sin, rx * sin + ry * cos),
-    );
-    this._mouseJoint.stiff = false;
-    this._mouseJoint.frequency = 15;
-    this._mouseJoint.damping = 0.9;
-    this._mouseJoint.space = space;
+    // Detect which cell we're in to tune mouse joint strength
+    const cw = (W - 2 * T) / 3;
+    const ch = (H - 2 * T) / 2;
+    const col = Math.floor((x - T) / cw);
+    const row = Math.floor((y - T) / ch);
+
+    let freq = 15, damp = 0.9;
+    if (col === 2 && row === 0) {
+      // AngleJoint cell — softer drag so rotation limits are felt
+      freq = 4; damp = 0.6;
+    } else if (col === 2 && row === 1) {
+      // LineJoint cell — moderate drag to prevent spin
+      freq = 6; damp = 0.9;
+    }
+
+    this._pendingGrab = { body: closest, localPt, freq, damp };
   },
 
   drag(x, y) {
-    if (this._dragTarget) {
-      this._dragTarget.x = x;
-      this._dragTarget.y = y;
+    if (this._isDragging) {
+      this._dragX = x;
+      this._dragY = y;
     }
   },
 
   release() {
-    if (this._mouseJoint) { this._mouseJoint.space = null; this._mouseJoint = null; }
-    if (this._mouseBody) { this._mouseBody.space = null; this._mouseBody = null; }
-    this._dragTarget = null;
+    this._isDragging = false;
+    this._pendingRelease = true;
   },
 
   render(ctx, space, W, H, debugDraw) {
@@ -420,8 +470,8 @@ export default {
     }
 
     // ── Drag indicator: dashed line from cursor to grabbed body ──────────────
-    if (this._mouseBody && this._mouseJoint) {
-      const mx = this._mouseBody.position.x, my = this._mouseBody.position.y;
+    if (this._isDragging && this._mouseJoint) {
+      const mx = this._dragX, my = this._dragY;
       const grabbed = this._mouseJoint.body2;
       if (grabbed) {
         ctx.beginPath();
