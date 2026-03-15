@@ -89,6 +89,25 @@ function drawBody(body) {
   }
   ctx.restore();
 }
+function drawGrid() {
+  ctx.strokeStyle = "#1a2030"; ctx.lineWidth = 0.5;
+  for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+}
+function drawConstraintLines() {
+  try {
+    const raw = space.constraints;
+    for (let i = 0; i < raw.length; i++) {
+      const c = raw.at(i);
+      if (c.body1 && c.body2) {
+        ctx.beginPath();
+        ctx.moveTo(c.body1.position.x, c.body1.position.y);
+        ctx.lineTo(c.body2.position.x, c.body2.position.y);
+        ctx.strokeStyle = "#d2992233"; ctx.lineWidth = 1; ctx.stroke();
+      }
+    }
+  } catch(_) {}
+}
 function addWalls() {
   const t = 20;
   const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - t / 2));
@@ -113,13 +132,13 @@ function openInCodePen(demo) {
   const js   = `import {
   Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
-  Material, InteractionFilter, InteractionGroup,
+  Material, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
 } from "${NAPE_CDN}";
 
 const canvas = document.getElementById("demoCanvas");
+const canvasWrap = canvas;
 const ctx = canvas.getContext("2d");
-const W = canvas.width, H = canvas.height;
 
 ${RENDERER_2D}${code}`;
 

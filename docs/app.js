@@ -286,15 +286,15 @@ ${WALLS_3D}
 ${code}`;
   } else {
     js = `import {
-  Space, Body, BodyType, Vec2, Circle, Polygon,
+  Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
-  Material, InteractionFilter, InteractionGroup,
+  Material, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
 } from "${NAPE_CDN}";
 
 const canvas = document.getElementById("demoCanvas");
+const canvasWrap = canvas;
 const ctx = canvas.getContext("2d");
-const W = canvas.width, H = canvas.height;
 
 ${RENDERER_2D}
 ${code}`;
