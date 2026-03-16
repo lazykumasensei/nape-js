@@ -491,7 +491,12 @@ function render(alpha) {
         ctx.fillStyle = c.stroke; ctx.fill();
       }
     } else if (obj) {
-      if (obj.shape === "circle") {
+      if (obj.moving) {
+        // Moving platform — render as a static-style platform
+        drawRoundRect(0, 0, obj.w, obj.h, 3);
+        ctx.fillStyle = PLATFORM_COLOR.fill; ctx.fill();
+        ctx.strokeStyle = PLATFORM_COLOR.stroke; ctx.lineWidth = 1.5; ctx.stroke();
+      } else if (obj.shape === "circle") {
         ctx.beginPath();
         ctx.arc(0, 0, obj.size, 0, Math.PI * 2);
         ctx.fillStyle = c.fill; ctx.fill();
