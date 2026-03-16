@@ -14,6 +14,12 @@ import { ZPP_AABB } from "../geom/ZPP_AABB";
 import { ZPP_Collide } from "../geom/ZPP_Collide";
 import { ZPP_Broadphase } from "./ZPP_Broadphase";
 
+/** Callback for Map.forEach — recycles cell array into the pool (bound as `this`). */
+function recycleCell(this: any[][], cell: any[]): void {
+  cell.length = 0;
+  this.push(cell);
+}
+
 export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
   // --- Static: namespace references ---
   static _zpp: any = null;
@@ -36,6 +42,12 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
 
   /** Hash map: cell key → array of shapes in that cell. */
   grid: Map<number, any[]> = new Map();
+
+  /** Pool of reusable cell arrays to avoid GC pressure. */
+  cellPool: any[][] = [];
+
+  /** Set for pair deduplication across multi-cell shapes. */
+  testedPairs: Set<number> = new Set();
 
   /** Frame counter for auto-tuning cell size periodically. */
   frameCount: number = 0;
@@ -267,6 +279,15 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
 
   // ========== Broadphase pair detection ==========
 
+  /** Encode a unique pair key from two shape indices for dedup. */
+  pairKey(idxA: number, idxB: number): number {
+    // Ensure order-independent: always put smaller index first.
+    // Use Szudzik's pairing for compact unique keys.
+    const a = idxA < idxB ? idxA : idxB;
+    const b = idxA < idxB ? idxB : idxA;
+    return b * b + a;
+  }
+
   broadphase(space: any, discrete: boolean): void {
     const n = this.shapes.length;
     if (n === 0) return;
@@ -282,8 +303,15 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
 
     const inv = this.invCellSize;
 
-    // Clear grid
-    this.grid.clear();
+    // Return used cell arrays to pool, then clear grid
+    const grid = this.grid;
+    const pool = this.cellPool;
+    grid.forEach(recycleCell, pool);
+    grid.clear();
+
+    // Clear pair dedup set
+    const tested = this.testedPairs;
+    tested.clear();
 
     // Insert all shapes into grid cells
     for (let i = 0; i < n; i++) {
@@ -298,14 +326,16 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
       for (let cx = minCX; cx <= maxCX; cx++) {
         for (let cy = minCY; cy <= maxCY; cy++) {
           const key = this.cellKey(cx, cy);
-          let cell = this.grid.get(key);
+          let cell = grid.get(key);
           if (cell === undefined) {
-            cell = [];
-            this.grid.set(key, cell);
+            // Grab from pool or allocate
+            cell = pool.length > 0 ? pool.pop()! : [];
+            grid.set(key, cell);
           }
 
           // Check this shape against all shapes already in this cell
-          for (let j = 0; j < cell.length; j++) {
+          const cLen = cell.length;
+          for (let j = 0; j < cLen; j++) {
             const other = cell[j];
             const b1 = shape.body;
             const b2 = other.body;
@@ -317,10 +347,10 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
             // Skip both sleeping
             if (b1.component.sleeping && b2.component.sleeping) continue;
 
-            // Deduplicate: use a pair stamp. We encode a unique pair key.
-            // For shapes that span multiple cells, the same pair may appear many times.
-            // Use the narrowPhase/continuousEvent's internal arbiter dedup to handle this.
-            // nape's narrowPhase already handles duplicate pair calls gracefully.
+            // Deduplicate: shapes spanning multiple cells produce the same pair
+            const pk = this.pairKey(shape.__shIdx as number, other.__shIdx as number);
+            if (tested.has(pk)) continue;
+            tested.add(pk);
 
             // AABB overlap test
             const a1 = shape.aabb;
@@ -350,6 +380,8 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
       this.__remove(shape);
     }
     this.grid.clear();
+    this.cellPool.length = 0;
+    this.testedPairs.clear();
   }
 
   // ========== Spatial queries: shapes/bodies under point ==========
