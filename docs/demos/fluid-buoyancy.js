@@ -15,6 +15,8 @@ let _H = 0;
 let _time = 0;
 let _THREE = null;
 let _waterMesh3d = null;
+let _boatFlagMesh3d = null;
+let _lastScene = null;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -78,48 +80,39 @@ function spawnObject(space, x, y, type) {
 function spawnBoat(space, x, y) {
   const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
 
-  // Hull — wide trapezoid (boat bottom)
-  const hullVerts = [
-    new Vec2(-40, -4),
-    new Vec2(40, -4),
-    new Vec2(32, 12),
-    new Vec2(-32, 12),
+  // Hull bottom — V-shaped keel (pointed bow, tapered stern)
+  const keelVerts = [
+    new Vec2(-38, 0),
+    new Vec2(50, 0),
+    new Vec2(58, 6),
+    new Vec2(0, 14),
+    new Vec2(-42, 10),
   ];
-  const hull = new Polygon(hullVerts);
-  hull.material.density = 0.25;
-  hull.material.elasticity = 0.1;
-  hull.material.dynamicFriction = 0.4;
-  hull.material.staticFriction = 0.4;
-  body.shapes.add(hull);
+  const keel = new Polygon(keelVerts);
+  keel.material.density = 0.25;
+  keel.material.elasticity = 0.1;
+  keel.material.dynamicFriction = 0.4;
+  keel.material.staticFriction = 0.4;
+  body.shapes.add(keel);
 
-  // Bow (front triangle)
-  const bowVerts = [
-    new Vec2(40, -4),
-    new Vec2(55, 4),
-    new Vec2(40, 12),
+  // Deck — flat top section
+  const deckVerts = [
+    new Vec2(-38, -4),
+    new Vec2(50, -4),
+    new Vec2(50, 0),
+    new Vec2(-38, 0),
   ];
-  const bow = new Polygon(bowVerts);
-  bow.material.density = 0.25;
-  bow.material.elasticity = 0.1;
-  body.shapes.add(bow);
+  const deck = new Polygon(deckVerts);
+  deck.material.density = 0.2;
+  deck.material.elasticity = 0.1;
+  body.shapes.add(deck);
 
-  // Stern (back triangle)
-  const sternVerts = [
-    new Vec2(-40, -4),
-    new Vec2(-40, 12),
-    new Vec2(-52, 4),
-  ];
-  const stern = new Polygon(sternVerts);
-  stern.material.density = 0.25;
-  stern.material.elasticity = 0.1;
-  body.shapes.add(stern);
-
-  // Cabin — small box on top (offset upward via explicit vertices)
+  // Cabin — small box on top
   const cabinVerts = [
-    new Vec2(-15, -18),
-    new Vec2(5, -18),
-    new Vec2(5, -4),
-    new Vec2(-15, -4),
+    new Vec2(-12, -16),
+    new Vec2(8, -16),
+    new Vec2(8, -4),
+    new Vec2(-12, -4),
   ];
   const cabin = new Polygon(cabinVerts);
   cabin.material.density = 0.15;
@@ -280,6 +273,104 @@ function renderFluid(ctx, space, W, H, showOutlines) {
   ctx.restore();
 }
 
+// ---------------------------------------------------------------------------
+// 3D wave geometry helper
+// ---------------------------------------------------------------------------
+
+function buildWaveGeometry(THREE, W, H, waterY, time) {
+  const xMin = 20, xMax = W - 20;
+  const zMin = -30, zMax = 30;
+  const xSegs = 80, zSegs = 8;
+  const geom = new THREE.BufferGeometry();
+
+  const verts = [];
+  const indices = [];
+  const normals = [];
+
+  for (let zi = 0; zi <= zSegs; zi++) {
+    const z = zMin + (zi / zSegs) * (zMax - zMin);
+    const zFactor = 1.0 - 0.3 * Math.abs(z / zMax); // slight wave damping at edges
+    for (let xi = 0; xi <= xSegs; xi++) {
+      const x = xMin + (xi / xSegs) * (xMax - xMin);
+      const wy = waveY(x + z * 0.3, time) * zFactor;
+      verts.push(x, -(waterY + wy), z);
+      normals.push(0, 1, 0); // approximate — will be recalculated
+    }
+  }
+
+  for (let zi = 0; zi < zSegs; zi++) {
+    for (let xi = 0; xi < xSegs; xi++) {
+      const a = zi * (xSegs + 1) + xi;
+      const b = a + 1;
+      const c = a + (xSegs + 1);
+      const d = c + 1;
+      indices.push(a, b, c);
+      indices.push(b, d, c);
+    }
+  }
+
+  geom.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  geom.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function updateWaveGeometry(geom, W, H, waterY, time) {
+  const pos = geom.attributes.position;
+  const xMin = 20, xMax = W - 20;
+  const zMin = -30, zMax = 30;
+  const xSegs = 80, zSegs = 8;
+
+  let idx = 0;
+  for (let zi = 0; zi <= zSegs; zi++) {
+    const z = zMin + (zi / zSegs) * (zMax - zMin);
+    const zFactor = 1.0 - 0.3 * Math.abs(z / zMax);
+    for (let xi = 0; xi <= xSegs; xi++) {
+      const x = xMin + (xi / xSegs) * (xMax - xMin);
+      const wy = waveY(x + z * 0.3, time) * zFactor;
+      pos.setY(idx, -(waterY + wy));
+      idx++;
+    }
+  }
+  pos.needsUpdate = true;
+  geom.computeVertexNormals();
+}
+
+// ---------------------------------------------------------------------------
+// 3D boat flag helper
+// ---------------------------------------------------------------------------
+
+function buildBoatFlag(THREE) {
+  const group = new THREE.Group();
+
+  // Mast — thin cylinder
+  const mastGeom = new THREE.CylinderGeometry(1.2, 1.2, 37, 6);
+  const mastMat = new THREE.MeshPhongMaterial({ color: 0xc8a060, shininess: 40 });
+  const mast = new THREE.Mesh(mastGeom, mastMat);
+  mast.position.set(-5, 18.5 + 18, 0); // relative to boat body center, Y up in 3D
+  group.add(mast);
+
+  // Flag — flat triangle
+  const flagShape = new THREE.Shape();
+  flagShape.moveTo(0, 0);
+  flagShape.lineTo(20, 8);
+  flagShape.lineTo(0, 15);
+  flagShape.closePath();
+  const flagGeom = new THREE.ShapeGeometry(flagShape);
+  const flagMat = new THREE.MeshPhongMaterial({
+    color: 0xf85149,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.85,
+  });
+  const flag = new THREE.Mesh(flagGeom, flagMat);
+  flag.position.set(-5, 18 + 22, 0);
+  group.add(flag);
+
+  return group;
+}
+
 
 export default {
   id: "fluid-buoyancy",
@@ -294,6 +385,7 @@ export default {
     _H = H;
     _time = 0;
     _waterMesh3d = null;
+    _boatFlagMesh3d = null;
     space.gravity = new Vec2(0, 600);
 
     const t = 20;
@@ -313,6 +405,11 @@ export default {
     right.shapes.add(new Polygon(Polygon.box(t, H)));
     right.space = space;
 
+    // Ceiling
+    const ceil = new Body(BodyType.STATIC, new Vec2(W / 2, t / 2));
+    ceil.shapes.add(new Polygon(Polygon.box(W, t)));
+    ceil.space = space;
+
     // Water pool — fluid-enabled static body covering bottom 60%
     _waterY = H * 0.4;
     const waterH = H - _waterY;
@@ -328,11 +425,15 @@ export default {
     // Spawn boat
     spawnBoat(space, W / 2, _waterY - 10);
 
-    // Spawn initial objects
+    // Spawn initial objects — spread to sides so they don't land on the boat
     const types = [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 2];
+    const leftZone = { min: 60, max: W / 2 - 80 };
+    const rightZone = { min: W / 2 + 80, max: W - 60 };
     for (let i = 0; i < types.length; i++) {
-      const x = 60 + (i % 6) * 140 + (Math.random() - 0.5) * 40;
-      const y = 40 + Math.floor(i / 6) * 50 + (Math.random() - 0.5) * 20;
+      // Alternate between left and right zones
+      const zone = i % 2 === 0 ? leftZone : rightZone;
+      const x = zone.min + Math.random() * (zone.max - zone.min);
+      const y = _waterY + 20 + Math.random() * (waterH - 60);
       spawnObject(space, x, y, types[i]);
     }
   },
@@ -342,6 +443,15 @@ export default {
   },
 
   render3d(renderer, scene, camera, space, W, H) {
+    _time += 1 / 60;
+
+    // Reset 3D state when scene changes (e.g. 2d→3d→2d→3d toggle)
+    if (scene !== _lastScene) {
+      _waterMesh3d = null;
+      _boatFlagMesh3d = null;
+      _lastScene = scene;
+    }
+
     // Lazy-load THREE (cached by loadThree from demo-runner)
     if (!_THREE) {
       loadThree().then(mod => { _THREE = mod; });
@@ -349,27 +459,46 @@ export default {
       return;
     }
 
-    // Create transparent water mesh once
+    // Create/update animated wave water surface
     if (!_waterMesh3d) {
-      const waterH = H - _waterY;
-      const geom = new _THREE.BoxGeometry(W - 40, waterH, 60);
+      const geom = buildWaveGeometry(_THREE, W, H, _waterY, _time);
       const mat = new _THREE.MeshPhongMaterial({
         color: 0x1e90ff,
         transparent: true,
-        opacity: 0.28,
-        shininess: 90,
-        specular: 0x4488cc,
+        opacity: 0.45,
+        shininess: 100,
+        specular: 0x66aaff,
+        emissive: 0x1e6abf,
+        emissiveIntensity: 0.7,
         side: _THREE.DoubleSide,
         depthWrite: false,
       });
       _waterMesh3d = new _THREE.Mesh(geom, mat);
-      _waterMesh3d.position.set(W / 2, -(_waterY + waterH / 2), 0);
       _waterMesh3d.renderOrder = 999;
       scene.add(_waterMesh3d);
+
+      // Also add a deeper water volume below the surface
+      const waterH = H - _waterY;
+      const volGeom = new _THREE.BoxGeometry(W - 40, waterH - 6, 60);
+      const volMat = new _THREE.MeshPhongMaterial({
+        color: 0x1464aa,
+        transparent: true,
+        opacity: 0.35,
+        emissive: 0x0e4478,
+        emissiveIntensity: 0.6,
+        side: _THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const volMesh = new _THREE.Mesh(volGeom, volMat);
+      volMesh.position.set(W / 2, -(_waterY + waterH / 2 + 3), 0);
+      volMesh.renderOrder = 998;
+      scene.add(volMesh);
+      _waterMesh3d.userData._volume = volMesh;
+    } else {
+      updateWaveGeometry(_waterMesh3d.geometry, W, H, _waterY, _time);
     }
 
     // Sync body meshes — replicate DemoRunner's default logic
-    // Build meshes for new bodies
     const spaceBodies = new Set();
     for (const body of space.bodies) spaceBodies.add(body);
 
@@ -426,14 +555,20 @@ export default {
           new _THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }),
         );
         mesh.add(edges);
-        meshes.push({ mesh, body, edges });
+        meshes.push({ mesh, body, edges, isBoat: !!body.userData?._isBoat });
       }
     }
 
-    // Sync positions
-    for (const { mesh, body } of meshes) {
+    // Sync positions + boat flag
+    for (const { mesh, body, isBoat } of meshes) {
       mesh.position.set(body.position.x, -body.position.y, 0);
       mesh.rotation.z = -body.rotation;
+
+      // Attach flag to boat on first encounter
+      if (isBoat && !_boatFlagMesh3d) {
+        _boatFlagMesh3d = buildBoatFlag(_THREE);
+        mesh.add(_boatFlagMesh3d);
+      }
     }
 
     renderer.render(scene, camera);
@@ -495,20 +630,17 @@ ws.fluidProperties = new FluidProperties(1.5, 3.0);
 water.shapes.add(ws);
 water.space = space;
 
-// Boat — multiple shapes on one body
+// Boat — V-hull with flat deck and cabin
 const boat = new Body(BodyType.DYNAMIC, new Vec2(W / 2, waterY - 10));
-// Hull (trapezoid)
+// Keel (V-shaped bottom)
 boat.shapes.add(new Polygon([
-  new Vec2(-40, -4), new Vec2(40, -4),
-  new Vec2(32, 12), new Vec2(-32, 12),
+  new Vec2(-38, 0), new Vec2(50, 0),
+  new Vec2(58, 6), new Vec2(0, 14), new Vec2(-42, 10),
 ]));
-// Bow
+// Deck (flat top)
 boat.shapes.add(new Polygon([
-  new Vec2(40, -4), new Vec2(55, 4), new Vec2(40, 12),
-]));
-// Stern
-boat.shapes.add(new Polygon([
-  new Vec2(-40, -4), new Vec2(-40, 12), new Vec2(-52, 4),
+  new Vec2(-38, -4), new Vec2(50, -4),
+  new Vec2(50, 0), new Vec2(-38, 0),
 ]));
 for (const s of boat.shapes) {
   s.material.density = 0.25;
