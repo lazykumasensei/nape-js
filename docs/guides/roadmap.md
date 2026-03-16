@@ -56,7 +56,7 @@ Key competitors to watch:
 | P43 — Concave polygon helper              | M      | high     | low    | ✅ Done        |
 | P44 — PixiJS integration package          | M      | adoption | low    | ⬜ Not started |
 | P45 — Character controller                | M      | DX       | medium | ⬜ Not started |
-| P46 — Hot-path optimization               | M      | perf     | low    | ⬜ Not started |
+| P46 — Hot-path optimization               | M      | perf     | low    | ✅ Done        |
 | P47 — CJS bundle dedup (serialization)    | S      | bundle   | low    | ⬜ Not started |
 | P48 — Deterministic mode (soft)           | L      | critical | high   | ⬜ Not started |
 | P49 — ECS adapter layer                   | M      | DX       | medium | ⬜ Not started |
@@ -251,17 +251,18 @@ Geometric character controller (Box2D v3.1 pattern) separate from the physics wo
 
 ---
 
-## Planned: P46 — Hot-path Optimization
+## Done: P46 — Hot-path Optimization
 
-**Effort: M | Impact: perf | Risk: low**
+**Effort: M | Impact: perf | Risk: low | Status: ✅ Done**
 
-Performance improvements identified in the codebase:
+Performance improvements applied to the simulation hot path:
 
-- Deduplicate body invalidation loops in `step()` (~90 lines of copy-paste)
-- Extract inlined linked-list operations in `prestep()` (3×50 lines repeated)
-- Fix pool bypass: several `new ZPP_Vec2()` / `new ZPP_AABB()` in hot paths should use pools
-- Optimize `DynAABBPhase.__remove`: O(n) linear scan of syncs/moves/pairs lists
-- Reduce 300+ `any` annotations in hot-path files for better V8 optimization
+- ✅ Deduplicated body invalidation loops in `step()` — extracted `_invalidateBodyList()` helper (~60 lines removed)
+- ✅ Extracted inlined linked-list operations in `prestep()` — `_prestepArbiterList()` helper for fluid/sensor arbiters (~100 lines removed)
+- ✅ Fixed pool bypass: 19 inline pool-check blocks replaced with `ZPP_Vec2.get()` calls (ZPP_Collide, ZPP_SweepDistance, ZPP_SweepPhase, ZPP_ToiEvent)
+- ✅ Optimized `DynAABBPhase.__remove`: added `gprev` doubly-linked pointer to `ZPP_AABBPair` for O(1) pair unlinking; `_linkPair`/`_unlinkPair` helpers; O(n) global scan → O(k) per-shape iteration
+- ✅ Narrowed `any` → concrete types in hot-path files (ZPP_Space, ZPP_Body, ZPP_ColArbiter, ZPP_Collide, ZPP_DynAABBPhase) for V8 monomorphic inline caches
+- Net result: −429 lines, 7 new pair-consistency tests (3844 → 3851)
 
 ---
 
