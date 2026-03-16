@@ -374,7 +374,7 @@ Third broadphase algorithm for dense, uniform-object scenes:
 - Auto-tunes cell size to 2× average shape AABB (or accepts explicit cell size)
 - Best for: particle simulations, many same-sized objects, bounded worlds
 - Not useful for variable-size objects or sparse worlds
-- Includes hourglass demo (1000 particles pouring through funnel)
+- Includes asteroid field demo (2000 drifting asteroids in zero-g)
 - 34 integration tests covering collisions, spatial queries, raycasting, constraints
 
 ---

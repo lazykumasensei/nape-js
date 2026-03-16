@@ -77,7 +77,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | Hot-path optimization    | ✅ Done — P46 (step/prestep dedup, pool bypass fix, O(1) pair removal, `any` narrowing) |
 | Deterministic mode       | ⬜ Planned — P48 (multiplayer) |
 | ECS adapter              | ⬜ Planned — P49 |
-| Spatial hash grid        | ✅ Done — P50 (`Broadphase.SPATIAL_HASH`, hourglass demo) |
+| Spatial hash grid        | ✅ Done — P50 (`Broadphase.SPATIAL_HASH`, asteroid field demo) |
 | Sub-stepping solver      | ⬜ Planned — P51 (long-term) |
 | Multiplayer demo         | ✅ Done — P52 (Railway WebSocket, `docs/multiplayer.html` + `server/`) |
 | Polygon-Polygon bug      | ✅ P53 — validated: polygon-polygon collision works correctly; reported tunneling not reproducible (22 tests confirm) |
