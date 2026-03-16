@@ -2338,33 +2338,9 @@ export class ZPP_SweepDistance {
   }
   static distanceBody(b1: ZPP_Body, b2: ZPP_Body, w1: ZPP_Vec2, w2: ZPP_Vec2) {
     const napeNs = getNape();
-    let t1;
-    if (ZPP_Vec2.zpp_pool == null) {
-      t1 = new ZPP_Vec2();
-    } else {
-      t1 = ZPP_Vec2.zpp_pool;
-      ZPP_Vec2.zpp_pool = t1.next;
-      t1.next = null;
-    }
-    t1.weak = false;
-    let t2;
-    if (ZPP_Vec2.zpp_pool == null) {
-      t2 = new ZPP_Vec2();
-    } else {
-      t2 = ZPP_Vec2.zpp_pool;
-      ZPP_Vec2.zpp_pool = t2.next;
-      t2.next = null;
-    }
-    t2.weak = false;
-    let ax;
-    if (ZPP_Vec2.zpp_pool == null) {
-      ax = new ZPP_Vec2();
-    } else {
-      ax = ZPP_Vec2.zpp_pool;
-      ZPP_Vec2.zpp_pool = ax.next;
-      ax.next = null;
-    }
-    ax.weak = false;
+    const t1 = ZPP_Vec2.get(0, 0);
+    const t2 = ZPP_Vec2.get(0, 0);
+    const ax = ZPP_Vec2.get(0, 0);
     let min = 1e100;
     let cx_ite = b1.shapes.head;
     while (cx_ite != null) {

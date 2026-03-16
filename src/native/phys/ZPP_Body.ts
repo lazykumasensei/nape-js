@@ -30,7 +30,7 @@ export class ZPP_Body {
   static bodyset: any = null;
   static cur_graph_depth: number = 0;
 
-  static bodysetlt(a: any, b: any): boolean {
+  static bodysetlt(a: ZPP_Body, b: ZPP_Body): boolean {
     return a.id < b.id;
   }
 
@@ -55,9 +55,9 @@ export class ZPP_Body {
   // --- ZPP_Interactor fields (base class, not extracted) ---
   outer_i: any = null;
   id: number = 0;
-  userData: any = null;
+  userData: Record<string, unknown> | null = null;
   ishape: any = null;
-  ibody: any = null;
+  ibody: ZPP_Body | null = null;
   icompound: any = null;
   wrap_cbTypes: any = null;
   cbSet: any = null;

@@ -37,12 +37,12 @@ export class ZPP_Collide {
   /** Internal list for flow collision segments (ZNPList_ZPP_Vec2). */
   static flowsegs: any = null;
 
-  static circleContains(c: any, p: any) {
+  static circleContains(c: any, p: ZPP_Vec2) {
     const dx = p.x - c.worldCOMx;
     const dy = p.y - c.worldCOMy;
     return dx * dx + dy * dy < c.radius * c.radius;
   }
-  static polyContains(s: any, p: any) {
+  static polyContains(s: any, p: ZPP_Vec2) {
     let retvar;
     retvar = true;
     let cx_ite = s.edges.head;
@@ -1641,18 +1641,7 @@ export class ZPP_Collide {
                   const T = min2;
                   const cx = u2.x + (v4.x - u2.x) * T;
                   const cy = u2.y + (v4.y - u2.y) * T;
-                  let ret;
-                  if (ZPP_Vec2.zpp_pool == null) {
-                    ret = new ZPP_Vec2();
-                  } else {
-                    ret = ZPP_Vec2.zpp_pool;
-                    ZPP_Vec2.zpp_pool = ret.next;
-                    ret.next = null;
-                  }
-                  ret.weak = false;
-                  ret._immutable = false;
-                  ret.x = cx;
-                  ret.y = cy;
+                  const ret = ZPP_Vec2.get(cx, cy);
                   fst_vert = ret;
                   ZPP_Collide.flowpoly.add(fst_vert);
                   poly1 = true;
@@ -1754,18 +1743,7 @@ export class ZPP_Collide {
                     const T1 = min3;
                     const cx1 = u2.x + (v5.x - u2.x) * T1;
                     const cy1 = u2.y + (v5.y - u2.y) * T1;
-                    let ret1;
-                    if (ZPP_Vec2.zpp_pool == null) {
-                      ret1 = new ZPP_Vec2();
-                    } else {
-                      ret1 = ZPP_Vec2.zpp_pool;
-                      ZPP_Vec2.zpp_pool = ret1.next;
-                      ret1.next = null;
-                    }
-                    ret1.weak = false;
-                    ret1._immutable = false;
-                    ret1.x = cx1;
-                    ret1.y = cy1;
+                    const ret1 = ZPP_Vec2.get(cx1, cy1);
                     fst_vert = ret1;
                     ZPP_Collide.flowpoly.add(fst_vert);
                     poly1 = true;
@@ -1945,18 +1923,7 @@ export class ZPP_Collide {
                     break;
                   }
                   const tmp8 = ZPP_Collide.flowpoly;
-                  let ret2;
-                  if (ZPP_Vec2.zpp_pool == null) {
-                    ret2 = new ZPP_Vec2();
-                  } else {
-                    ret2 = ZPP_Vec2.zpp_pool;
-                    ZPP_Vec2.zpp_pool = ret2.next;
-                    ret2.next = null;
-                  }
-                  ret2.weak = false;
-                  ret2._immutable = false;
-                  ret2.x = cx2;
-                  ret2.y = cy2;
+                  const ret2 = ZPP_Vec2.get(cx2, cy2);
                   tmp8.add(ret2);
                   if (fst_vert == null) {
                     fst_vert = ZPP_Collide.flowpoly.head.elt;
@@ -2133,18 +2100,7 @@ export class ZPP_Collide {
                     break;
                   }
                   const tmp13 = ZPP_Collide.flowpoly;
-                  let ret3;
-                  if (ZPP_Vec2.zpp_pool == null) {
-                    ret3 = new ZPP_Vec2();
-                  } else {
-                    ret3 = ZPP_Vec2.zpp_pool;
-                    ZPP_Vec2.zpp_pool = ret3.next;
-                    ret3.next = null;
-                  }
-                  ret3.weak = false;
-                  ret3._immutable = false;
-                  ret3.x = cx3;
-                  ret3.y = cy3;
+                  const ret3 = ZPP_Vec2.get(cx3, cy3);
                   tmp13.add(ret3);
                   if (fst_vert == null) {
                     fst_vert = ZPP_Collide.flowpoly.head.elt;
@@ -2441,18 +2397,7 @@ export class ZPP_Collide {
                         break;
                       }
                       const tmp15 = ZPP_Collide.flowpoly;
-                      let ret4;
-                      if (ZPP_Vec2.zpp_pool == null) {
-                        ret4 = new ZPP_Vec2();
-                      } else {
-                        ret4 = ZPP_Vec2.zpp_pool;
-                        ZPP_Vec2.zpp_pool = ret4.next;
-                        ret4.next = null;
-                      }
-                      ret4.weak = false;
-                      ret4._immutable = false;
-                      ret4.x = cx4;
-                      ret4.y = cy4;
+                      const ret4 = ZPP_Vec2.get(cx4, cy4);
                       tmp15.add(ret4);
                       state = 2;
                     }
@@ -2496,18 +2441,7 @@ export class ZPP_Collide {
                             cx_ite12 = beg_ite2;
                             break;
                           }
-                          let ret5;
-                          if (ZPP_Vec2.zpp_pool == null) {
-                            ret5 = new ZPP_Vec2();
-                          } else {
-                            ret5 = ZPP_Vec2.zpp_pool;
-                            ZPP_Vec2.zpp_pool = ret5.next;
-                            ret5.next = null;
-                          }
-                          ret5.weak = false;
-                          ret5._immutable = false;
-                          ret5.x = cx5;
-                          ret5.y = cy5;
+                          const ret5 = ZPP_Vec2.get(cx5, cy5);
                           const cp = ret5;
                           ZPP_Collide.flowsegs.add(ZPP_Collide.flowpoly.head.elt);
                           ZPP_Collide.flowsegs.add(cp);
@@ -2561,18 +2495,7 @@ export class ZPP_Collide {
                               cx_ite12 = beg_ite2;
                               break;
                             }
-                            let ret6;
-                            if (ZPP_Vec2.zpp_pool == null) {
-                              ret6 = new ZPP_Vec2();
-                            } else {
-                              ret6 = ZPP_Vec2.zpp_pool;
-                              ZPP_Vec2.zpp_pool = ret6.next;
-                              ret6.next = null;
-                            }
-                            ret6.weak = false;
-                            ret6._immutable = false;
-                            ret6.x = cx6;
-                            ret6.y = cy6;
+                            const ret6 = ZPP_Vec2.get(cx6, cy6);
                             const cp1 = ret6;
                             if (ZPP_Collide.flowpoly.head != null) {
                               ZPP_Collide.flowsegs.add(ZPP_Collide.flowpoly.head.elt);
@@ -2589,18 +2512,7 @@ export class ZPP_Collide {
                               cx7 = u10.x + (v17.x - u10.x) * T7;
                               cy7 = u10.y + (v17.y - u10.y) * T7;
                               const tmp17 = ZPP_Collide.flowpoly;
-                              let ret7;
-                              if (ZPP_Vec2.zpp_pool == null) {
-                                ret7 = new ZPP_Vec2();
-                              } else {
-                                ret7 = ZPP_Vec2.zpp_pool;
-                                ZPP_Vec2.zpp_pool = ret7.next;
-                                ret7.next = null;
-                              }
-                              ret7.weak = false;
-                              ret7._immutable = false;
-                              ret7.x = cx7;
-                              ret7.y = cy7;
+                              const ret7 = ZPP_Vec2.get(cx7, cy7);
                               tmp17.add(ret7);
                             }
                           }
@@ -2646,18 +2558,7 @@ export class ZPP_Collide {
                             cx_ite12 = beg_ite2;
                             break;
                           }
-                          let ret8;
-                          if (ZPP_Vec2.zpp_pool == null) {
-                            ret8 = new ZPP_Vec2();
-                          } else {
-                            ret8 = ZPP_Vec2.zpp_pool;
-                            ZPP_Vec2.zpp_pool = ret8.next;
-                            ret8.next = null;
-                          }
-                          ret8.weak = false;
-                          ret8._immutable = false;
-                          ret8.x = cx8;
-                          ret8.y = cy8;
+                          const ret8 = ZPP_Vec2.get(cx8, cy8);
                           const cp2 = ret8;
                           ZPP_Collide.flowsegs.add(ZPP_Collide.flowpoly.head.elt);
                           ZPP_Collide.flowsegs.add(cp2);
@@ -2711,18 +2612,7 @@ export class ZPP_Collide {
                               cx_ite12 = beg_ite2;
                               break;
                             }
-                            let ret9;
-                            if (ZPP_Vec2.zpp_pool == null) {
-                              ret9 = new ZPP_Vec2();
-                            } else {
-                              ret9 = ZPP_Vec2.zpp_pool;
-                              ZPP_Vec2.zpp_pool = ret9.next;
-                              ret9.next = null;
-                            }
-                            ret9.weak = false;
-                            ret9._immutable = false;
-                            ret9.x = cx9;
-                            ret9.y = cy9;
+                            const ret9 = ZPP_Vec2.get(cx9, cy9);
                             const cp3 = ret9;
                             if (ZPP_Collide.flowpoly.head != null) {
                               ZPP_Collide.flowsegs.add(ZPP_Collide.flowpoly.head.elt);
@@ -2739,18 +2629,7 @@ export class ZPP_Collide {
                               cx10 = u10.x + (v18.x - u10.x) * T10;
                               cy10 = u10.y + (v18.y - u10.y) * T10;
                               const tmp19 = ZPP_Collide.flowpoly;
-                              let ret10;
-                              if (ZPP_Vec2.zpp_pool == null) {
-                                ret10 = new ZPP_Vec2();
-                              } else {
-                                ret10 = ZPP_Vec2.zpp_pool;
-                                ZPP_Vec2.zpp_pool = ret10.next;
-                                ret10.next = null;
-                              }
-                              ret10.weak = false;
-                              ret10._immutable = false;
-                              ret10.x = cx10;
-                              ret10.y = cy10;
+                              const ret10 = ZPP_Vec2.get(cx10, cy10);
                               tmp19.add(ret10);
                             }
                           }
@@ -2967,7 +2846,7 @@ export class ZPP_Collide {
   // ===========================================================================
 
   /** Point-in-capsule containment test. */
-  static capsuleContains(cap: any, p: any): boolean {
+  static capsuleContains(cap: any, p: ZPP_Vec2): boolean {
     const t = ZPP_Collide._closestT(cap.spine1x, cap.spine1y, cap.spine2x, cap.spine2y, p.x, p.y);
     const cx = cap.spine1x + t * (cap.spine2x - cap.spine1x);
     const cy = cap.spine1y + t * (cap.spine2y - cap.spine1y);
@@ -3071,8 +2950,8 @@ export class ZPP_Collide {
    * Create or reuse a contact in the arbiter's contact list.
    * Returns the contact, or null if creation failed.
    */
-  private static _getOrCreateContact(arb: any, hash: number, stamp: number): any {
-    let c: any = null;
+  private static _getOrCreateContact(arb: ZPP_ColArbiter, hash: number, stamp: number): ZPP_Contact {
+    let c: ZPP_Contact | null = null;
     let cx_ite = arb.contacts.next;
     while (cx_ite != null) {
       if (hash == cx_ite.hash) {
@@ -3116,7 +2995,7 @@ export class ZPP_Collide {
   static _capsuleContactCollide(
     s1: ZPP_Shape,
     s2: ZPP_Shape,
-    arb: any,
+    arb: ZPP_ColArbiter,
     rev: boolean,
     napeNs: any,
   ): boolean {
@@ -3135,7 +3014,7 @@ export class ZPP_Collide {
   }
 
   /** Circle vs Capsule contact generation. */
-  static _circleCapsuleContact(circ: any, cap: any, arb: any, rev: boolean, napeNs: any): boolean {
+  static _circleCapsuleContact(circ: any, cap: any, arb: ZPP_ColArbiter, rev: boolean, napeNs: any): boolean {
     // Find closest point on capsule spine to circle center
     const t = ZPP_Collide._closestT(
       cap.spine1x,
