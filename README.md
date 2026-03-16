@@ -170,17 +170,16 @@ present, with automatic `postMessage` fallback otherwise.
 
 ## Known Issues
 
-- **Polygon-Polygon tunneling** — When two or more dynamic `Polygon` bodies are
-  present in the same space, they may tunnel through static `Polygon` floors.
-  Single polygon works fine; circles and capsules are unaffected.
-  **Workaround:** use `Circle` shapes for free-falling objects.
+- **Zero-friction tunneling** — Bodies with zero-friction material and horizontal
+  velocity may tunnel through floors. This affects all shape types (circles,
+  polygons, capsules). **Workaround:** use small friction values (e.g. `0.01`).
 
 ## Development
 
 ```bash
 npm install
 npm run build      # tsup → dist/ (ESM + CJS + DTS)
-npm test           # vitest — 3784 tests across 176 files
+npm test           # vitest — 3806 tests across 177 files
 npm run benchmark  # Performance benchmarks
 ```
 

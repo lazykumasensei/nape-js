@@ -13,7 +13,7 @@ A fully typed TypeScript 2D physics engine — modernized rewrite of the origina
 - **Fluid simulation** — buoyancy and drag via fluid-enabled shapes (unique among JS engines)
 - **Serialization** — JSON (`spaceToJSON` / `spaceFromJSON`) + binary (`spaceToBinary` / `spaceFromBinary`) for save/load/multiplayer rollback
 - **Debug draw** — abstract `DebugDraw` interface (Box2D pattern), reference impls for Canvas/Three.js/PixiJS/p5.js
-- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 3784 tests
+- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 3806 tests
 
 ## Build & Test
 
@@ -63,7 +63,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | What                     | Status |
 | ------------------------ | ------ |
 | Haxe modernization       | ✅ Complete — pure TypeScript, fully typed |
-| Test coverage            | 🔶 ~58% statements (3784 tests), target ≥80% |
+| Test coverage            | 🔶 ~58% statements (3806 tests), target ≥80% |
 | Serialization API        | ✅ Done — `@newkrok/nape-js/serialization` |
 | Binary snapshots         | ✅ Done — `spaceToBinary` / `spaceFromBinary` (P39) |
 | Debug draw API           | ✅ Done — abstract `DebugDraw` + `Space.debugDraw()` |
@@ -80,6 +80,6 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | Spatial hash grid        | ⬜ Planned — P50 |
 | Sub-stepping solver      | ⬜ Planned — P51 (long-term) |
 | Multiplayer demo         | ✅ Done — P52 (Railway WebSocket, `docs/multiplayer.html` + `server/`) |
-| Polygon-Polygon bug      | 🐛 P53 — dynamic Polygon bodies tunnel through static Polygon floors when ≥2 present |
+| Polygon-Polygon bug      | ✅ P53 — validated: polygon-polygon collision works correctly; reported tunneling not reproducible (22 tests confirm) |
 
 Full roadmap with details, competitor analysis, and history: `docs/guides/roadmap.md`
