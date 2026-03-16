@@ -63,7 +63,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | What                     | Status |
 | ------------------------ | ------ |
 | Haxe modernization       | ✅ Complete — pure TypeScript, fully typed |
-| Test coverage            | 🔶 ~58% statements (3806 tests), target ≥80% |
+| Test coverage            | 🔶 ~58% statements (3844 tests), target ≥80% |
 | Serialization API        | ✅ Done — `@newkrok/nape-js/serialization` |
 | Binary snapshots         | ✅ Done — `spaceToBinary` / `spaceFromBinary` (P39) |
 | Debug draw API           | ✅ Done — abstract `DebugDraw` + `Space.debugDraw()` |
@@ -71,7 +71,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | Haxe remnant cleanup     | ✅ Done — P40 (`__name__`/`__class__`/`__super__`/`_gthis`/`_init()`) |
 | Capsule shape            | ✅ Done — P41 (`Capsule.create` / `Capsule.createVertical`) |
 | Web Worker helper        | ✅ Done — P42 (`@newkrok/nape-js/worker`, `PhysicsWorkerManager`) |
-| Concave polygon helper   | ⬜ Planned — P43 |
+| Concave polygon helper   | ✅ Done — P43 (`createConcaveBody`) |
 | PixiJS integration       | ⬜ Planned — P44 |
 | Character controller     | ⬜ Planned — P45 |
 | Hot-path optimization    | ⬜ Planned — P46 |

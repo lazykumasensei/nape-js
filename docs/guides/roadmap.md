@@ -53,7 +53,7 @@ Key competitors to watch:
 | P36 — Server-side + demo examples         | M      | medium   | low    | ❌ Cancelled   |
 | P52 — Multiplayer demo                    | M      | adoption | low    | ✅ Done        |
 | P42 — Web Worker helper                   | M      | perf/DX  | medium | ✅ Done        |
-| P43 — Concave polygon helper              | M      | high     | low    | ⬜ Not started |
+| P43 — Concave polygon helper              | M      | high     | low    | ✅ Done        |
 | P44 — PixiJS integration package          | M      | adoption | low    | ⬜ Not started |
 | P45 — Character controller                | M      | DX       | medium | ⬜ Not started |
 | P46 — Hot-path optimization               | M      | perf     | low    | ⬜ Not started |
@@ -206,16 +206,22 @@ const t = mgr.getTransform(id); // { x, y, rotation }
 
 ---
 
-## Planned: P43 — Concave Polygon Helper
+## Done: P43 — Concave Polygon Helper
 
 **Effort: M | Impact: high (user demand) | Risk: low**
 
-Convenience API for creating bodies from concave polygon vertices. The engine already has
-`GeomPoly.convexDecomposition()` — this wraps it into a user-friendly API:
+Convenience API for creating bodies from concave polygon vertices. Wraps
+`GeomPoly.convexDecomposition()` into a user-friendly function:
 
-- `Body.fromConcavePolygon(vertices, material?)` — auto-decomposes into convex shapes
-- Handles winding order normalization, simplification, validation
-- Addresses #1 pain point in Matter.js (fragile external `poly-decomp.js` dependency)
+- `createConcaveBody(vertices, options?)` — exported from main `@newkrok/nape-js`
+- Accepts `Vec2[]` or `GeomPoly`, returns `Body` with multiple convex `Polygon` shapes
+- Automatic winding order normalization (clockwise for decomposition)
+- Input validation: null/degenerate/self-intersecting checks
+- Optional simplification via `simplify` option (Ramer–Douglas–Peucker)
+- Delaunay refinement option for higher-quality decomposition
+- Convex passthrough: already-convex input creates a single shape (no decomposition overhead)
+- Options: `type`, `position`, `material`, `filter`, `delaunay`, `simplify`
+- 38 tests covering validation, decomposition, options, physics integration, edge cases
 
 ---
 
