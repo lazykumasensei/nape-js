@@ -5,14 +5,12 @@ import { Body } from "../../src/phys/Body";
 import { BodyType } from "../../src/phys/BodyType";
 import { Vec2 } from "../../src/geom/Vec2";
 import { Circle } from "../../src/shape/Circle";
-import { Polygon } from "../../src/shape/Polygon";
+// Polygon import available if needed
 import { AngleJoint } from "../../src/constraint/AngleJoint";
 import { MotorJoint } from "../../src/constraint/MotorJoint";
 import { WeldJoint } from "../../src/constraint/WeldJoint";
 import { PulleyJoint } from "../../src/constraint/PulleyJoint";
 import { LineJoint } from "../../src/constraint/LineJoint";
-import { PivotJoint } from "../../src/constraint/PivotJoint";
-import { DistanceJoint } from "../../src/constraint/DistanceJoint";
 import { Compound } from "../../src/phys/Compound";
 
 // ---------------------------------------------------------------------------
@@ -35,13 +33,6 @@ function stepSpace(space: Space, n = 60, dt = 1 / 60): void {
   for (let i = 0; i < n; i++) {
     space.step(dt, 10, 10);
   }
-}
-
-/** Check body identity by comparing position (body getter returns new wrapper). */
-function sameBody(a: Body, b: Body): boolean {
-  if (a == null && b == null) return true;
-  if (a == null || b == null) return false;
-  return a.position.x === b.position.x && a.position.y === b.position.y;
 }
 
 // ===========================================================================
@@ -78,9 +69,15 @@ describe("AngleJoint — coverage", () => {
 
   it("setter rejects NaN for jointMin/jointMax/ratio", () => {
     const j = new AngleJoint(b1, b2, -1, 1);
-    expect(() => { j.jointMin = NaN; }).toThrow("NaN");
-    expect(() => { j.jointMax = NaN; }).toThrow("NaN");
-    expect(() => { j.ratio = NaN; }).toThrow("NaN");
+    expect(() => {
+      j.jointMin = NaN;
+    }).toThrow("NaN");
+    expect(() => {
+      j.jointMax = NaN;
+    }).toThrow("NaN");
+    expect(() => {
+      j.ratio = NaN;
+    }).toThrow("NaN");
   });
 
   it("set jointMin/jointMax/ratio to new values", () => {
@@ -261,8 +258,12 @@ describe("MotorJoint — coverage", () => {
 
   it("setter rejects NaN for rate/ratio", () => {
     const j = new MotorJoint(b1, b2, 1);
-    expect(() => { j.rate = NaN; }).toThrow("NaN");
-    expect(() => { j.ratio = NaN; }).toThrow("NaN");
+    expect(() => {
+      j.rate = NaN;
+    }).toThrow("NaN");
+    expect(() => {
+      j.ratio = NaN;
+    }).toThrow("NaN");
   });
 
   it("simulation: motor drives angular velocity toward rate", () => {
@@ -373,7 +374,9 @@ describe("WeldJoint — coverage", () => {
 
   it("setter rejects NaN phase", () => {
     const j = new WeldJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0));
-    expect(() => { j.phase = NaN; }).toThrow("NaN");
+    expect(() => {
+      j.phase = NaN;
+    }).toThrow("NaN");
   });
 
   it("phase setter updates value", () => {
@@ -489,10 +492,17 @@ describe("PulleyJoint — coverage", () => {
 
   it("creates with 4 bodies and anchors", () => {
     const j = new PulleyJoint(
-      b1, b2, b3, b4,
-      Vec2.weak(0, 0), Vec2.weak(0, 0),
-      Vec2.weak(0, 0), Vec2.weak(0, 0),
-      0, 200, 1.0,
+      b1,
+      b2,
+      b3,
+      b4,
+      Vec2.weak(0, 0),
+      Vec2.weak(0, 0),
+      Vec2.weak(0, 0),
+      Vec2.weak(0, 0),
+      0,
+      200,
+      1.0,
     );
     expect(j.body1).toBeDefined();
     expect(j.body2).toBeDefined();
@@ -527,11 +537,21 @@ describe("PulleyJoint — coverage", () => {
   it("setter rejects NaN and negative for jointMin/jointMax/ratio", () => {
     const a = () => Vec2.weak(0, 0);
     const j = new PulleyJoint(b1, b2, b3, b4, a(), a(), a(), a(), 0, 200);
-    expect(() => { j.jointMin = NaN; }).toThrow("NaN");
-    expect(() => { j.jointMax = NaN; }).toThrow("NaN");
-    expect(() => { j.ratio = NaN; }).toThrow("NaN");
-    expect(() => { j.jointMin = -1; }).toThrow(">= 0");
-    expect(() => { j.jointMax = -1; }).toThrow(">= 0");
+    expect(() => {
+      j.jointMin = NaN;
+    }).toThrow("NaN");
+    expect(() => {
+      j.jointMax = NaN;
+    }).toThrow("NaN");
+    expect(() => {
+      j.ratio = NaN;
+    }).toThrow("NaN");
+    expect(() => {
+      j.jointMin = -1;
+    }).toThrow(">= 0");
+    expect(() => {
+      j.jointMax = -1;
+    }).toThrow(">= 0");
   });
 
   it("set jointMin/jointMax/ratio to new values", () => {
@@ -670,11 +690,7 @@ describe("LineJoint — coverage", () => {
   });
 
   it("creates with direction vector and limits", () => {
-    const j = new LineJoint(
-      b1, b2,
-      Vec2.weak(0, 0), Vec2.weak(0, 0),
-      Vec2.weak(0, 1), -50, 50,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50);
     expect(j.body1).toBeDefined();
     expect(j.body2).toBeDefined();
     expect(j.jointMin).toBeCloseTo(-50);
@@ -682,38 +698,38 @@ describe("LineJoint — coverage", () => {
   });
 
   it("rejects NaN jointMin/jointMax in constructor", () => {
-    expect(() => new LineJoint(
-      b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), NaN, 50,
-    )).toThrow("NaN");
-    expect(() => new LineJoint(
-      b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), 0, NaN,
-    )).toThrow("NaN");
+    expect(
+      () => new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), NaN, 50),
+    ).toThrow("NaN");
+    expect(
+      () => new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), 0, NaN),
+    ).toThrow("NaN");
   });
 
   it("rejects null anchors and direction", () => {
-    expect(() => new LineJoint(
-      b1, b2, null!, Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50,
-    )).toThrow("null");
-    expect(() => new LineJoint(
-      b1, b2, Vec2.weak(0, 0), null!, Vec2.weak(0, 1), -50, 50,
-    )).toThrow("null");
-    expect(() => new LineJoint(
-      b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), null!, -50, 50,
-    )).toThrow("null");
+    expect(() => new LineJoint(b1, b2, null!, Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50)).toThrow(
+      "null",
+    );
+    expect(() => new LineJoint(b1, b2, Vec2.weak(0, 0), null!, Vec2.weak(0, 1), -50, 50)).toThrow(
+      "null",
+    );
+    expect(() => new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), null!, -50, 50)).toThrow(
+      "null",
+    );
   });
 
   it("setter rejects NaN for jointMin/jointMax", () => {
-    const j = new LineJoint(
-      b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50,
-    );
-    expect(() => { j.jointMin = NaN; }).toThrow("NaN");
-    expect(() => { j.jointMax = NaN; }).toThrow("NaN");
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50);
+    expect(() => {
+      j.jointMin = NaN;
+    }).toThrow("NaN");
+    expect(() => {
+      j.jointMax = NaN;
+    }).toThrow("NaN");
   });
 
   it("set jointMin/jointMax to new values", () => {
-    const j = new LineJoint(
-      b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50);
     j.jointMin = -100;
     j.jointMax = 100;
     expect(j.jointMin).toBeCloseTo(-100);
@@ -721,11 +737,7 @@ describe("LineJoint — coverage", () => {
   });
 
   it("anchor and direction getters return correct values", () => {
-    const j = new LineJoint(
-      b1, b2,
-      Vec2.weak(1, 2), Vec2.weak(3, 4),
-      Vec2.weak(0, 1), -50, 50,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(1, 2), Vec2.weak(3, 4), Vec2.weak(0, 1), -50, 50);
 
     expect(j.anchor1.x).toBeCloseTo(1);
     expect(j.anchor2.x).toBeCloseTo(3);
@@ -733,11 +745,7 @@ describe("LineJoint — coverage", () => {
   });
 
   it("anchor and direction setters update values", () => {
-    const j = new LineJoint(
-      b1, b2,
-      Vec2.weak(0, 0), Vec2.weak(0, 0),
-      Vec2.weak(0, 1), -50, 50,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50);
 
     j.anchor1 = new Vec2(10, 20);
     j.anchor2 = new Vec2(30, 40);
@@ -749,11 +757,7 @@ describe("LineJoint — coverage", () => {
   });
 
   it("simulation: body slides along direction", () => {
-    const j = new LineJoint(
-      b1, b2,
-      Vec2.weak(0, 0), Vec2.weak(0, 0),
-      Vec2.weak(0, 1), -100, 100,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -100, 100);
     j.space = space;
 
     stepSpace(space, 60);
@@ -762,11 +766,7 @@ describe("LineJoint — coverage", () => {
   });
 
   it("simulation: jointMin/jointMax limit sliding range", () => {
-    const j = new LineJoint(
-      b1, b2,
-      Vec2.weak(0, 0), Vec2.weak(0, 0),
-      Vec2.weak(0, 1), 0, 30,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), 0, 30);
     j.space = space;
 
     stepSpace(space, 120);
@@ -775,11 +775,7 @@ describe("LineJoint — coverage", () => {
   });
 
   it("elastic line joint", () => {
-    const j = new LineJoint(
-      b1, b2,
-      Vec2.weak(0, 0), Vec2.weak(0, 0),
-      Vec2.weak(0, 1), -20, 20,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -20, 20);
     j.stiff = false;
     j.frequency = 5;
     j.damping = 0.5;
@@ -790,9 +786,7 @@ describe("LineJoint — coverage", () => {
   });
 
   it("impulse returns MatMN(2,1)", () => {
-    const j = new LineJoint(
-      b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50);
     j.space = space;
     stepSpace(space, 5);
     const imp = j.impulse();
@@ -800,18 +794,14 @@ describe("LineJoint — coverage", () => {
   });
 
   it("bodyImpulse throws for null and unlinked body", () => {
-    const j = new LineJoint(
-      b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50);
     expect(() => j.bodyImpulse(null!)).toThrow("null");
     const other = makeDynamic(999, 999);
     expect(() => j.bodyImpulse(other)).toThrow("not linked");
   });
 
   it("visitBodies throws for null lambda", () => {
-    const j = new LineJoint(
-      b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50);
     expect(() => j.visitBodies(null!)).toThrow("null");
   });
 });
@@ -851,26 +841,44 @@ describe("General Constraint features — coverage", () => {
     j.stiff = false;
 
     // Frequency must be > 0
-    expect(() => { j.frequency = 0; }).toThrow(">0");
-    expect(() => { j.frequency = -1; }).toThrow(">0");
-    expect(() => { j.frequency = NaN; }).toThrow("NaN");
+    expect(() => {
+      j.frequency = 0;
+    }).toThrow(">0");
+    expect(() => {
+      j.frequency = -1;
+    }).toThrow(">0");
+    expect(() => {
+      j.frequency = NaN;
+    }).toThrow("NaN");
 
     // Damping must be >= 0
-    expect(() => { j.damping = -1; }).toThrow(">=0");
+    expect(() => {
+      j.damping = -1;
+    }).toThrow(">=0");
     // Note: damping error says "Nan" (capital N, lowercase an)
-    expect(() => { j.damping = NaN; }).toThrow("Nan");
+    expect(() => {
+      j.damping = NaN;
+    }).toThrow("Nan");
   });
 
   it("maxForce validation", () => {
     const j = new MotorJoint(null, null, 1);
-    expect(() => { j.maxForce = NaN; }).toThrow("NaN");
-    expect(() => { j.maxForce = -1; }).toThrow(">=0");
+    expect(() => {
+      j.maxForce = NaN;
+    }).toThrow("NaN");
+    expect(() => {
+      j.maxForce = -1;
+    }).toThrow(">=0");
   });
 
   it("maxError validation", () => {
     const j = new AngleJoint(null, null, -1, 1);
-    expect(() => { j.maxError = NaN; }).toThrow("NaN");
-    expect(() => { j.maxError = -1; }).toThrow(">=0");
+    expect(() => {
+      j.maxError = NaN;
+    }).toThrow("NaN");
+    expect(() => {
+      j.maxError = -1;
+    }).toThrow(">=0");
   });
 
   it("removeOnBreak=false keeps constraint in space after break", () => {
@@ -985,7 +993,9 @@ describe("General Constraint features — coverage", () => {
     compound.space = space;
     expect(j.space).toBe(space);
 
-    expect(() => { j.space = null; }).toThrow("Compound");
+    expect(() => {
+      j.space = null;
+    }).toThrow("Compound");
 
     compound.constraints.remove(j);
     expect(j.compound).toBeNull();
@@ -1133,11 +1143,7 @@ describe("General Constraint features — coverage", () => {
     const b3 = makeDynamic(100, 0);
     b3.space = space;
 
-    const j = new LineJoint(
-      b1, b2,
-      Vec2.weak(0, 0), Vec2.weak(0, 0),
-      Vec2.weak(0, 1), -50, 50,
-    );
+    const j = new LineJoint(b1, b2, Vec2.weak(0, 0), Vec2.weak(0, 0), Vec2.weak(0, 1), -50, 50);
     j.space = space;
 
     j.body2 = b3;

@@ -20,10 +20,8 @@ import { Circle } from "../../src/shape/Circle";
 import { Polygon } from "../../src/shape/Polygon";
 import { Material } from "../../src/phys/Material";
 import { FluidProperties } from "../../src/phys/FluidProperties";
-import { InteractionFilter } from "../../src/dynamics/InteractionFilter";
 import { ArbiterType } from "../../src/dynamics/ArbiterType";
 import { Arbiter } from "../../src/dynamics/Arbiter";
-import { CollisionArbiter } from "../../src/dynamics/CollisionArbiter";
 import { FluidArbiter } from "../../src/dynamics/FluidArbiter";
 import { InteractionListener } from "../../src/callbacks/InteractionListener";
 import { CbEvent } from "../../src/callbacks/CbEvent";
@@ -606,8 +604,7 @@ describe("FluidArbiter coverage — buoyancy and drag", () => {
 
     expect(captured).not.toBeNull();
     expect(capturedBase).not.toBeNull();
-    const body =
-      capturedBase!.body1 === ball ? ball : capturedBase!.body2;
+    const body = capturedBase!.body1 === ball ? ball : capturedBase!.body2;
     const buoy = captured!.buoyancyImpulse(body);
     const drag = captured!.dragImpulse(body);
     expect(typeof buoy.x).toBe("number");

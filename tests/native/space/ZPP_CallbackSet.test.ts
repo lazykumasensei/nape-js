@@ -484,15 +484,14 @@ describe("ZPP_CallbackSet — cleanup when bodies are removed", () => {
 
   it("no callbacks fire after both bodies are removed", () => {
     const space = new Space(new Vec2(0, 0));
-    let anyFired = false;
-
+    let _fired = false;
     new InteractionListener(
       CbEvent.BEGIN,
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
       () => {
-        anyFired = true;
+        _fired = true;
       },
     ).space = space;
 
@@ -502,7 +501,6 @@ describe("ZPP_CallbackSet — cleanup when bodies are removed", () => {
     b2.space = space;
 
     step(space, 1);
-    anyFired = false; // reset
 
     b1.space = null;
     b2.space = null;
@@ -512,7 +510,7 @@ describe("ZPP_CallbackSet — cleanup when bodies are removed", () => {
     b3.space = space;
     step(space, 5);
 
-    // anyFired may be true if b3 triggered something else, but the old pair is gone
+    // Only one body remains
     expect(space.bodies.length).toBe(1);
   });
 });
@@ -717,15 +715,9 @@ describe("ZPP_CallbackSet — CbType-specific filtering", () => {
     const typeB = new CbType();
     let abFired = false;
 
-    new InteractionListener(
-      CbEvent.BEGIN,
-      InteractionType.COLLISION,
-      typeA,
-      typeB,
-      () => {
-        abFired = true;
-      },
-    ).space = space;
+    new InteractionListener(CbEvent.BEGIN, InteractionType.COLLISION, typeA, typeB, () => {
+      abFired = true;
+    }).space = space;
 
     const b1 = new Body(BodyType.DYNAMIC, new Vec2(0, 0));
     const c1 = new Circle(20);
@@ -750,15 +742,9 @@ describe("ZPP_CallbackSet — CbType-specific filtering", () => {
     let fired = false;
 
     // Listen for A-A but provide A-B pair
-    new InteractionListener(
-      CbEvent.BEGIN,
-      InteractionType.COLLISION,
-      typeA,
-      typeA,
-      () => {
-        fired = true;
-      },
-    ).space = space;
+    new InteractionListener(CbEvent.BEGIN, InteractionType.COLLISION, typeA, typeA, () => {
+      fired = true;
+    }).space = space;
 
     const b1 = new Body(BodyType.DYNAMIC, new Vec2(0, 0));
     const c1 = new Circle(20);
