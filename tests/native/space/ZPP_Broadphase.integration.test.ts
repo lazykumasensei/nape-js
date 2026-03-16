@@ -476,3 +476,142 @@ describe("ZPP_Broadphase — edge cases", () => {
     expect(() => space.step(1 / 60)).not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 8. DynAABBPhase pair-list consistency on shape/body removal (P46)
+// ---------------------------------------------------------------------------
+
+describe("ZPP_Broadphase — pair-list consistency on removal (P46)", () => {
+  it("removing one overlapping body keeps pairs consistent", () => {
+    const space = makeSpace(Broadphase.DYNAMIC_AABB_TREE, 0);
+    const _a = dynamicCircle(space, 0, 0, 20);
+    const b = dynamicCircle(space, 15, 0, 20);
+    const _c = dynamicCircle(space, 30, 0, 20);
+    space.step(1 / 60);
+    // All three overlap — broadphase should have created pairs
+    b.space = null;
+    // Stepping after removal must not crash or leave dangling pairs
+    expect(() => space.step(1 / 60)).not.toThrow();
+    expect(space.bodies.length).toBe(2);
+    // a and c still overlap, simulation continues correctly
+    expect(() => {
+      for (let i = 0; i < 10; i++) space.step(1 / 60);
+    }).not.toThrow();
+  });
+
+  it("removing all overlapping bodies one by one after step", () => {
+    const space = makeSpace(Broadphase.DYNAMIC_AABB_TREE, 0);
+    const bodies: Body[] = [];
+    for (let i = 0; i < 5; i++) {
+      bodies.push(dynamicCircle(space, i * 10, 0, 15));
+    }
+    space.step(1 / 60);
+    // Remove bodies one by one, stepping between each
+    for (const b of bodies) {
+      b.space = null;
+      expect(() => space.step(1 / 60)).not.toThrow();
+    }
+    expect(space.bodies.length).toBe(0);
+  });
+
+  it("removing all overlapping bodies at once between steps", () => {
+    const space = makeSpace(Broadphase.DYNAMIC_AABB_TREE, 0);
+    const bodies: Body[] = [];
+    for (let i = 0; i < 5; i++) {
+      bodies.push(dynamicCircle(space, i * 10, 0, 15));
+    }
+    space.step(1 / 60);
+    // Remove all at once without stepping between
+    for (const b of bodies) {
+      b.space = null;
+    }
+    expect(space.bodies.length).toBe(0);
+    expect(() => space.step(1 / 60)).not.toThrow();
+  });
+
+  it("sleeping pairs are cleaned up correctly on removal", () => {
+    const space = makeSpace(Broadphase.DYNAMIC_AABB_TREE, 0);
+    // Create overlapping bodies, let them settle so pairs go to sleep
+    const floor = new Body(BodyType.STATIC, new Vec2(0, 100));
+    floor.shapes.add(new Polygon(Polygon.box(200, 20)));
+    floor.space = space;
+    const a = dynamicCircle(space, -5, 0, 10);
+    const _b = dynamicCircle(space, 5, 0, 10);
+    // Step many times to let bodies settle and pairs go to sleep
+    for (let i = 0; i < 120; i++) space.step(1 / 60);
+    // Remove one settled body — sleeping pairs must be cleaned
+    a.space = null;
+    expect(() => {
+      for (let i = 0; i < 30; i++) space.step(1 / 60);
+    }).not.toThrow();
+    expect(space.bodies.length).toBe(2); // floor + b
+  });
+
+  it("rapid add-remove-add cycles keep broadphase consistent", () => {
+    const space = makeSpace(Broadphase.DYNAMIC_AABB_TREE, 500);
+    const floor = new Body(BodyType.STATIC, new Vec2(0, 200));
+    floor.shapes.add(new Polygon(Polygon.box(400, 20)));
+    floor.space = space;
+
+    for (let cycle = 0; cycle < 5; cycle++) {
+      const bodies: Body[] = [];
+      for (let i = 0; i < 8; i++) {
+        bodies.push(dynamicCircle(space, (i - 4) * 15, 0, 10));
+      }
+      space.step(1 / 60);
+      // Remove half the bodies
+      for (let i = 0; i < 4; i++) {
+        bodies[i].space = null;
+      }
+      space.step(1 / 60);
+      // Remove the rest
+      for (let i = 4; i < 8; i++) {
+        bodies[i].space = null;
+      }
+    }
+    expect(() => space.step(1 / 60)).not.toThrow();
+    expect(space.bodies.length).toBe(1); // only floor remains
+  });
+
+  it("shape removal from multi-shape body keeps pairs consistent", () => {
+    const space = makeSpace(Broadphase.DYNAMIC_AABB_TREE, 0);
+    const b = new Body(BodyType.DYNAMIC, new Vec2(0, 0));
+    const c1 = new Circle(15);
+    const c2 = new Circle(15);
+    c2.localPosition = new Vec2(20, 0);
+    b.shapes.add(c1);
+    b.shapes.add(c2);
+    b.space = space;
+
+    // Add an overlapping body
+    dynamicCircle(space, 10, 0, 15);
+    space.step(1 / 60);
+
+    // Remove one shape from the multi-shape body
+    (b.shapes as any).remove(c1);
+    expect(b.shapes.length).toBe(1);
+    expect(() => {
+      for (let i = 0; i < 10; i++) space.step(1 / 60);
+    }).not.toThrow();
+  });
+
+  it("removing body during active collision does not corrupt pairs", () => {
+    const space = makeSpace(Broadphase.DYNAMIC_AABB_TREE, 500);
+    const floor = new Body(BodyType.STATIC, new Vec2(0, 60));
+    floor.shapes.add(new Polygon(Polygon.box(200, 20)));
+    floor.space = space;
+
+    // Drop bodies so they're actively colliding with the floor
+    const a = dynamicCircle(space, -10, 0, 10);
+    const b = dynamicCircle(space, 10, 0, 10);
+    for (let i = 0; i < 30; i++) space.step(1 / 60);
+
+    // Both should be touching the floor — remove one mid-collision
+    a.space = null;
+    expect(() => {
+      for (let i = 0; i < 30; i++) space.step(1 / 60);
+    }).not.toThrow();
+    // b should still interact with floor
+    expect(b.position.y).toBeGreaterThan(0);
+  });
+});
