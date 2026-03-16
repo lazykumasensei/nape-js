@@ -633,18 +633,30 @@ water.space = space;
 // Boat — V-hull with flat deck and cabin
 const boat = new Body(BodyType.DYNAMIC, new Vec2(W / 2, waterY - 10));
 // Keel (V-shaped bottom)
-boat.shapes.add(new Polygon([
+const keel = new Polygon([
   new Vec2(-38, 0), new Vec2(50, 0),
   new Vec2(58, 6), new Vec2(0, 14), new Vec2(-42, 10),
-]));
+]);
+keel.material.density = 0.25;
+keel.material.elasticity = 0.1;
+keel.material.dynamicFriction = 0.4;
+keel.material.staticFriction = 0.4;
+boat.shapes.add(keel);
 // Deck (flat top)
-boat.shapes.add(new Polygon([
+const deck = new Polygon([
   new Vec2(-38, -4), new Vec2(50, -4),
   new Vec2(50, 0), new Vec2(-38, 0),
-]));
-for (const s of boat.shapes) {
-  s.material.density = 0.25;
-}
+]);
+deck.material.density = 0.2;
+deck.material.elasticity = 0.1;
+boat.shapes.add(deck);
+// Cabin (small box on top)
+const cabin = new Polygon([
+  new Vec2(-12, -16), new Vec2(8, -16),
+  new Vec2(8, -4), new Vec2(-12, -4),
+]);
+cabin.material.density = 0.15;
+boat.shapes.add(cabin);
 boat.space = space;
 
 // Drop some objects
@@ -678,6 +690,25 @@ function loop() {
 
   for (const body of space.bodies) drawBody(body);
 
+  // Boat mast + flag
+  ctx.save();
+  ctx.translate(boat.position.x, boat.position.y);
+  ctx.rotate(boat.rotation);
+  ctx.strokeStyle = "#c8a060";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-5, -18);
+  ctx.lineTo(-5, -55);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(248,81,73,0.8)";
+  ctx.beginPath();
+  ctx.moveTo(-5, -55);
+  ctx.lineTo(15, -47);
+  ctx.lineTo(-5, -40);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
   // Water overlay with wave surface
   ctx.save();
   ctx.beginPath();
@@ -704,5 +735,24 @@ function loop() {
 
   requestAnimationFrame(loop);
 }
-loop();`,
+loop();
+
+// Click to drop random objects
+canvas.addEventListener("click", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width;
+  const sy = canvas.height / rect.height;
+  const cx = (e.clientX - rect.left) * sx;
+  const cy = (e.clientY - rect.top) * sy;
+  const spawnY = Math.min(cy, waterY - 30);
+  const b = new Body(BodyType.DYNAMIC, new Vec2(cx, spawnY));
+  if (Math.random() < 0.5) {
+    b.shapes.add(new Circle(8 + Math.random() * 12));
+  } else {
+    const sz = 12 + Math.random() * 18;
+    b.shapes.add(new Polygon(Polygon.box(sz, sz)));
+  }
+  b.shapes.at(0).material.density = 0.3 + Math.random() * 6;
+  b.space = space;
+});`,
 };
