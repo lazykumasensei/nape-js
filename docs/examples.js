@@ -163,7 +163,7 @@ function createCard(demo, { onTagClick } = {}) {
     btn2d.classList.toggle("active", mode === "2d");
     btn3d.classList.toggle("active", mode === "3d");
     btnPixi.classList.toggle("active", mode === "pixi");
-    runner.setMode(adapterId);
+    await runner.setMode(adapterId);
     updateUrlForCard(demo.id, { mode: cardMode, outline: runner.debugDraw });
   });
 
@@ -400,7 +400,7 @@ function createCard(demo, { onTagClick } = {}) {
       btn2d.classList.toggle("active", mode === "2d");
       btn3d.classList.toggle("active", mode === "3d");
       btnPixi.classList.toggle("active", mode === "pixi");
-      runner.setMode(adapterId);
+      await runner.setMode(adapterId);
       outlineToggleBtn.classList.toggle("active", runner.debugDraw);
     },
     setOutline: (val) => {

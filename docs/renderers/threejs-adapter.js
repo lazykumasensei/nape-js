@@ -143,11 +143,7 @@ export class ThreeJSAdapter {
     this.#camera = null;
     this.#meshes = [];
 
-    // Restore container height
-    if (this.#container) {
-      this.#container.style.height = "";
-      this.#container = null;
-    }
+    this.#container = null;
   }
 
   isAttached() {

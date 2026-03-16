@@ -224,7 +224,7 @@ export class DemoRunner {
    * Switch render mode to a different adapter.
    * @param {string} adapterId — e.g. "canvas2d", "threejs", "pixijs"
    */
-  setMode(adapterId) {
+  async setMode(adapterId) {
     if (this.#activeAdapter?.id === adapterId) return;
 
     const adapter = this.#adapters.get(adapterId);
@@ -232,6 +232,12 @@ export class DemoRunner {
 
     const wasRunning = this.isRunning;
     this.stop();
+
+    // Pin container height before detaching, so new adapter can read it
+    if (this.#container) {
+      const cr = this.#container.getBoundingClientRect();
+      this.#container.style.height = `${cr.height}px`;
+    }
 
     // Detach old adapter
     if (this.#activeAdapter) {
@@ -244,9 +250,10 @@ export class DemoRunner {
       }
     }
 
-    // Attach new adapter (if not already attached)
+    // Attach new adapter (if not already attached).
+    // Await in case attach() is async (e.g. PixiJS app.init()).
     if (!adapter.isAttached()) {
-      adapter.attach(this.#container, this.#W, this.#H);
+      await adapter.attach(this.#container, this.#W, this.#H);
     } else if (adapter.show) {
       adapter.show();
     }

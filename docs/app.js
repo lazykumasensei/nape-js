@@ -173,7 +173,7 @@ document.getElementById("renderModeToggle").addEventListener("click", async (e) 
   document.querySelectorAll(".card-render-btn").forEach(b => {
     b.classList.toggle("active", b.dataset.mode === mode);
   });
-  runner.setMode(adapterId);
+  await runner.setMode(adapterId);
   updateCodePreview();
 });
 

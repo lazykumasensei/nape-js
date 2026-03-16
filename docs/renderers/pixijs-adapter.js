@@ -59,10 +59,6 @@ export class PixiJSAdapter {
     this.#W = W;
     this.#H = H;
 
-    // Pin container height (same pattern as ThreeJS adapter)
-    const cr = container.getBoundingClientRect();
-    container.style.height = `${cr.height}px`;
-
     this.#app = new _PIXI.Application();
     await this.#app.init({
       width: W,
@@ -71,10 +67,14 @@ export class PixiJSAdapter {
       antialias: true,
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
+      autoStart: false,
     });
+    // We drive rendering manually from DemoRunner's rAF loop,
+    // so stop the built-in ticker to avoid double-rendering.
+    this.#app.ticker.stop();
 
     this.#app.canvas.style.cssText =
-      "display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:contain";
+      "display:block;position:absolute;inset:0;width:100%;height:100%";
     container.appendChild(this.#app.canvas);
   }
 
@@ -85,10 +85,7 @@ export class PixiJSAdapter {
       this.#app = null;
     }
     this.#bodyGraphics.clear();
-    if (this.#container) {
-      this.#container.style.height = "";
-      this.#container = null;
-    }
+    this.#container = null;
   }
 
   isAttached() {
@@ -139,7 +136,7 @@ export class PixiJSAdapter {
       gfx.rotation = body.rotation;
     }
 
-    // PixiJS renders automatically via its ticker, but we force a manual render
+    // Ticker is stopped; we drive rendering manually from DemoRunner's rAF loop
     this.#app.render();
   }
 
