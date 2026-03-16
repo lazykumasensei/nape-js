@@ -176,9 +176,9 @@ const sceneObjects = [
   spawnObject(710,         H * 0.50 - 25, "circle", 11),
   // Lelógó elemek — mennyezetről
   spawnHanging(160,  WALL,       110, "circle", 16),
-  spawnHanging(W/2,  H * 0.65,   60, "box",    20),
+  spawnHanging(W/2,  H * 0.65,   60, "circle", 20),
   spawnHanging(740,  WALL,       120, "circle", 13),
-  spawnHanging(310,  WALL,        70, "box",    16),
+  spawnHanging(310,  WALL,        70, "circle", 16),
   spawnHanging(610,  WALL,        80, "circle", 11),
 ];
 
@@ -310,6 +310,25 @@ function buildStateFrame() {
   return buf;
 }
 
+// Build a full snapshot of ALL dynamic bodies (used for new client sync)
+function buildFullSnapshot() {
+  const all = [];
+  for (const [id, body] of dynamicBodies) {
+    all.push({ id, x: body.position.x, y: body.position.y, rot: body.rotation });
+  }
+  if (all.length === 0) return null;
+  const buf = Buffer.allocUnsafe(2 + all.length * 14);
+  buf.writeUInt16LE(all.length, 0);
+  let offset = 2;
+  for (const { id, x, y, rot } of all) {
+    buf.writeUInt16LE(id, offset);     offset += 2;
+    buf.writeFloatLE(x,   offset);     offset += 4;
+    buf.writeFloatLE(y,   offset);     offset += 4;
+    buf.writeFloatLE(rot, offset);     offset += 4;
+  }
+  return buf;
+}
+
 // ─── Broadcast helpers ────────────────────────────────────────────────────────
 
 function broadcastBinary(buf) {
@@ -355,9 +374,37 @@ function buildInitPacket(playerId, bodyId, colorIdx) {
   };
 }
 
+// ─── Moving platform ─────────────────────────────────────────────────────────
+// The lowest platform oscillates left-right as a kinematic body.
+
+const MOVING_PLAT_SPEED = 60;    // px/s
+const MOVING_PLAT_RANGE = 200;   // total travel distance (±100 from center)
+const movingPlatCenterX = W / 2;
+const movingPlatY = H - WALL / 2 - 30;  // just above the floor
+
+const movingPlatBody = new Body(BodyType.KINEMATIC, new Vec2(movingPlatCenterX, movingPlatY));
+movingPlatBody.shapes.add(new Polygon(Polygon.box(140, 14)));
+movingPlatBody.space = space;
+const movingPlatId = nextBodyId++;
+dynamicBodies.set(movingPlatId, movingPlatBody);
+
+// Track in sceneObjects so clients know how to render it
+const movingPlatDesc = { id: movingPlatId, shape: "box", size: 0, x: movingPlatCenterX, y: movingPlatY, w: 140, h: 14, moving: true };
+sceneObjects.push(movingPlatDesc);
+
+let movingPlatDir = 1; // 1 = right, -1 = left
+
+function updateMovingPlatform() {
+  const x = movingPlatBody.position.x;
+  if (x >= movingPlatCenterX + MOVING_PLAT_RANGE / 2) movingPlatDir = -1;
+  if (x <= movingPlatCenterX - MOVING_PLAT_RANGE / 2) movingPlatDir = 1;
+  movingPlatBody.velocity = new Vec2(MOVING_PLAT_SPEED * movingPlatDir, 0);
+}
+
 // ─── Main loop ────────────────────────────────────────────────────────────────
 
 setInterval(() => {
+  updateMovingPlatform();
   applyPlayerInputs();
   space.step(TICK_MS / 1000);
   const frame = buildStateFrame();
@@ -403,6 +450,9 @@ wss.on("connection", (ws) => {
       playerColors: PLAYER_COLORS,
       players: [...players.entries()].map(([id, p]) => ({ id, colorIdx: p.colorIdx, bodyId: p.bodyId })),
     }));
+    // Send full snapshot so the spectator sees all current positions immediately
+    const snap = buildFullSnapshot();
+    if (snap) ws.send(snap);
     broadcastPlayerList();
 
     ws.on("message", (data) => {
@@ -426,6 +476,9 @@ wss.on("connection", (ws) => {
   console.log(`Player ${playerId} connected (body ${bodyId}), total: ${players.size}`);
 
   ws.send(JSON.stringify(buildInitPacket(playerId, bodyId, colorIdx)));
+  // Send full snapshot so the client sees all current positions immediately
+  const snapshot = buildFullSnapshot();
+  if (snapshot) ws.send(snapshot);
   broadcastPlayerList();
 
   ws.on("message", (data) => {

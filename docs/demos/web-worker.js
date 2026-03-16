@@ -526,6 +526,7 @@ import {
   Space, Body, BodyType, Vec2, Circle, Polygon,
 } from "https://cdn.jsdelivr.net/npm/@newkrok/nape-js/dist/index.js";
 
+const W = canvas.width, H = canvas.height;
 const BODY_COUNT = 300;
 const FLOATS_PER_BODY = 3;
 const HEADER_FLOATS = 3;

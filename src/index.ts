@@ -97,6 +97,9 @@ export type {
   ConvexResultList,
 } from "./util/listTypes";
 
+// Helpers
+export { createConcaveBody, type ConcaveBodyOptions } from "./helpers/createConcaveBody";
+
 // List/Iterator registration (side-effect import — registers all typed list pairs)
 import "./util/registerLists";
 

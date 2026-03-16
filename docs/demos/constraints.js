@@ -1,19 +1,33 @@
 import {
-  Body, BodyType, Vec2, Circle, Polygon,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
+  Body, BodyType, Vec2, Polygon,
+  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, PulleyJoint,
 } from '../nape-js.esm.js';
 import { addWalls } from '../demo-runner.js';
 import { drawBody, drawGrid } from '../renderer.js';
 
-// ── Layout helpers ────────────────────────────────────────────────────────────
+// ── Layout ──────────────────────────────────────────────────────────────────
 const T = 20; // wall thickness
+const COLS = 3;
+const ROWS = 3;
+const SIZE = 14; // half-size of each box (smaller for clarity)
 
-function cellCenter(col, row, W, H) {
-  const cw = (W - 2 * T) / 3;
-  const ch = (H - 2 * T) / 2;
+// Per-cell color indices (each constraint gets its own color pair)
+const COLORS = {
+  pivot:    [0, 0],  // blue
+  weld:     [4, 5],  // purple, teal
+  distance: [1, 1],  // yellow
+  line:     [2, 2],  // green
+  pulley:   [3, 3],  // red
+  angle:    [4, 4],  // purple
+  motor:    [3, 3],  // red
+};
+
+function cellOrigin(col, row, W, H) {
+  const cw = (W - 2 * T) / COLS;
+  const ch = (H - 2 * T) / ROWS;
   return {
-    x: T + col * cw + cw / 2,
-    y: T + row * ch + ch / 2,
+    cx: T + col * cw + cw / 2,
+    cy: T + row * ch + ch / 2,
     cw,
     ch,
     left: T + col * cw,
@@ -21,9 +35,18 @@ function cellCenter(col, row, W, H) {
   };
 }
 
-// ── Drawing helpers ───────────────────────────────────────────────────────────
+// ── Drawing helpers ─────────────────────────────────────────────────────────
+function drawPin(ctx, x, y, color = '#58a6ff') {
+  ctx.beginPath();
+  ctx.arc(x, y, 4, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff44';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
 
-function drawSpring(ctx, x1, y1, x2, y2, coils = 8, amp = 5) {
+function drawSpring(ctx, x1, y1, x2, y2, color = '#d29922', coils = 8, amp = 4) {
   const dx = x2 - x1, dy = y2 - y1;
   const len = Math.sqrt(dx * dx + dy * dy);
   if (len < 2) return;
@@ -39,569 +62,622 @@ function drawSpring(ctx, x1, y1, x2, y2, coils = 8, amp = 5) {
     ctx.lineTo(x1 + ux * len * t + px * amp * sign, y1 + uy * len * t + py * amp * sign);
   }
   ctx.lineTo(x2, y2);
-  ctx.strokeStyle = '#d2992299';
+  ctx.strokeStyle = color + '99';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([]);
   ctx.stroke();
 }
 
-function drawPin(ctx, x, y, color = '#f85149') {
+function drawDashedLine(ctx, x1, y1, x2, y2, color = '#ffffff33') {
   ctx.beginPath();
-  ctx.arc(x, y, 5, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = '#ffffff55';
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.strokeStyle = color;
   ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// Small "pin" icon for pinned bodies — hollow ring
+function drawPinnedMarker(ctx, x, y) {
+  ctx.beginPath();
+  ctx.arc(x, y, 3, 0, Math.PI * 2);
+  ctx.strokeStyle = '#ffffff66';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 }
+
+// ── Module-level drag state ─────────────────────────────────────────────────
+let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0;
+let _dragY = 0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default {
   id: 'constraints',
   label: 'Constraints Showcase',
-  tags: ['PivotJoint', 'DistanceJoint', 'AngleJoint', 'WeldJoint', 'MotorJoint', 'LineJoint'],
+  tags: ['PivotJoint', 'DistanceJoint', 'AngleJoint', 'WeldJoint', 'MotorJoint', 'LineJoint', 'PulleyJoint'],
   featured: true,
   featuredOrder: 4,
-  desc: 'All 6 built-in constraint types in a 2×3 grid. <b>Drag</b> any body to feel how each constraint reacts.',
+  desc: 'All 7 built-in constraint types in a 3×3 grid (original nape layout). <b>Drag</b> any body to feel how each constraint reacts.',
 
-  // Stored refs for custom rendering
-  _pAnchor: null,
-  _pBar: null,
-  _dAnchor: null,
-  _dBall: null,
-  _aAnchor: null,
-  _aBar: null,
-  _aLimits: null,
-  _w1: null,
-  _w2: null,
-  _mAnchor: null,
-  _lAnchor: null,
-  _lLimits: null,
-
-  // Mouse-drag state
-  _mouseBody: null,
-  _mouseJoint: null,
-  _dragTarget: null,
+  // Body refs for constraint rendering
+  _bodies: {},
+  // Track which bodies are pinned (for visual indicator)
+  _pinnedBodies: null,
 
   setup(space, W, H) {
-    space.gravity = new Vec2(0, 300);
+    space.gravity = new Vec2(0, 600);
     addWalls(space, W, H);
 
-    // ── PivotJoint (col=0, row=0) — pendulum bar ────────────────────────────
+    this._bodies = {};
+    this._pinnedBodies = new Set();
+
+    // ── Cell divider walls (thin static bodies, like original nape demo) ──
+    const cw = (W - 2 * T) / COLS;
+    const ch = (H - 2 * T) / ROWS;
+    const dividers = new Body(BodyType.STATIC);
+    for (let c = 1; c < COLS; c++) {
+      const x = T + c * cw;
+      dividers.shapes.add(new Polygon(Polygon.rect(x - 0.5, 0, 1, H)));
+    }
+    for (let r = 1; r < ROWS; r++) {
+      const y = T + r * ch;
+      dividers.shapes.add(new Polygon(Polygon.rect(0, y - 0.5, W, 1)));
+    }
+    dividers.space = space;
+
+    // Constraint settings (matching original nape demo)
+    const frequency = 20;
+    const damping = 1;
+
+    function format(c) {
+      c.stiff = false;
+      c.frequency = frequency;
+      c.damping = damping;
+      c.space = space;
+    }
+
+    const pinnedSet = this._pinnedBodies;
+    function box(x, y, pinned = false, colorIdx = 0) {
+      const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+      b.shapes.add(new Polygon(Polygon.box(SIZE * 2, SIZE * 2)));
+      try { b.userData._colorIdx = colorIdx; } catch (_) {}
+      b.space = space;
+      if (pinned) {
+        const pin = new PivotJoint(space.world, b, new Vec2(x, y), new Vec2(0, 0));
+        pin.space = space;
+        pinnedSet.add(b);
+      }
+      return b;
+    }
+
+    // ── PivotJoint (col=1, row=0) ─────────────────────────────────────────
     {
-      const { x, top } = cellCenter(0, 0, W, H);
-      const ay = top + 28;
+      const { cx, cy, cw } = cellOrigin(1, 0, W, H);
+      const b1 = box(cx - cw / 6, cy, false, COLORS.pivot[0]);
+      const b2 = box(cx + cw / 6, cy, false, COLORS.pivot[1]);
+      const pivot = new Vec2(cx, cy);
+      format(new PivotJoint(
+        b1, b2,
+        b1.worldPointToLocal(pivot),
+        b2.worldPointToLocal(pivot),
+      ));
+      this._bodies.pivot = { b1, b2, px: cx, py: cy };
+    }
 
-      const anchor = new Body(BodyType.STATIC, new Vec2(x, ay));
-      anchor.shapes.add(new Circle(4));
-      anchor.space = space;
+    // ── WeldJoint (col=2, row=0) ──────────────────────────────────────────
+    {
+      const { cx, cy, cw } = cellOrigin(2, 0, W, H);
+      const gap = SIZE + 2; // bodies nearly touching
+      const b1 = box(cx - gap, cy, false, COLORS.weld[0]);
+      const b2 = box(cx + gap, cy, false, COLORS.weld[1]);
+      const weld = new Vec2(cx, cy);
+      format(new WeldJoint(
+        b1, b2,
+        b1.worldPointToLocal(weld),
+        b2.worldPointToLocal(weld),
+        0, // no phase — bodies stay aligned
+      ));
+      this._bodies.weld = { b1, b2 };
+    }
 
-      // Pivot at bar's left end (local offset -40,0) so it hangs like a pendulum
-      const bar = new Body(BodyType.DYNAMIC, new Vec2(x + 40, ay));
-      bar.shapes.add(new Polygon(Polygon.box(80, 10)));
-      try { bar.userData._colorIdx = 0; } catch (_) {}
-      bar.angularVel = 1.5;
+    // ── DistanceJoint (col=0, row=1) ──────────────────────────────────────
+    {
+      const { cx, cy, cw, top } = cellOrigin(0, 1, W, H);
+      const startY = top + SIZE * 2; // start near top of cell so spring effect is visible
+      const b1 = box(cx - cw * 0.12, startY, false, COLORS.distance[0]);
+      const b2 = box(cx + cw * 0.12, startY, false, COLORS.distance[1]);
+      format(new DistanceJoint(
+        b1, b2,
+        new Vec2(0, -SIZE),
+        new Vec2(0, -SIZE),
+        cw / 3 * 0.75,
+        cw / 3 * 1.25,
+      ));
+      this._bodies.distance = { b1, b2 };
+    }
+
+    // ── LineJoint (col=1, row=1) ──────────────────────────────────────────
+    {
+      const { cx, cy, cw } = cellOrigin(1, 1, W, H);
+      const b1 = box(cx - cw / 6, cy, false, COLORS.line[0]);
+      const b2 = box(cx + cw / 6, cy, false, COLORS.line[1]);
+      const anchor = new Vec2(cx, cy);
+      format(new LineJoint(
+        b1, b2,
+        b1.worldPointToLocal(anchor),
+        b2.worldPointToLocal(anchor),
+        new Vec2(0, 1),
+        -SIZE,
+        SIZE,
+      ));
+      this._bodies.line = { b1, b2, ax: cx, ay: cy };
+    }
+
+    // ── PulleyJoint (col=2, row=1) ────────────────────────────────────────
+    {
+      const { cx, cy, cw, ch, top } = cellOrigin(2, 1, W, H);
+      const barW = SIZE * 4; // narrower bar
+      // Bar at top (pinned)
+      const bar = new Body(BodyType.DYNAMIC, new Vec2(cx, top + SIZE + 8));
+      bar.shapes.add(new Polygon(Polygon.box(barW, SIZE)));
+      try { bar.userData._colorIdx = COLORS.pulley[0]; } catch (_) {}
       bar.space = space;
+      const pinBar = new PivotJoint(space.world, bar, new Vec2(cx, top + SIZE + 8), new Vec2(0, 0));
+      pinBar.space = space;
+      pinnedSet.add(bar);
 
-      new PivotJoint(anchor, bar, new Vec2(0, 0), new Vec2(-40, 0)).space = space;
-
-      this._pAnchor = anchor;
-      this._pBar = bar;
+      const hangGap = barW / 2 - SIZE; // hang points near bar ends
+      const b2 = box(cx - hangGap, cy - ch * 0.1, false, COLORS.pulley[0]);
+      const b3 = box(cx + hangGap, cy - ch * 0.1, false, COLORS.pulley[1]);
+      format(new PulleyJoint(
+        bar, b2,
+        bar, b3,
+        new Vec2(-hangGap, 0), new Vec2(0, -SIZE / 2),
+        new Vec2(hangGap, 0), new Vec2(0, -SIZE),
+        ch * 0.6,
+        ch * 0.6,
+        2.5,
+      ));
+      this._bodies.pulley = { bar, b2, b3, hangGap };
     }
 
-    // ── DistanceJoint (col=1, row=0) — bouncy spring ────────────────────────
+    // ── AngleJoint (col=0, row=2) ─────────────────────────────────────────
     {
-      const { x, top } = cellCenter(1, 0, W, H);
-      const ay = top + 30;
-
-      const anchor = new Body(BodyType.STATIC, new Vec2(x, ay));
-      anchor.shapes.add(new Circle(4));
-      anchor.space = space;
-
-      const ball = new Body(BodyType.DYNAMIC, new Vec2(x, ay + 100));
-      ball.shapes.add(new Circle(18));
-      try { ball.userData._colorIdx = 1; } catch (_) {}
-      ball.space = space;
-
-      const dj = new DistanceJoint(anchor, ball, new Vec2(0, 0), new Vec2(0, 0), 75, 125);
-      dj.stiff = false;
-      dj.frequency = 2.5;
-      dj.damping = 0.2;
-      dj.space = space;
-
-      this._dAnchor = anchor;
-      this._dBall = ball;
+      const { cx, cy, cw } = cellOrigin(0, 2, W, H);
+      const b1 = box(cx - cw / 6, cy, true, COLORS.angle[0]);
+      const b2 = box(cx + cw / 6, cy, true, COLORS.angle[1]);
+      format(new AngleJoint(
+        b1, b2,
+        -Math.PI * 1.5,
+        Math.PI * 1.5,
+        2,
+      ));
+      this._bodies.angle = { b1, b2 };
     }
 
-    // ── AngleJoint (col=2, row=0) — rotation-limited pendulum ───────────────
+    // ── MotorJoint (col=1, row=2) ─────────────────────────────────────────
     {
-      const { x, top } = cellCenter(2, 0, W, H);
-      const ay = top + 28;
-      const limits = { min: -Math.PI / 3, max: Math.PI / 3 };
-
-      const anchor = new Body(BodyType.STATIC, new Vec2(x, ay));
-      anchor.shapes.add(new Circle(4));
-      anchor.space = space;
-
-      const bar = new Body(BodyType.DYNAMIC, new Vec2(x + 40, ay));
-      bar.shapes.add(new Polygon(Polygon.box(80, 10)));
-      try { bar.userData._colorIdx = 2; } catch (_) {}
-      bar.angularVel = 2;
-      bar.space = space;
-
-      new PivotJoint(anchor, bar, new Vec2(0, 0), new Vec2(-40, 0)).space = space;
-
-      const aj = new AngleJoint(anchor, bar, limits.min, limits.max);
-      aj.stiff = false;
-      aj.frequency = 4;
-      aj.damping = 0.4;
-      aj.space = space;
-
-      this._aAnchor = anchor;
-      this._aBar = bar;
-      this._aLimits = limits;
+      const { cx, cy, cw } = cellOrigin(1, 2, W, H);
+      const b1 = box(cx - cw / 6, cy, true, COLORS.motor[0]);
+      const b2 = box(cx + cw / 6, cy, true, COLORS.motor[1]);
+      format(new MotorJoint(
+        b1, b2,
+        10,
+        3,
+      ));
+      this._bodies.motor = { b1, b2 };
     }
 
-    // ── WeldJoint (col=0, row=1) — two bodies glued as one ──────────────────
-    {
-      const { x, top } = cellCenter(0, 1, W, H);
-      const cy = top + 55;
+    // Kinematic mouse body for dragging
+    _mouseBody = new Body(BodyType.KINEMATIC, new Vec2(-1000, -1000));
+    _mouseBody.space = space;
+    _grabJoint = null;
+    _pendingGrab = null;
+    _pendingRelease = false;
+  },
 
-      const w1 = new Body(BodyType.DYNAMIC, new Vec2(x - 20, cy));
-      w1.shapes.add(new Polygon(Polygon.box(34, 34)));
-      try { w1.userData._colorIdx = 4; } catch (_) {}
-      w1.space = space;
-
-      const w2 = new Body(BodyType.DYNAMIC, new Vec2(x + 22, cy));
-      w2.shapes.add(new Circle(19));
-      try { w2.userData._colorIdx = 5; } catch (_) {}
-      w2.space = space;
-
-      new WeldJoint(w1, w2, new Vec2(17, 0), new Vec2(-19, 0)).space = space;
-
-      this._w1 = w1;
-      this._w2 = w2;
+  step(space) {
+    if (_pendingRelease) {
+      _pendingRelease = false;
+      if (_grabJoint) { _grabJoint.space = null; _grabJoint = null; }
+      _mouseBody.position.setxy(-1000, -1000);
+      _mouseBody.velocity.setxy(0, 0);
     }
-
-    // ── MotorJoint (col=1, row=1) — constant angular velocity ───────────────
-    {
-      const { x, y } = cellCenter(1, 1, W, H);
-
-      const anchor = new Body(BodyType.STATIC, new Vec2(x, y));
-      anchor.shapes.add(new Circle(4));
-      anchor.space = space;
-
-      const wheel = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-      wheel.shapes.add(new Polygon(Polygon.regular(38, 38, 8)));
-      try { wheel.userData._colorIdx = 3; } catch (_) {}
-      wheel.space = space;
-
-      new PivotJoint(anchor, wheel, new Vec2(0, 0), new Vec2(0, 0)).space = space;
-      new MotorJoint(anchor, wheel, 3).space = space;
-
-      this._mAnchor = anchor;
+    if (_pendingGrab) {
+      const { body, localPt } = _pendingGrab;
+      _pendingGrab = null;
+      if (_grabJoint) { _grabJoint.space = null; _grabJoint = null; }
+      _mouseBody.position.setxy(_dragX, _dragY);
+      _grabJoint = new PivotJoint(
+        _mouseBody, body,
+        new Vec2(0, 0), localPt,
+      );
+      _grabJoint.stiff = false;
+      _grabJoint.frequency = 4;
+      _grabJoint.damping = 0.9;
+      _grabJoint.space = space;
     }
-
-    // ── LineJoint (col=2, row=1) — horizontal slider ─────────────────────────
-    {
-      const { x, y } = cellCenter(2, 1, W, H);
-      const limits = { min: -90, max: 90 };
-
-      const anchor = new Body(BodyType.STATIC, new Vec2(x, y));
-      anchor.shapes.add(new Circle(4));
-      anchor.space = space;
-
-      const slider = new Body(BodyType.DYNAMIC, new Vec2(x + 50, y));
-      slider.shapes.add(new Polygon(Polygon.box(38, 22)));
-      try { slider.userData._colorIdx = 1; } catch (_) {}
-      slider.space = space;
-
-      new LineJoint(
-        anchor, slider,
-        new Vec2(0, 0), new Vec2(0, 0),
-        new Vec2(1, 0), limits.min, limits.max,
-      ).space = space;
-
-      this._lAnchor = anchor;
-      this._lLimits = limits;
+    if (_grabJoint) {
+      const dx = _dragX - _mouseBody.position.x;
+      const dy = _dragY - _mouseBody.position.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const maxSpeed = 800;
+      if (dist > 1) {
+        const speed = Math.min(dist * 60, maxSpeed);
+        _mouseBody.velocity.setxy(dx / dist * speed, dy / dist * speed);
+      } else {
+        _mouseBody.velocity.setxy(0, 0);
+      }
     }
   },
 
-  // Drive the kinematic cursor body toward the drag target each step
-  step(_space) {
-    if (this._mouseBody && this._dragTarget) {
-      this._mouseBody.kinematicVel.x = (this._dragTarget.x - this._mouseBody.position.x) * 60;
-      this._mouseBody.kinematicVel.y = (this._dragTarget.y - this._mouseBody.position.y) * 60;
-    }
-  },
-
-  // Pointerdown: find nearest dynamic body, create a mouse joint
   click(x, y, space) {
-    let closest = null, minDist = Infinity;
+    _dragX = x;
+    _dragY = y;
+    let best = null, bestDist = 60;
     for (const body of space.bodies) {
-      if (body.isStatic()) continue;
-      const dx = body.position.x - x, dy = body.position.y - y;
+      if (!body.isDynamic() || body === _mouseBody) continue;
+      const dx = body.position.x - x;
+      const dy = body.position.y - y;
       const d = Math.sqrt(dx * dx + dy * dy);
-      if (d < 80 && d < minDist) { minDist = d; closest = body; }
+      if (d < bestDist) { bestDist = d; best = body; }
     }
-    if (!closest) return;
-
-    this._mouseBody = new Body(BodyType.KINEMATIC, new Vec2(x, y));
-    this._mouseBody.space = space;
-    this._dragTarget = { x, y };
-
-    // Convert click position to body-local anchor
-    const cos = Math.cos(-closest.rotation), sin = Math.sin(-closest.rotation);
-    const rx = x - closest.position.x, ry = y - closest.position.y;
-
-    this._mouseJoint = new PivotJoint(
-      this._mouseBody, closest,
-      new Vec2(0, 0),
-      new Vec2(rx * cos - ry * sin, rx * sin + ry * cos),
-    );
-    this._mouseJoint.stiff = false;
-    this._mouseJoint.frequency = 15;
-    this._mouseJoint.damping = 0.9;
-    this._mouseJoint.space = space;
+    if (!best) return;
+    const localPt = best.worldPointToLocal(new Vec2(x, y));
+    _pendingGrab = { body: best, localPt };
   },
 
   drag(x, y) {
-    if (this._dragTarget) {
-      this._dragTarget.x = x;
-      this._dragTarget.y = y;
-    }
+    _dragX = x;
+    _dragY = y;
   },
 
   release() {
-    if (this._mouseJoint) { this._mouseJoint.space = null; this._mouseJoint = null; }
-    if (this._mouseBody) { this._mouseBody.space = null; this._mouseBody = null; }
-    this._dragTarget = null;
+    _pendingRelease = true;
   },
 
   render(ctx, space, W, H, debugDraw) {
     drawGrid(ctx, W, H);
-
     ctx.save();
 
-    // ── Subtle cell dividers ──────────────────────────────────────────────────
-    const cw = (W - 2 * T) / 3;
-    const ch = (H - 2 * T) / 2;
+    const cw = (W - 2 * T) / COLS;
+    const ch = (H - 2 * T) / ROWS;
+
+    // ── Cell dividers ────────────────────────────────────────────────────
     ctx.strokeStyle = '#ffffff09';
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 7]);
-    for (let c = 1; c < 3; c++) {
+    for (let c = 1; c < COLS; c++) {
       const lx = T + c * cw;
       ctx.beginPath(); ctx.moveTo(lx, T); ctx.lineTo(lx, H - T); ctx.stroke();
     }
-    ctx.beginPath(); ctx.moveTo(T, T + ch); ctx.lineTo(W - T, T + ch); ctx.stroke();
+    for (let r = 1; r < ROWS; r++) {
+      const ly = T + r * ch;
+      ctx.beginPath(); ctx.moveTo(T, ly); ctx.lineTo(W - T, ly); ctx.stroke();
+    }
     ctx.setLineDash([]);
 
-    // ── PivotJoint: faint line from pin to bar center ─────────────────────────
-    if (this._pAnchor && this._pBar) {
-      ctx.beginPath();
-      ctx.moveTo(this._pAnchor.position.x, this._pAnchor.position.y);
-      ctx.lineTo(this._pBar.position.x, this._pBar.position.y);
-      ctx.strokeStyle = '#58a6ff22';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      drawPin(ctx, this._pAnchor.position.x, this._pAnchor.position.y);
+    // ── Constraint overlays (drawn BEFORE bodies so they appear behind) ──
+
+    // PivotJoint: pin marker + faint lines to both bodies
+    if (this._bodies.pivot) {
+      const { b1, b2, px, py } = this._bodies.pivot;
+      drawDashedLine(ctx, px, py, b1.position.x, b1.position.y, '#58a6ff33');
+      drawDashedLine(ctx, px, py, b2.position.x, b2.position.y, '#58a6ff33');
+      drawPin(ctx, px, py, '#58a6ff');
     }
 
-    // ── DistanceJoint: animated spring coils ─────────────────────────────────
-    if (this._dAnchor && this._dBall) {
-      drawSpring(
-        ctx,
-        this._dAnchor.position.x, this._dAnchor.position.y,
-        this._dBall.position.x, this._dBall.position.y,
-      );
-      drawPin(ctx, this._dAnchor.position.x, this._dAnchor.position.y, '#d29922');
-    }
-
-    // ── AngleJoint: sector showing allowed rotation range ────────────────────
-    if (this._aAnchor && this._aBar && this._aLimits) {
-      const ax = this._aAnchor.position.x, ay = this._aAnchor.position.y;
-      const { min, max } = this._aLimits;
-      const r = 38;
-      // Filled sector: allowed range
-      ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      ctx.arc(ax, ay, r, min, max);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(63,185,80,0.10)';
-      ctx.fill();
-      ctx.strokeStyle = '#3fb95055';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      // Current bar angle indicator
-      const angle = this._aBar.rotation;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      ctx.lineTo(ax + Math.cos(angle) * r, ay + Math.sin(angle) * r);
-      ctx.strokeStyle = '#3fb95099';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      drawPin(ctx, ax, ay, '#3fb950');
-    }
-
-    // ── WeldJoint: dashed connection line + X marker at weld point ───────────
-    if (this._w1 && this._w2) {
-      ctx.beginPath();
-      ctx.moveTo(this._w1.position.x, this._w1.position.y);
-      ctx.lineTo(this._w2.position.x, this._w2.position.y);
-      ctx.strokeStyle = '#a371f744';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 4]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // X marker at the weld point (w1 local anchor (17,0) in world space)
-      const rot = this._w1.rotation;
-      const wx = this._w1.position.x + Math.cos(rot) * 17;
-      const wy = this._w1.position.y + Math.sin(rot) * 17;
+    // WeldJoint: X marker at weld midpoint + dashed connection
+    if (this._bodies.weld) {
+      const { b1, b2 } = this._bodies.weld;
+      drawDashedLine(ctx, b1.position.x, b1.position.y, b2.position.x, b2.position.y, '#a371f733');
+      const mx = (b1.position.x + b2.position.x) / 2;
+      const my = (b1.position.y + b2.position.y) / 2;
       const s = 6;
       ctx.beginPath();
-      ctx.moveTo(wx - s, wy - s); ctx.lineTo(wx + s, wy + s);
-      ctx.moveTo(wx + s, wy - s); ctx.lineTo(wx - s, wy + s);
+      ctx.moveTo(mx - s, my - s); ctx.lineTo(mx + s, my + s);
+      ctx.moveTo(mx + s, my - s); ctx.lineTo(mx - s, my + s);
       ctx.strokeStyle = '#a371f7';
       ctx.lineWidth = 2;
       ctx.stroke();
     }
 
-    // ── MotorJoint: circular arrow indicating spin direction ─────────────────
-    if (this._mAnchor) {
-      const ax = this._mAnchor.position.x, ay = this._mAnchor.position.y;
-      const r = 52;
-      ctx.beginPath();
-      ctx.arc(ax, ay, r, -Math.PI * 0.85, Math.PI * 0.35);
-      ctx.strokeStyle = '#f8514955';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Arrowhead at arc end
-      const ea = Math.PI * 0.35;
-      const ex = ax + Math.cos(ea) * r, ey = ay + Math.sin(ea) * r;
-      const ta = ea + Math.PI / 2;
-      const hs = 8;
-      ctx.beginPath();
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(ex + Math.cos(ta - 0.5) * hs, ey + Math.sin(ta - 0.5) * hs);
-      ctx.lineTo(ex + Math.cos(ta + 0.5) * hs, ey + Math.sin(ta + 0.5) * hs);
-      ctx.closePath();
-      ctx.fillStyle = '#f85149';
-      ctx.fill();
-      drawPin(ctx, ax, ay, '#f85149');
+    // DistanceJoint: spring coil between anchor points on bodies
+    if (this._bodies.distance) {
+      const { b1, b2 } = this._bodies.distance;
+      // Anchor is (0, -SIZE) in local space → transform to world
+      const cos1 = Math.cos(b1.rotation), sin1 = Math.sin(b1.rotation);
+      const cos2 = Math.cos(b2.rotation), sin2 = Math.sin(b2.rotation);
+      const ax1 = b1.position.x + SIZE * sin1;
+      const ay1 = b1.position.y - SIZE * cos1;
+      const ax2 = b2.position.x + SIZE * sin2;
+      const ay2 = b2.position.y - SIZE * cos2;
+      // Draw spring coil
+      drawSpring(ctx, ax1, ay1, ax2, ay2, '#d29922');
+      drawPin(ctx, ax1, ay1, '#d29922');
+      drawPin(ctx, ax2, ay2, '#d29922');
     }
 
-    // ── LineJoint: dashed rail with limit tick marks ──────────────────────────
-    if (this._lAnchor && this._lLimits) {
-      const ax = this._lAnchor.position.x, ay = this._lAnchor.position.y;
-      const { min, max } = this._lLimits;
+    // LineJoint: solid rail line between bodies + direction indicator
+    if (this._bodies.line) {
+      const { b1, b2, ax, ay } = this._bodies.line;
+      // Rail line (full cell height, vertical)
+      const railLen = SIZE * 4;
       ctx.beginPath();
-      ctx.moveTo(ax + min, ay);
-      ctx.lineTo(ax + max, ay);
-      ctx.strokeStyle = '#d2992266';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
+      ctx.moveTo(ax, ay - railLen);
+      ctx.lineTo(ax, ay + railLen);
+      ctx.strokeStyle = '#3fb95033';
+      ctx.lineWidth = 3;
       ctx.stroke();
-      ctx.setLineDash([]);
-      for (const lx of [ax + min, ax + max]) {
+      // Limit tick marks
+      for (const dy of [-SIZE, SIZE]) {
         ctx.beginPath();
-        ctx.moveTo(lx, ay - 10); ctx.lineTo(lx, ay + 10);
-        ctx.strokeStyle = '#d29922';
+        ctx.moveTo(ax - 8, ay + dy);
+        ctx.lineTo(ax + 8, ay + dy);
+        ctx.strokeStyle = '#3fb95088';
         ctx.lineWidth = 2;
         ctx.stroke();
       }
-      drawPin(ctx, ax, ay, '#d29922');
+      // Lines from rail to each body
+      drawDashedLine(ctx, ax, ay, b1.position.x, b1.position.y, '#3fb95033');
+      drawDashedLine(ctx, ax, ay, b2.position.x, b2.position.y, '#3fb95033');
+      drawPin(ctx, ax, ay, '#3fb950');
     }
 
-    // ── Bodies (skip the invisible mouse-drag cursor body) ────────────────────
+    // PulleyJoint: rope lines from bar anchors to hanging bodies
+    if (this._bodies.pulley) {
+      const { bar, b2, b3, hangGap } = this._bodies.pulley;
+      const cos = Math.cos(bar.rotation), sin = Math.sin(bar.rotation);
+      const lx = bar.position.x + (-hangGap) * cos;
+      const ly = bar.position.y + (-hangGap) * sin;
+      const rx = bar.position.x + hangGap * cos;
+      const ry = bar.position.y + hangGap * sin;
+      drawDashedLine(ctx, lx, ly, b2.position.x, b2.position.y, '#f8514955');
+      drawDashedLine(ctx, rx, ry, b3.position.x, b3.position.y, '#f8514955');
+      drawPin(ctx, lx, ly, '#f85149');
+      drawPin(ctx, rx, ry, '#f85149');
+    }
+
+    // AngleJoint: angle indicators on each body + connecting arc
+    if (this._bodies.angle) {
+      const { b1, b2 } = this._bodies.angle;
+      const r = SIZE + 8;
+      // Draw "clock hand" on each body showing current rotation
+      for (const [b, color] of [[b1, '#a371f7'], [b2, '#a371f7']]) {
+        // Rotation hand
+        ctx.beginPath();
+        ctx.moveTo(b.position.x, b.position.y);
+        ctx.lineTo(
+          b.position.x + Math.cos(b.rotation) * r,
+          b.position.y + Math.sin(b.rotation) * r,
+        );
+        ctx.strokeStyle = color + '88';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Circle outline
+        ctx.beginPath();
+        ctx.arc(b.position.x, b.position.y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = color + '22';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      // Curved arrow between bodies showing angular coupling
+      const mx = (b1.position.x + b2.position.x) / 2;
+      const my = (b1.position.y + b2.position.y) / 2;
+      ctx.beginPath();
+      ctx.moveTo(b1.position.x + r, b1.position.y);
+      ctx.quadraticCurveTo(mx, my - 20, b2.position.x - r, b2.position.y);
+      ctx.strokeStyle = '#a371f744';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // MotorJoint: spinning arrows on each body + link
+    if (this._bodies.motor) {
+      const { b1, b2 } = this._bodies.motor;
+      const r = SIZE + 8;
+      for (const b of [b1, b2]) {
+        // Spinning arrow arc (follows body rotation)
+        const arcStart = b.rotation - 1.5;
+        const arcEnd = b.rotation + 1.5;
+        ctx.beginPath();
+        ctx.arc(b.position.x, b.position.y, r, arcStart, arcEnd);
+        ctx.strokeStyle = '#f8514966';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Arrowhead at arc end
+        const ex = b.position.x + Math.cos(arcEnd) * r;
+        const ey = b.position.y + Math.sin(arcEnd) * r;
+        const ta = arcEnd + Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex + Math.cos(ta - 0.4) * 6, ey + Math.sin(ta - 0.4) * 6);
+        ctx.lineTo(ex + Math.cos(ta + 0.4) * 6, ey + Math.sin(ta + 0.4) * 6);
+        ctx.closePath();
+        ctx.fillStyle = '#f8514977';
+        ctx.fill();
+      }
+      // Link between bodies
+      const mx = (b1.position.x + b2.position.x) / 2;
+      const my = (b1.position.y + b2.position.y) / 2;
+      ctx.beginPath();
+      ctx.moveTo(b1.position.x + r, b1.position.y);
+      ctx.quadraticCurveTo(mx, my - 20, b2.position.x - r, b2.position.y);
+      ctx.strokeStyle = '#f8514933';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // ── Bodies ───────────────────────────────────────────────────────────
     for (const body of space.bodies) {
-      if (body === this._mouseBody) continue;
+      if (body === _mouseBody) continue;
       drawBody(ctx, body, debugDraw);
     }
 
-    // ── Drag indicator: dashed line from cursor to grabbed body ──────────────
-    if (this._mouseBody && this._mouseJoint) {
-      const mx = this._mouseBody.position.x, my = this._mouseBody.position.y;
-      const grabbed = this._mouseJoint.body2;
+    // ── Pinned body markers (drawn ON TOP of bodies) ────────────────────
+    if (this._pinnedBodies) {
+      for (const b of this._pinnedBodies) {
+        drawPinnedMarker(ctx, b.position.x, b.position.y);
+      }
+    }
+
+    // ── Drag indicator ──────────────────────────────────────────────────
+    if (_grabJoint) {
+      const grabbed = _grabJoint.body2;
       if (grabbed) {
+        const lp = _grabJoint.anchor2;
+        const cos = Math.cos(grabbed.rotation), sin = Math.sin(grabbed.rotation);
+        const ax = grabbed.position.x + lp.x * cos - lp.y * sin;
+        const ay = grabbed.position.y + lp.x * sin + lp.y * cos;
         ctx.beginPath();
-        ctx.moveTo(mx, my);
-        ctx.lineTo(grabbed.position.x, grabbed.position.y);
+        ctx.moveTo(_dragX, _dragY);
+        ctx.lineTo(ax, ay);
         ctx.strokeStyle = '#ffffff44';
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 4]);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.arc(mx, my, 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff66';
+        ctx.arc(_dragX, _dragY, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff55';
         ctx.fill();
       }
     }
 
-    // ── Cell labels ───────────────────────────────────────────────────────────
+    // ── Cell labels ──────────────────────────────────────────────────────
     const LABELS = [
-      { col: 0, row: 0, name: 'PivotJoint',    desc: 'pin / hinge pivot point' },
-      { col: 1, row: 0, name: 'DistanceJoint', desc: 'spring distance constraint' },
-      { col: 2, row: 0, name: 'AngleJoint',    desc: 'rotation range limit' },
-      { col: 0, row: 1, name: 'WeldJoint',     desc: 'rigid weld (glue)' },
-      { col: 1, row: 1, name: 'MotorJoint',    desc: 'angular velocity motor' },
-      { col: 2, row: 1, name: 'LineJoint',     desc: 'linear rail / slider' },
+      { col: 0, row: 0, name: '', desc: `Constraints softened with\nfrequency=20  damping=1` },
+      { col: 1, row: 0, name: 'PivotJoint', desc: 'shared pivot point' },
+      { col: 2, row: 0, name: 'WeldJoint', desc: 'rigid weld + 45\u00B0 phase' },
+      { col: 0, row: 1, name: 'DistanceJoint', desc: 'spring distance range' },
+      { col: 1, row: 1, name: 'LineJoint', desc: 'vertical rail slider' },
+      { col: 2, row: 1, name: 'PulleyJoint', desc: 'pulley with ratio 2.5' },
+      { col: 0, row: 2, name: 'AngleJoint', desc: 'linked rotation (ratio 2)' },
+      { col: 1, row: 2, name: 'MotorJoint', desc: 'driven spin (ratio 3)' },
     ];
     for (const { col, row, name, desc } of LABELS) {
-      const c = cellCenter(col, row, W, H);
+      const c = cellOrigin(col, row, W, H);
       const lx = c.left + 8, ly = c.top + 17;
-      ctx.fillStyle = '#58a6ffdd';
-      ctx.font = 'bold 11px monospace';
-      ctx.fillText(name, lx, ly);
-      ctx.fillStyle = '#8b949eaa';
-      ctx.font = '10px monospace';
-      ctx.fillText(desc, lx, ly + 14);
+      if (name) {
+        ctx.fillStyle = '#58a6ffdd';
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(name, lx, ly);
+        ctx.fillStyle = '#8b949eaa';
+        ctx.font = '10px monospace';
+        ctx.fillText(desc, lx, ly + 14);
+      } else {
+        ctx.fillStyle = '#8b949ecc';
+        ctx.font = '11px monospace';
+        const lines = desc.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          ctx.fillText(lines[i], c.left + 12, c.top + ch / 2 - 6 + i * 16);
+        }
+      }
     }
 
     ctx.restore();
   },
 
-  code2d: `// Constraints Showcase — all 6 built-in joint types
-const space = new Space(new Vec2(0, 300));
+  code2d: `// Constraints Showcase — original nape layout (3\u00D73 grid)
+const space = new Space(new Vec2(0, 600));
 
-// 1. PivotJoint — two bodies pinned at a shared point (pivot at bar's left end)
-const anchor1 = new Body(BodyType.STATIC, new Vec2(163, 48));
-anchor1.space = space;
-const bar = new Body(BodyType.DYNAMIC, new Vec2(203, 48));
-bar.shapes.add(new Polygon(Polygon.box(80, 10)));
-bar.angularVel = 1.5; // start swinging
-bar.space = space;
-new PivotJoint(anchor1, bar, new Vec2(0, 0), new Vec2(-40, 0)).space = space;
-
-// 2. DistanceJoint — soft spring between anchor and ball
-const anchor2 = new Body(BodyType.STATIC, new Vec2(450, 50));
-anchor2.space = space;
-const ball = new Body(BodyType.DYNAMIC, new Vec2(450, 150));
-ball.shapes.add(new Circle(18));
-ball.space = space;
-const spring = new DistanceJoint(anchor2, ball, new Vec2(0,0), new Vec2(0,0), 75, 125);
-spring.stiff = false; spring.frequency = 2.5; spring.damping = 0.2;
-spring.space = space;
-
-// 3. AngleJoint — limits relative rotation to ±60°
-//    (combined with PivotJoint so the bar can only swing in a range)
-const aj = new AngleJoint(anchor1, bar, -Math.PI / 3, Math.PI / 3);
-aj.stiff = false; aj.frequency = 4; aj.damping = 0.4;
-aj.space = space;
-
-// 4. WeldJoint — glues two bodies into one rigid compound shape
-const box = new Body(BodyType.DYNAMIC, new Vec2(143, 305));
-box.shapes.add(new Polygon(Polygon.box(34, 34)));
-box.space = space;
-const circ = new Body(BodyType.DYNAMIC, new Vec2(185, 305));
-circ.shapes.add(new Circle(19));
-circ.space = space;
-new WeldJoint(box, circ, new Vec2(17, 0), new Vec2(-19, 0)).space = space;
-
-// 5. MotorJoint — drives a constant angular velocity (needs PivotJoint too)
-const hub = new Body(BodyType.STATIC, new Vec2(450, 365));
-hub.space = space;
-const wheel = new Body(BodyType.DYNAMIC, new Vec2(450, 365));
-wheel.shapes.add(new Polygon(Polygon.regular(38, 38, 8)));
-wheel.space = space;
-new PivotJoint(hub, wheel, new Vec2(0, 0), new Vec2(0, 0)).space = space;
-new MotorJoint(hub, wheel, 3 /* rad/s */).space = space;
-
-// 6. LineJoint — body can only slide along an axis, within limits
-const rail = new Body(BodyType.STATIC, new Vec2(737, 365));
-rail.space = space;
-const slider = new Body(BodyType.DYNAMIC, new Vec2(787, 365));
-slider.shapes.add(new Polygon(Polygon.box(38, 22)));
-slider.space = space;
-// axis=(1,0) → horizontal, limits ±90 px from anchor
-new LineJoint(
-  rail, slider, new Vec2(0,0), new Vec2(0,0), new Vec2(1,0), -90, 90,
-).space = space;
-
-function loop() {
-  space.step(1 / 60, 8, 3);
-  ctx.clearRect(0, 0, W, H);
-  drawGrid();
-  drawConstraintLines();
-  for (const body of space.bodies) drawBody(body);
-  requestAnimationFrame(loop);
+// Common constraint settings
+const frequency = 20, damping = 1;
+function format(c) {
+  c.stiff = false;
+  c.frequency = frequency;
+  c.damping = damping;
+  c.space = space;
 }
-loop();`,
+function box(x, y, pinned) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+  b.shapes.add(new Polygon(Polygon.box(28, 28)));
+  b.space = space;
+  if (pinned) new PivotJoint(space.world, b, new Vec2(x,y), new Vec2(0,0)).space = space;
+  return b;
+}
 
-  code3d: `// Setup Three.js scene
+// PivotJoint — two bodies share a pivot point
+const p1 = box(250, 100), p2 = box(350, 100);
+format(new PivotJoint(p1, p2,
+  p1.worldPointToLocal(new Vec2(300, 100)),
+  p2.worldPointToLocal(new Vec2(300, 100))));
+
+// WeldJoint — rigid connection with 45\u00B0 phase offset
+const w1 = box(550, 100), w2 = box(650, 100);
+format(new WeldJoint(w1, w2,
+  w1.worldPointToLocal(new Vec2(600, 100)),
+  w2.worldPointToLocal(new Vec2(600, 100)), Math.PI/4));
+
+// DistanceJoint — spring between two bodies
+const d1 = box(100, 300), d2 = box(180, 300);
+format(new DistanceJoint(d1, d2,
+  new Vec2(0, -14), new Vec2(0, -14), 60, 100));
+
+// LineJoint — constrained to slide along an axis
+const l1 = box(350, 300), l2 = box(450, 300);
+format(new LineJoint(l1, l2,
+  l1.worldPointToLocal(new Vec2(400, 300)),
+  l2.worldPointToLocal(new Vec2(400, 300)),
+  new Vec2(0, 1), -14, 14));
+
+// AngleJoint — limits relative rotation
+const a1 = box(100, 500, true), a2 = box(200, 500, true);
+format(new AngleJoint(a1, a2, -Math.PI*1.5, Math.PI*1.5, 2));
+
+// MotorJoint — drives angular velocity
+const m1 = box(350, 500, true), m2 = box(450, 500, true);
+format(new MotorJoint(m1, m2, 10, 3));`,
+
+  code3d: `// 3D view of constraints demo
 const container = document.getElementById("container");
-const W = 900, H = 500;
+const W = 900, H = 600;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d1117);
-const fov = 45;
-const camZ = (W / 2) / Math.tan((fov / 2) * Math.PI / 180) / (W / H);
-const camera = new THREE.PerspectiveCamera(fov, W / H, 1, camZ * 6);
-camera.position.set(W / 2, -H / 2, camZ);
-camera.lookAt(W / 2, -H / 2, 0);
+const camera = new THREE.PerspectiveCamera(45, W/H, 1, 3000);
+camera.position.set(W/2, -H/2, 900);
+camera.lookAt(W/2, -H/2, 0);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(W, H);
 container.appendChild(renderer.domElement);
-const keyLight = new THREE.DirectionalLight(0xfff5e0, 2.0); keyLight.position.set(-W*0.3, H*0.6, 800); scene.add(keyLight);
-const fillLight = new THREE.DirectionalLight(0xadd8ff, 0.6); fillLight.position.set(W*1.2, -H*0.3, 400); scene.add(fillLight);
+scene.add(new THREE.DirectionalLight(0xfff5e0, 2.0));
 scene.add(new THREE.AmbientLight(0x1a1a2e, 1.5));
 
-const space = new Space(new Vec2(0, 300));
-const COLORS = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0x4dd0e1];
+const space = new Space(new Vec2(0, 600));
 const meshes = [];
 
-function addMesh(body, color) {
-  const shape = body.shapes.at(0);
-  let geom;
-  if (shape.isCircle()) {
-    geom = new THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
-  } else {
-    const verts = shape.castPolygon.localVerts;
-    const pts = [];
-    for (let i = 0; i < verts.length; i++) pts.push(new THREE.Vector2(verts.at(i).x, verts.at(i).y));
-    geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: 28, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 1 });
-    geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
-    geom.translate(0, 0, -14);
-  }
-  const mesh = new THREE.Mesh(geom, new THREE.MeshPhongMaterial({ color, shininess: 80, specular: 0x444444, side: THREE.DoubleSide }));
+function addBox(body, color) {
+  const geom = new THREE.BoxGeometry(28, 28, 14);
+  const mesh = new THREE.Mesh(geom,
+    new THREE.MeshPhongMaterial({ color, shininess: 80 }));
   scene.add(mesh);
   meshes.push({ mesh, body });
 }
 
-const T = 20;
-function cell(col, row) {
-  const cw = (W - 2*T) / 3, ch = (H - 2*T) / 2;
-  return { x: T + col*cw + cw/2, y: T + row*ch + ch/2, top: T + row*ch };
-}
-
-// PivotJoint — pendulum
-const c0 = cell(0, 0);
-const pAnchor = new Body(BodyType.STATIC, new Vec2(c0.x, c0.top + 28)); pAnchor.shapes.add(new Circle(4)); pAnchor.space = space;
-const pBar = new Body(BodyType.DYNAMIC, new Vec2(c0.x + 40, c0.top + 28));
-pBar.shapes.add(new Polygon(Polygon.box(80, 10))); pBar.angularVel = 1.5; pBar.space = space;
-new PivotJoint(pAnchor, pBar, new Vec2(0,0), new Vec2(-40,0)).space = space;
-addMesh(pAnchor, 0x455a64); addMesh(pBar, COLORS[0]);
-
-// DistanceJoint — spring
-const c1 = cell(1, 0);
-const dAnchor = new Body(BodyType.STATIC, new Vec2(c1.x, c1.top + 30)); dAnchor.shapes.add(new Circle(4)); dAnchor.space = space;
-const ball = new Body(BodyType.DYNAMIC, new Vec2(c1.x, c1.top + 130));
-ball.shapes.add(new Circle(18)); ball.space = space;
-const spring = new DistanceJoint(dAnchor, ball, new Vec2(0,0), new Vec2(0,0), 75, 125);
-spring.stiff = false; spring.frequency = 2.5; spring.damping = 0.2; spring.space = space;
-addMesh(dAnchor, 0x455a64); addMesh(ball, COLORS[1]);
-
-// MotorJoint — spinning wheel
-const c4 = cell(1, 1);
-const mAnchor = new Body(BodyType.STATIC, new Vec2(c4.x, c4.y)); mAnchor.shapes.add(new Circle(4)); mAnchor.space = space;
-const wheel = new Body(BodyType.DYNAMIC, new Vec2(c4.x, c4.y));
-wheel.shapes.add(new Polygon(Polygon.regular(38, 38, 8))); wheel.space = space;
-new PivotJoint(mAnchor, wheel, new Vec2(0,0), new Vec2(0,0)).space = space;
-new MotorJoint(mAnchor, wheel, 3).space = space;
-addMesh(mAnchor, 0x455a64); addMesh(wheel, COLORS[3]);
+// PivotJoint
+const p1 = new Body(BodyType.DYNAMIC, new Vec2(300, 100));
+p1.shapes.add(new Polygon(Polygon.box(28,28))); p1.space = space;
+const p2 = new Body(BodyType.DYNAMIC, new Vec2(400, 100));
+p2.shapes.add(new Polygon(Polygon.box(28,28))); p2.space = space;
+const pj = new PivotJoint(p1, p2,
+  p1.worldPointToLocal(new Vec2(350,100)),
+  p2.worldPointToLocal(new Vec2(350,100)));
+pj.stiff = false; pj.frequency = 20; pj.damping = 1; pj.space = space;
+addBox(p1, 0x58a6ff); addBox(p2, 0x58a6ff);
 
 function loop() {
-  space.step(1 / 60, 8, 3);
+  space.step(1/60, 8, 3);
   for (const { mesh, body } of meshes) {
     mesh.position.set(body.position.x, -body.position.y, 0);
     mesh.rotation.z = -body.rotation;
