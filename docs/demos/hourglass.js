@@ -7,7 +7,7 @@ export default {
   featured: true,
   featuredOrder: 20,
   desc:
-    "200 small circles pour through an hourglass using the <b>SPATIAL_HASH</b> broadphase — optimal for dense scenes with same-sized objects. Click to add more particles.",
+    "1000 small circles pour through an hourglass using the <b>SPATIAL_HASH</b> broadphase — optimal for dense scenes with same-sized objects. Click to add more particles.",
 
   setup(space, W, H) {
     // Use Spatial Hash broadphase — ideal for many same-sized particles
@@ -64,8 +64,8 @@ export default {
     lr.space = space;
 
     // Spawn particles in the upper half
-    const r = 4;
-    for (let i = 0; i < 200; i++) {
+    const r = 3;
+    for (let i = 0; i < 1000; i++) {
       const px = cx + (Math.random() - 0.5) * (W - 80);
       const py = 20 + Math.random() * (cy - 80);
       const b = new Body(BodyType.DYNAMIC, new Vec2(px, py));
@@ -75,8 +75,8 @@ export default {
   },
 
   click(x, y, space) {
-    const r = 4;
-    for (let i = 0; i < 15; i++) {
+    const r = 3;
+    for (let i = 0; i < 25; i++) {
       const b = new Body(BodyType.DYNAMIC, new Vec2(
         x + (Math.random() - 0.5) * 30,
         y + (Math.random() - 0.5) * 30,
@@ -104,13 +104,13 @@ for (const [dx, dy, angle] of [
   wall.space = space;
 }
 
-// 200 small particles — ideal for spatial hash
-for (let i = 0; i < 200; i++) {
+// 1000 small particles — ideal for spatial hash
+for (let i = 0; i < 1000; i++) {
   const body = new Body(BodyType.DYNAMIC, new Vec2(
     cx + (Math.random() - 0.5) * (W - 80),
     20 + Math.random() * (cy - 80),
   ));
-  body.shapes.add(new Circle(4));
+  body.shapes.add(new Circle(3));
   body.space = space;
 }
 
