@@ -374,19 +374,7 @@ export class ZPP_SweepPhase extends ZPP_Broadphase {
   shapesUnderPoint(x: number, y: number, filter: any, output: any): any {
     this.sync_broadphase();
 
-    let ret: any;
-    if (ZPP_Vec2.zpp_pool == null) {
-      ret = new ZPP_Vec2();
-    } else {
-      ret = ZPP_Vec2.zpp_pool;
-      ZPP_Vec2.zpp_pool = ret.next;
-      ret.next = null;
-    }
-    ret.weak = false;
-    ret._immutable = false;
-    ret.x = x;
-    ret.y = y;
-    const v = ret;
+    const v = ZPP_Vec2.get(x, y);
 
     const ret1 = output == null ? new ZPP_SweepPhase._nape.shape.ShapeList() : output;
 
@@ -435,19 +423,7 @@ export class ZPP_SweepPhase extends ZPP_Broadphase {
   bodiesUnderPoint(x: number, y: number, filter: any, output: any): any {
     this.sync_broadphase();
 
-    let ret: any;
-    if (ZPP_Vec2.zpp_pool == null) {
-      ret = new ZPP_Vec2();
-    } else {
-      ret = ZPP_Vec2.zpp_pool;
-      ZPP_Vec2.zpp_pool = ret.next;
-      ret.next = null;
-    }
-    ret.weak = false;
-    ret._immutable = false;
-    ret.x = x;
-    ret.y = y;
-    const v = ret;
+    const v = ZPP_Vec2.get(x, y);
 
     const ret1 = output == null ? new ZPP_SweepPhase._nape.phys.BodyList() : output;
 

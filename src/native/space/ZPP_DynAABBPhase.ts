@@ -46,9 +46,31 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
     this.dtree = new ZPP_AABBTree();
   }
 
+  /** Prepend a pair to the global doubly-linked pairs list. */
+  private _linkPair(p: ZPP_AABBPair): void {
+    p.gprev = null;
+    p.next = this.pairs;
+    if (this.pairs != null) this.pairs.gprev = p;
+    this.pairs = p;
+  }
+
+  /** Unlink a pair from the global doubly-linked pairs list. */
+  private _unlinkPair(p: ZPP_AABBPair): void {
+    if (p.gprev != null) {
+      p.gprev.next = p.next;
+    } else {
+      this.pairs = p.next;
+    }
+    if (p.next != null) {
+      p.next.gprev = p.gprev;
+    }
+    p.gprev = null;
+    p.next = null;
+  }
+
   // ========== dyn ==========
 
-  dyn(shape: any): any {
+  dyn(shape: any): boolean {
     if (shape.body.type == 1) {
       return false;
     } else {
@@ -58,7 +80,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== __insert ==========
 
-  __insert(shape: any): any {
+  __insert(shape: any): void {
     let node;
     if (ZPP_AABBNode.zpp_pool == null) {
       node = new ZPP_AABBNode();
@@ -87,7 +109,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== __remove ==========
 
-  __remove(shape: any): any {
+  __remove(shape: any): void {
     const node = shape.node;
     if (!node.first_sync) {
       if (node.dyn) {
@@ -133,49 +155,25 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
       cur1!.mnext = null;
       node.moved = false;
     }
-    let pre2 = null;
-    let cur2 = this.pairs;
-    while (cur2 != null) {
-      const nxt = cur2.next;
-      if (cur2.n1 == node || cur2.n2 == node) {
-        if (pre2 == null) {
-          this.pairs = nxt;
-        } else {
-          pre2.next = nxt;
-        }
-        if (cur2.arb != null) {
-          cur2.arb.pair = null;
-        }
-        cur2.arb = null;
-        cur2.n1.shape.pairs.remove(cur2);
-        cur2.n2.shape.pairs.remove(cur2);
-        const o = cur2;
-        o.n1 = o.n2 = null;
-        o.sleeping = false;
-        o.next = ZPP_AABBPair.zpp_pool;
-        ZPP_AABBPair.zpp_pool = o;
-        cur2 = nxt;
-        continue;
-      }
-      pre2 = cur2;
-      cur2 = nxt;
-    }
     while (shape.pairs.head != null) {
-      const cur3 = shape.pairs.pop_unsafe();
-      if (cur3.n1 == node) {
-        cur3.n2.shape.pairs.remove(cur3);
+      const pair = shape.pairs.pop_unsafe();
+      if (!pair.sleeping) {
+        this._unlinkPair(pair);
+      }
+      if (pair.n1 == node) {
+        pair.n2.shape.pairs.remove(pair);
       } else {
-        cur3.n1.shape.pairs.remove(cur3);
+        pair.n1.shape.pairs.remove(pair);
       }
-      if (cur3.arb != null) {
-        cur3.arb.pair = null;
+      if (pair.arb != null) {
+        pair.arb.pair = null;
       }
-      cur3.arb = null;
-      const o1 = cur3;
-      o1.n1 = o1.n2 = null;
-      o1.sleeping = false;
-      o1.next = ZPP_AABBPair.zpp_pool;
-      ZPP_AABBPair.zpp_pool = o1;
+      pair.arb = null;
+      pair.n1 = pair.n2 = null;
+      pair.sleeping = false;
+      pair.gprev = null;
+      pair.next = ZPP_AABBPair.zpp_pool;
+      ZPP_AABBPair.zpp_pool = pair;
     }
     const o2 = node;
     o2.height = -1;
@@ -199,7 +197,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== __sync ==========
 
-  __sync(shape: any): any {
+  __sync(shape: any): void {
     const node = shape.node;
     if (!node.synced) {
       if (!this.space.continuous) {
@@ -370,7 +368,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== sync_broadphase ==========
 
-  sync_broadphase(): any {
+  sync_broadphase(): void {
     this.space.validation();
     if (this.syncs != null) {
       if (this.moves == null) {
@@ -1691,7 +1689,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== broadphase ==========
 
-  broadphase(space: any, discrete: any): any {
+  broadphase(space: any, discrete: boolean): void {
     let node = this.syncs;
     while (node != null) {
       const shape = node.shape;
@@ -2393,8 +2391,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               if (p1 != null) {
                 if (p1.sleeping) {
                   p1.sleeping = false;
-                  p1.next = this.pairs;
-                  this.pairs = p1;
+                  this._linkPair(p1);
                   p1.first = true;
                 }
                 continue;
@@ -2410,8 +2407,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               p1.n2 = node3;
               p1.id = id;
               p1.di = di;
-              p1.next = this.pairs;
-              this.pairs = p1;
+              this._linkPair(p1);
               p1.first = true;
               const _this35 = lshape.pairs;
               let ret2;
@@ -2509,8 +2505,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               if (p2 != null) {
                 if (p2.sleeping) {
                   p2.sleeping = false;
-                  p2.next = this.pairs;
-                  this.pairs = p2;
+                  this._linkPair(p2);
                   p2.first = true;
                 }
                 continue;
@@ -2526,8 +2521,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               p2.n2 = node4;
               p2.id = id1;
               p2.di = di1;
-              p2.next = this.pairs;
-              this.pairs = p2;
+              this._linkPair(p2);
               p2.first = true;
               const _this37 = lshape.pairs;
               let ret5;
@@ -2639,8 +2633,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               if (p3 != null) {
                 if (p3.sleeping) {
                   p3.sleeping = false;
-                  p3.next = this.pairs;
-                  this.pairs = p3;
+                  this._linkPair(p3);
                   p3.first = true;
                 }
                 continue;
@@ -2656,8 +2649,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               p3.n2 = node5;
               p3.id = id2;
               p3.di = di2;
-              p3.next = this.pairs;
-              this.pairs = p3;
+              this._linkPair(p3);
               p3.first = true;
               const _this39 = lshape1.pairs;
               let ret9;
@@ -2755,8 +2747,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               if (p4 != null) {
                 if (p4.sleeping) {
                   p4.sleeping = false;
-                  p4.next = this.pairs;
-                  this.pairs = p4;
+                  this._linkPair(p4);
                   p4.first = true;
                 }
                 continue;
@@ -2772,8 +2763,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               p4.n2 = node6;
               p4.id = id3;
               p4.di = di3;
-              p4.next = this.pairs;
-              this.pairs = p4;
+              this._linkPair(p4);
               p4.first = true;
               const _this41 = lshape1.pairs;
               let ret12;
@@ -2827,7 +2817,6 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
         }
       }
     }
-    let pre = null;
     let cur = this.pairs;
     while (cur != null) {
       let tmp;
@@ -2844,93 +2833,19 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
         tmp = false;
       }
       if (tmp) {
-        if (pre == null) {
-          this.pairs = cur.next;
-        } else {
-          pre.next = cur.next;
-        }
-        const _this44 = cur.n1.shape.pairs;
-        let pre1 = null;
-        let cur1 = _this44.head;
-        let ret14 = false;
-        while (cur1 != null) {
-          if (cur1.elt == cur) {
-            let old;
-            let ret15;
-            if (pre1 == null) {
-              old = _this44.head;
-              ret15 = old.next;
-              _this44.head = ret15;
-              if (_this44.head == null) {
-                _this44.pushmod = true;
-              }
-            } else {
-              old = pre1.next;
-              ret15 = old.next;
-              pre1.next = ret15;
-              if (ret15 == null) {
-                _this44.pushmod = true;
-              }
-            }
-            const o4 = old;
-            o4.elt = null;
-            o4.next = ZPP_DynAABBPhase._zpp.util.ZNPNode_ZPP_AABBPair.zpp_pool;
-            ZPP_DynAABBPhase._zpp.util.ZNPNode_ZPP_AABBPair.zpp_pool = o4;
-            _this44.modified = true;
-            _this44.length--;
-            _this44.pushmod = true;
-            ret14 = true;
-            break;
-          }
-          pre1 = cur1;
-          cur1 = cur1.next;
-        }
-        const _this45 = cur.n2.shape.pairs;
-        let pre2 = null;
-        let cur2 = _this45.head;
-        let ret16 = false;
-        while (cur2 != null) {
-          if (cur2.elt == cur) {
-            let old1;
-            let ret17;
-            if (pre2 == null) {
-              old1 = _this45.head;
-              ret17 = old1.next;
-              _this45.head = ret17;
-              if (_this45.head == null) {
-                _this45.pushmod = true;
-              }
-            } else {
-              old1 = pre2.next;
-              ret17 = old1.next;
-              pre2.next = ret17;
-              if (ret17 == null) {
-                _this45.pushmod = true;
-              }
-            }
-            const o5 = old1;
-            o5.elt = null;
-            o5.next = ZPP_DynAABBPhase._zpp.util.ZNPNode_ZPP_AABBPair.zpp_pool;
-            ZPP_DynAABBPhase._zpp.util.ZNPNode_ZPP_AABBPair.zpp_pool = o5;
-            _this45.modified = true;
-            _this45.length--;
-            _this45.pushmod = true;
-            ret16 = true;
-            break;
-          }
-          pre2 = cur2;
-          cur2 = cur2.next;
-        }
         const nxt = cur.next;
+        this._unlinkPair(cur);
+        cur.n1.shape.pairs.remove(cur);
+        cur.n2.shape.pairs.remove(cur);
         if (cur.arb != null) {
           cur.arb.pair = null;
         }
         cur.arb = null;
-        const o6 = cur;
-        o6.n1 = o6.n2 = null;
-        o6.sleeping = false;
-        o6.next = ZPP_AABBPair.zpp_pool;
-        ZPP_AABBPair.zpp_pool = o6;
+        cur.n1 = cur.n2 = null;
+        cur.sleeping = false;
+        cur.gprev = null;
+        cur.next = ZPP_AABBPair.zpp_pool;
+        ZPP_AABBPair.zpp_pool = cur;
         cur = nxt;
         continue;
       }
@@ -2944,12 +2859,9 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
           (b23.component.sleeping || b23.type == 1)
         ) {
           cur.sleeping = true;
-          if (pre == null) {
-            this.pairs = cur.next;
-          } else {
-            pre.next = cur.next;
-          }
-          cur = cur.next;
+          const sleepNext = cur.next;
+          this._unlinkPair(cur);
+          cur = sleepNext;
           continue;
         }
       }
@@ -2982,14 +2894,13 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
           cur.arb.pair = cur;
         }
       }
-      pre = cur;
       cur = cur.next;
     }
   }
 
   // ========== clear ==========
 
-  clear(): any {
+  clear(): void {
     while (this.syncs != null) {
       const next = this.syncs.snext;
       this.syncs.snext = null;
@@ -3012,89 +2923,18 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
     }
     while (this.pairs != null) {
       const nxt = this.pairs.next;
-      if (this.pairs.arb != null) {
-        this.pairs.arb.pair = null;
+      const p = this.pairs;
+      if (p.arb != null) {
+        p.arb.pair = null;
       }
-      this.pairs.arb = null;
-      const _this = this.pairs.n1.shape.pairs;
-      const obj = this.pairs;
-      let pre = null;
-      let cur = _this.head;
-      let ret = false;
-      while (cur != null) {
-        if (cur.elt == obj) {
-          let old;
-          let ret1;
-          if (pre == null) {
-            old = _this.head;
-            ret1 = old.next;
-            _this.head = ret1;
-            if (_this.head == null) {
-              _this.pushmod = true;
-            }
-          } else {
-            old = pre.next;
-            ret1 = old.next;
-            pre.next = ret1;
-            if (ret1 == null) {
-              _this.pushmod = true;
-            }
-          }
-          const o = old;
-          o.elt = null;
-          o.next = ZPP_DynAABBPhase._zpp.util.ZNPNode_ZPP_AABBPair.zpp_pool;
-          ZPP_DynAABBPhase._zpp.util.ZNPNode_ZPP_AABBPair.zpp_pool = o;
-          _this.modified = true;
-          _this.length--;
-          _this.pushmod = true;
-          ret = true;
-          break;
-        }
-        pre = cur;
-        cur = cur.next;
-      }
-      const _this1 = this.pairs.n2.shape.pairs;
-      const obj1 = this.pairs;
-      let pre1 = null;
-      let cur1 = _this1.head;
-      let ret2 = false;
-      while (cur1 != null) {
-        if (cur1.elt == obj1) {
-          let old1;
-          let ret3;
-          if (pre1 == null) {
-            old1 = _this1.head;
-            ret3 = old1.next;
-            _this1.head = ret3;
-            if (_this1.head == null) {
-              _this1.pushmod = true;
-            }
-          } else {
-            old1 = pre1.next;
-            ret3 = old1.next;
-            pre1.next = ret3;
-            if (ret3 == null) {
-              _this1.pushmod = true;
-            }
-          }
-          const o1 = old1;
-          o1.elt = null;
-          o1.next = ZPP_DynAABBPhase._zpp.util.ZNPNode_ZPP_AABBPair.zpp_pool;
-          ZPP_DynAABBPhase._zpp.util.ZNPNode_ZPP_AABBPair.zpp_pool = o1;
-          _this1.modified = true;
-          _this1.length--;
-          _this1.pushmod = true;
-          ret2 = true;
-          break;
-        }
-        pre1 = cur1;
-        cur1 = cur1.next;
-      }
-      const o2 = this.pairs;
-      o2.n1 = o2.n2 = null;
-      o2.sleeping = false;
-      o2.next = ZPP_AABBPair.zpp_pool;
-      ZPP_AABBPair.zpp_pool = o2;
+      p.arb = null;
+      p.n1.shape.pairs.remove(p);
+      p.n2.shape.pairs.remove(p);
+      p.n1 = p.n2 = null;
+      p.sleeping = false;
+      p.gprev = null;
+      p.next = ZPP_AABBPair.zpp_pool;
+      ZPP_AABBPair.zpp_pool = p;
       this.pairs = nxt;
     }
     this.dtree.clear();
@@ -3103,7 +2943,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== shapesUnderPoint ==========
 
-  shapesUnderPoint(x: any, y: any, filter: any, output: any): any {
+  shapesUnderPoint(x: number, y: number, filter: any, output: any): any {
     this.sync_broadphase();
     let ret;
     if (ZPP_Vec2.zpp_pool == null) {
@@ -3212,7 +3052,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== bodiesUnderPoint ==========
 
-  bodiesUnderPoint(x: any, y: any, filter: any, output: any): any {
+  bodiesUnderPoint(x: number, y: number, filter: any, output: any): any {
     this.sync_broadphase();
     let ret;
     if (ZPP_Vec2.zpp_pool == null) {
@@ -3327,7 +3167,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== shapesInAABB ==========
 
-  shapesInAABB(aabb: any, strict: any, containment: any, filter: any, output: any): any {
+  shapesInAABB(aabb: any, strict: boolean, containment: boolean, filter: any, output: any): any {
     this.sync_broadphase();
     (this as any).updateAABBShape(aabb);
     const ab = this.aabbShape.zpp_inner.aabb;
@@ -3575,7 +3415,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== bodiesInAABB ==========
 
-  bodiesInAABB(aabb: any, strict: any, containment: any, filter: any, output: any): any {
+  bodiesInAABB(aabb: any, strict: boolean, containment: boolean, filter: any, output: any): any {
     this.sync_broadphase();
     (this as any).updateAABBShape(aabb);
     const ab = this.aabbShape.zpp_inner.aabb;
@@ -3867,7 +3707,14 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== shapesInCircle ==========
 
-  shapesInCircle(x: any, y: any, r: any, containment: any, filter: any, output: any): any {
+  shapesInCircle(
+    x: number,
+    y: number,
+    r: number,
+    containment: boolean,
+    filter: any,
+    output: any,
+  ): any {
     this.sync_broadphase();
     (this as any).updateCircShape(x, y, r);
     const ab = this.circShape.zpp_inner.aabb;
@@ -3965,7 +3812,14 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== bodiesInCircle ==========
 
-  bodiesInCircle(x: any, y: any, r: any, containment: any, filter: any, output: any): any {
+  bodiesInCircle(
+    x: number,
+    y: number,
+    r: number,
+    containment: boolean,
+    filter: any,
+    output: any,
+  ): any {
     this.sync_broadphase();
     (this as any).updateCircShape(x, y, r);
     const ab = this.circShape.zpp_inner.aabb;
@@ -4087,7 +3941,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== shapesInShape ==========
 
-  shapesInShape(shp: any, containment: any, filter: any, output: any): any {
+  shapesInShape(shp: any, containment: boolean, filter: any, output: any): any {
     this.sync_broadphase();
     (this as any).validateShape(shp);
     const ab = shp.aabb;
@@ -4185,7 +4039,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== bodiesInShape ==========
 
-  bodiesInShape(shp: any, containment: any, filter: any, output: any): any {
+  bodiesInShape(shp: any, containment: boolean, filter: any, output: any): any {
     this.sync_broadphase();
     (this as any).validateShape(shp);
     const ab = shp.aabb;
@@ -4301,7 +4155,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== rayCast ==========
 
-  rayCast(ray: any, inner: any, filter: any): any {
+  rayCast(ray: any, inner: boolean, filter: any): any {
     if (this.openlist == null) {
       this.openlist = new ZPP_DynAABBPhase._zpp.util.ZNPList_ZPP_AABBNode();
     }
@@ -4511,7 +4365,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== rayMultiCast ==========
 
-  rayMultiCast(ray: any, inner: any, filter: any, output: any): any {
+  rayMultiCast(ray: any, inner: boolean, filter: any, output: any): any {
     if (this.openlist == null) {
       this.openlist = new ZPP_DynAABBPhase._zpp.util.ZNPList_ZPP_AABBNode();
     }

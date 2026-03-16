@@ -22,6 +22,8 @@ export class ZPP_AABBPair {
   di = 0;
   arb: any = null; // ZPP_Arbiter — circular
   next: ZPP_AABBPair | null = null;
+  /** Previous pointer in the global broadphase pairs list (doubly-linked for O(1) removal). */
+  gprev: ZPP_AABBPair | null = null;
 
   // ========== Pool callbacks ==========
 
@@ -30,5 +32,6 @@ export class ZPP_AABBPair {
   free(): void {
     this.n1 = this.n2 = null;
     this.sleeping = false;
+    this.gprev = null;
   }
 }

@@ -89,7 +89,7 @@ export class ZPP_ColArbiter extends ZPP_Arbiter {
   surfacey = 0.0;
 
   // --- Instance: collision geometry ---
-  ptype: any = null;
+  ptype: number = 0;
   lnormx = 0.0;
   lnormy = 0.0;
   lproj = 0.0;
@@ -103,10 +103,10 @@ export class ZPP_ColArbiter extends ZPP_Arbiter {
   __ref_vertex = 0;
 
   // --- Instance: contact point cache ---
-  c1: any = null;
-  oc1: any = null;
-  c2: any = null;
-  oc2: any = null;
+  c1: ZPP_IContact = null as unknown as ZPP_IContact;
+  oc1: ZPP_Contact = null as unknown as ZPP_Contact;
+  c2: ZPP_IContact = null as unknown as ZPP_IContact;
+  oc2: ZPP_Contact = null as unknown as ZPP_Contact;
   hc2 = false;
   hpc2 = false;
 

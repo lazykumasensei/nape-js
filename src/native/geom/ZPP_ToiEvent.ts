@@ -33,9 +33,9 @@ export class ZPP_ToiEvent {
   kinematic: boolean = false;
 
   constructor() {
-    this.c1 = new ZPP_Vec2();
-    this.c2 = new ZPP_Vec2();
-    this.axis = new ZPP_Vec2();
+    this.c1 = ZPP_Vec2.get(0, 0);
+    this.c2 = ZPP_Vec2.get(0, 0);
+    this.axis = ZPP_Vec2.get(0, 0);
   }
 
   // --- Pool methods ---

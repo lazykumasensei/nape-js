@@ -30,7 +30,7 @@ export class ZPP_Body {
   static bodyset: any = null;
   static cur_graph_depth: number = 0;
 
-  static bodysetlt(a: any, b: any): boolean {
+  static bodysetlt(a: ZPP_Body, b: ZPP_Body): boolean {
     return a.id < b.id;
   }
 
@@ -55,9 +55,9 @@ export class ZPP_Body {
   // --- ZPP_Interactor fields (base class, not extracted) ---
   outer_i: any = null;
   id: number = 0;
-  userData: any = null;
+  userData: Record<string, unknown> | null = null;
   ishape: any = null;
-  ibody: any = null;
+  ibody: ZPP_Body | null = null;
   icompound: any = null;
   wrap_cbTypes: any = null;
   cbSet: any = null;
@@ -560,7 +560,7 @@ export class ZPP_Body {
     this.zip_worldCOM = true;
   }
 
-  pos_invalidate(pos: any): void {
+  pos_invalidate(pos: ZPP_Vec2): void {
     this.immutable_midstep("Body::position");
     if (this.type === 1 && this.space != null) {
       throw new Error("Error: Cannot move a static object once inside a Space");
@@ -578,7 +578,7 @@ export class ZPP_Body {
     this.wrap_pos.zpp_inner.y = this.posy;
   }
 
-  vel_invalidate(vel: any): void {
+  vel_invalidate(vel: ZPP_Vec2): void {
     if (this.type === 1) {
       throw new Error("Error: Static body cannot have its velocity set.");
     }
@@ -592,7 +592,7 @@ export class ZPP_Body {
     this.wrap_vel.zpp_inner.y = this.vely;
   }
 
-  kinvel_invalidate(vel: any): void {
+  kinvel_invalidate(vel: ZPP_Vec2): void {
     this.kinvelx = vel.x;
     this.kinvely = vel.y;
     this.wake();
@@ -603,7 +603,7 @@ export class ZPP_Body {
     this.wrap_kinvel.zpp_inner.y = this.kinvely;
   }
 
-  svel_invalidate(vel: any): void {
+  svel_invalidate(vel: ZPP_Vec2): void {
     this.svelx = vel.x;
     this.svely = vel.y;
     this.wake();
@@ -614,7 +614,7 @@ export class ZPP_Body {
     this.wrap_svel.zpp_inner.y = this.svely;
   }
 
-  force_invalidate(force: any): void {
+  force_invalidate(force: ZPP_Vec2): void {
     if (this.type !== 2) {
       throw new Error("Error: Non-dynamic body cannot have force applied.");
     }
@@ -633,7 +633,7 @@ export class ZPP_Body {
   private _setupVec2Wrapper(
     x: number,
     y: number,
-    _invalidateFn: ((vec: any) => void) | null,
+    _invalidateFn: ((vec: ZPP_Vec2) => void) | null,
     _validateFn: (() => void) | null,
   ): any {
     const nape = ZPP_Body._nape;
@@ -1326,7 +1326,7 @@ export class ZPP_Body {
     s.zpp_inner.removedFromBody();
   }
 
-  shapes_invalidate(_param: any): void {
+  shapes_invalidate(_param: unknown): void {
     this.invalidate_shapes();
   }
 

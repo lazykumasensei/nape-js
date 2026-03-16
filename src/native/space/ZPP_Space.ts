@@ -40,8 +40,8 @@ export class ZPP_Space {
   // --- Instance fields ---
   outer: any = null;
   userData: any = null;
-  gravityx: any = null;
-  gravityy: any = null;
+  gravityx: number = 0;
+  gravityy: number = 0;
   wrap_gravity: any = null;
   bodies: any = null;
   wrap_bodies: any = null;
@@ -52,12 +52,12 @@ export class ZPP_Space {
   kinematics: any = null;
   bphase: any = null;
   __static: any = null;
-  global_lin_drag: any = null;
-  global_ang_drag: any = null;
-  stamp: any = null;
-  midstep: any = null;
-  time: any = null;
-  sortcontacts: any = null;
+  global_lin_drag: number = 0;
+  global_ang_drag: number = 0;
+  stamp: number = 0;
+  midstep: boolean = false;
+  time: number = 0;
+  sortcontacts: boolean = false;
   c_arbiters_true: any = null;
   c_arbiters_false: any = null;
   f_arbiters: any = null;
@@ -75,9 +75,9 @@ export class ZPP_Space {
   callbackset_list: any = null;
   cbsets: any = null;
   convexShapeList: any = null;
-  pre_dt: any = null;
+  pre_dt: number = 0;
   toiEvents: any = null;
-  continuous: any = null;
+  continuous: boolean = false;
   precb: any = null;
   prelisteners: any = null;
   mrca1: any = null;
@@ -3173,7 +3173,34 @@ export class ZPP_Space {
     return cb;
   }
 
-  step(deltaTime: any, velocityIterations: any, positionIterations: any) {
+  /** Invalidate shapes on bodies whose position or rotation changed. */
+  private _invalidateBodyList(list: any): void {
+    let node = list.head;
+    while (node != null) {
+      const body = node.elt;
+      const upos = !(body.posx == body.pre_posx && body.posy == body.pre_posy);
+      const urot = body.pre_rot != body.rot;
+      if (upos || urot) {
+        if (urot) {
+          body.zip_axis = true;
+        }
+        let sn = body.shapes.head;
+        while (sn != null) {
+          const s = sn.elt;
+          if (s.type == 1) {
+            s.polygon.invalidate_gverts();
+            s.polygon.invalidate_gaxi();
+          }
+          s.invalidate_worldCOM();
+          sn = sn.next;
+        }
+        body.zip_worldCOM = true;
+      }
+      node = node.next;
+    }
+  }
+
+  step(deltaTime: number, velocityIterations: number, positionIterations: number) {
     if (this.midstep) {
       throw new Error(
         "Error: ... REALLY?? you're going to call space.step() inside of space.step()? COME ON!!",
@@ -3279,74 +3306,8 @@ export class ZPP_Space {
       this.continuousCollisions(deltaTime);
       this.continuous = false;
       this.iteratePos(positionIterations);
-      let cx_ite2 = this.kinematics.head;
-      while (cx_ite2 != null) {
-        const cur2 = cx_ite2.elt;
-        const upos = !(cur2.posx == cur2.pre_posx && cur2.posy == cur2.pre_posy);
-        const urot = cur2.pre_rot != cur2.rot;
-        if (upos) {
-          let cx_ite3 = cur2.shapes.head;
-          while (cx_ite3 != null) {
-            const s = cx_ite3.elt;
-            if (s.type == 1) {
-              s.polygon.invalidate_gverts();
-              s.polygon.invalidate_gaxi();
-            }
-            s.invalidate_worldCOM();
-            cx_ite3 = cx_ite3.next;
-          }
-          cur2.zip_worldCOM = true;
-        }
-        if (urot) {
-          cur2.zip_axis = true;
-          let cx_ite4 = cur2.shapes.head;
-          while (cx_ite4 != null) {
-            const s1 = cx_ite4.elt;
-            if (s1.type == 1) {
-              s1.polygon.invalidate_gverts();
-              s1.polygon.invalidate_gaxi();
-            }
-            s1.invalidate_worldCOM();
-            cx_ite4 = cx_ite4.next;
-          }
-          cur2.zip_worldCOM = true;
-        }
-        cx_ite2 = cx_ite2.next;
-      }
-      let cx_ite5 = this.live.head;
-      while (cx_ite5 != null) {
-        const cur3 = cx_ite5.elt;
-        const upos1 = !(cur3.posx == cur3.pre_posx && cur3.posy == cur3.pre_posy);
-        const urot1 = cur3.pre_rot != cur3.rot;
-        if (upos1) {
-          let cx_ite6 = cur3.shapes.head;
-          while (cx_ite6 != null) {
-            const s2 = cx_ite6.elt;
-            if (s2.type == 1) {
-              s2.polygon.invalidate_gverts();
-              s2.polygon.invalidate_gaxi();
-            }
-            s2.invalidate_worldCOM();
-            cx_ite6 = cx_ite6.next;
-          }
-          cur3.zip_worldCOM = true;
-        }
-        if (urot1) {
-          cur3.zip_axis = true;
-          let cx_ite7 = cur3.shapes.head;
-          while (cx_ite7 != null) {
-            const s3 = cx_ite7.elt;
-            if (s3.type == 1) {
-              s3.polygon.invalidate_gverts();
-              s3.polygon.invalidate_gaxi();
-            }
-            s3.invalidate_worldCOM();
-            cx_ite7 = cx_ite7.next;
-          }
-          cur3.zip_worldCOM = true;
-        }
-        cx_ite5 = cx_ite5.next;
-      }
+      this._invalidateBodyList(this.kinematics);
+      this._invalidateBodyList(this.live);
       let pre = null;
       let cx_ite8 = this.staticsleep.head;
       while (cx_ite8 != null) {
@@ -3550,7 +3511,7 @@ export class ZPP_Space {
     }
   }
 
-  continuousCollisions(deltaTime: any) {
+  continuousCollisions(deltaTime: number) {
     const MAX_VEL = (2 * Math.PI) / deltaTime;
     this.bphase.broadphase(this, false);
     let curTimeAlpha = 0.0;
@@ -7123,7 +7084,7 @@ export class ZPP_Space {
     }
   }
 
-  updateVel(dt: any) {
+  updateVel(dt: number) {
     let pre = null;
     const linDrag = 1 - dt * this.global_lin_drag;
     const angDrag = 1 - dt * this.global_ang_drag;
@@ -7148,7 +7109,7 @@ export class ZPP_Space {
     }
   }
 
-  updatePos(dt: any) {
+  updatePos(dt: number) {
     const MAX_VEL = (2 * Math.PI) / dt;
     let cx_ite = this.live.head;
     while (cx_ite != null) {
@@ -7686,7 +7647,7 @@ export class ZPP_Space {
     }
   }
 
-  presteparb(arb: any, dt: any, cont?: any) {
+  presteparb(arb: ZPP_Arbiter, dt: number, cont?: boolean) {
     if (cont == null) {
       cont = false;
     }
@@ -9116,7 +9077,45 @@ export class ZPP_Space {
     return false;
   }
 
-  prestep(dt: any) {
+  /** Iterate a single arbiter list, removing arbiters that fail prestep. */
+  private _prestepArbiterList(arbs: any, nodePool: any, dt: number): void {
+    let pre = null;
+    let arbite = arbs.head;
+    while (arbite != null) {
+      const arb = arbite.elt;
+      if (this.presteparb(arb, dt)) {
+        let old;
+        let ret;
+        if (pre == null) {
+          old = arbs.head;
+          ret = old.next;
+          arbs.head = ret;
+          if (arbs.head == null) {
+            arbs.pushmod = true;
+          }
+        } else {
+          old = pre.next;
+          ret = old.next;
+          pre.next = ret;
+          if (ret == null) {
+            arbs.pushmod = true;
+          }
+        }
+        old.elt = null;
+        old.next = nodePool.zpp_pool;
+        nodePool.zpp_pool = old;
+        arbs.modified = true;
+        arbs.length--;
+        arbs.pushmod = true;
+        arbite = ret;
+        continue;
+      }
+      pre = arbite;
+      arbite = arbite.next;
+    }
+  }
+
+  prestep(dt: number) {
     let pre = null;
     let cx_ite = this.live_constraints.head;
     while (cx_ite != null) {
@@ -9198,110 +9197,8 @@ export class ZPP_Space {
         pre1 = null;
       }
     }
-    let pre2 = null;
-    let arbs1 = this.f_arbiters;
-    let arbite1 = arbs1.head;
-    let fst1 = false;
-    if (fst1 && arbite1 == null) {
-      fst1 = false;
-      arbs1 = null;
-      pre2 = null;
-    }
-    while (arbite1 != null) {
-      const arb1 = arbite1.elt;
-      if (this.presteparb(arb1, dt)) {
-        let old1;
-        let ret1;
-        if (pre2 == null) {
-          old1 = arbs1.head;
-          ret1 = old1.next;
-          arbs1.head = ret1;
-          if (arbs1.head == null) {
-            arbs1.pushmod = true;
-          }
-        } else {
-          old1 = pre2.next;
-          ret1 = old1.next;
-          pre2.next = ret1;
-          if (ret1 == null) {
-            arbs1.pushmod = true;
-          }
-        }
-        const o1 = old1;
-        o1.elt = null;
-        o1.next = ZPP_Space._zpp.util.ZNPNode_ZPP_FluidArbiter.zpp_pool;
-        ZPP_Space._zpp.util.ZNPNode_ZPP_FluidArbiter.zpp_pool = o1;
-        arbs1.modified = true;
-        arbs1.length--;
-        arbs1.pushmod = true;
-        arbite1 = ret1;
-        if (fst1 && arbite1 == null) {
-          fst1 = false;
-          arbs1 = null;
-          pre2 = null;
-        }
-        continue;
-      }
-      pre2 = arbite1;
-      arbite1 = arbite1.next;
-      if (fst1 && arbite1 == null) {
-        fst1 = false;
-        arbs1 = null;
-        pre2 = null;
-      }
-    }
-    let pre3 = null;
-    let arbs2 = this.s_arbiters;
-    let arbite2 = arbs2.head;
-    let fst2 = false;
-    if (fst2 && arbite2 == null) {
-      fst2 = false;
-      arbs2 = null;
-      pre3 = null;
-    }
-    while (arbite2 != null) {
-      const arb2 = arbite2.elt;
-      if (this.presteparb(arb2, dt)) {
-        let old2;
-        let ret2;
-        if (pre3 == null) {
-          old2 = arbs2.head;
-          ret2 = old2.next;
-          arbs2.head = ret2;
-          if (arbs2.head == null) {
-            arbs2.pushmod = true;
-          }
-        } else {
-          old2 = pre3.next;
-          ret2 = old2.next;
-          pre3.next = ret2;
-          if (ret2 == null) {
-            arbs2.pushmod = true;
-          }
-        }
-        const o2 = old2;
-        o2.elt = null;
-        o2.next = ZPP_Space._zpp.util.ZNPNode_ZPP_SensorArbiter.zpp_pool;
-        ZPP_Space._zpp.util.ZNPNode_ZPP_SensorArbiter.zpp_pool = o2;
-        arbs2.modified = true;
-        arbs2.length--;
-        arbs2.pushmod = true;
-        arbite2 = ret2;
-        if (fst2 && arbite2 == null) {
-          fst2 = false;
-          arbs2 = null;
-          pre3 = null;
-        }
-        continue;
-      }
-      pre3 = arbite2;
-      arbite2 = arbite2.next;
-      if (fst2 && arbite2 == null) {
-        fst2 = false;
-        arbs2 = null;
-        pre3 = null;
-      }
-    }
+    this._prestepArbiterList(this.f_arbiters, ZPP_Space._zpp.util.ZNPNode_ZPP_FluidArbiter, dt);
+    this._prestepArbiterList(this.s_arbiters, ZPP_Space._zpp.util.ZNPNode_ZPP_SensorArbiter, dt);
   }
 
   warmStart() {
@@ -9370,7 +9267,7 @@ export class ZPP_Space {
     }
   }
 
-  iterateVel(times: any) {
+  iterateVel(times: number) {
     let _g = 0;
     const _g1 = times;
     while (_g < _g1) {
@@ -9638,7 +9535,7 @@ export class ZPP_Space {
     }
   }
 
-  iteratePos(times: any) {
+  iteratePos(times: number) {
     let _g = 0;
     const _g1 = times;
     while (_g < _g1) {
