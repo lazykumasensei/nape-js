@@ -103,7 +103,7 @@ export function highlightCode(code) {
     "(`(?:[^`\\\\]|\\\\.)*`)",
     "\\b(import|from|export|const|let|var|new|for|if|else|return|function|class|extends|of|in|true|false|null|undefined|typeof|this|continue|break)\\b",
     "\\b(\\d+\\.?\\d*)\\b",
-    "\\b(Space|Body|BodyType|Vec2|Circle|Polygon|PivotJoint|DistanceJoint|AngleJoint|WeldJoint|MotorJoint|LineJoint|PulleyJoint|Material|InteractionFilter|InteractionGroup|CbType|CbEvent|InteractionType|InteractionListener|PreListener|PreFlag|MarchingSquares|AABB|GeomPoly|Math|THREE|Map)\\b",
+    "\\b(Space|Body|BodyType|Vec2|Circle|Polygon|PivotJoint|DistanceJoint|AngleJoint|WeldJoint|MotorJoint|LineJoint|PulleyJoint|Material|InteractionFilter|InteractionGroup|CbType|CbEvent|InteractionType|InteractionListener|PreListener|PreFlag|MarchingSquares|AABB|GeomPoly|FluidProperties|Math|THREE|Map)\\b",
   ].join("|"), "g");
 
   return code.replace(re, (match, comment, dStr, sStr, tStr, kw, num, type) => {
