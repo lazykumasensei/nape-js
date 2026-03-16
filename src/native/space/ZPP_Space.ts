@@ -149,13 +149,23 @@ export class ZPP_Space {
     if (tmp) {
       this.bphase = new ZPP_Space._zpp.space.ZPP_DynAABBPhase(this);
     } else {
-      if (ZPP_Flags.Broadphase_SWEEP_AND_PRUNE == null) {
+      // Check spatial hash first
+      if (ZPP_Flags.Broadphase_SPATIAL_HASH == null) {
         ZPP_Flags.internal = true;
-        ZPP_Flags.Broadphase_SWEEP_AND_PRUNE = new ZPP_Space._nape.space.Broadphase();
+        ZPP_Flags.Broadphase_SPATIAL_HASH = new ZPP_Space._nape.space.Broadphase();
         ZPP_Flags.internal = false;
       }
-      if (broadphase == ZPP_Flags.Broadphase_SWEEP_AND_PRUNE) {
-        this.bphase = new ZPP_Space._zpp.space.ZPP_SweepPhase(this);
+      if (broadphase == ZPP_Flags.Broadphase_SPATIAL_HASH) {
+        this.bphase = new ZPP_Space._zpp.space.ZPP_SpatialHashPhase(this);
+      } else {
+        if (ZPP_Flags.Broadphase_SWEEP_AND_PRUNE == null) {
+          ZPP_Flags.internal = true;
+          ZPP_Flags.Broadphase_SWEEP_AND_PRUNE = new ZPP_Space._nape.space.Broadphase();
+          ZPP_Flags.internal = false;
+        }
+        if (broadphase == ZPP_Flags.Broadphase_SWEEP_AND_PRUNE) {
+          this.bphase = new ZPP_Space._zpp.space.ZPP_SweepPhase(this);
+        }
       }
     }
     this.time = 0.0;

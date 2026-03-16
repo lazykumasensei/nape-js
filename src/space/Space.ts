@@ -121,9 +121,16 @@ export class Space {
     }
   }
 
-  /** The broadphase algorithm currently in use (SWEEP_AND_PRUNE or DYNAMIC_AABB_TREE). */
+  /** The broadphase algorithm currently in use. */
   get broadphase(): Broadphase {
-    if (this.zpp_inner.bphase.is_sweep) {
+    if (this.zpp_inner.bphase.is_spatial_hash) {
+      if (ZPP_Flags.Broadphase_SPATIAL_HASH == null) {
+        ZPP_Flags.internal = true;
+        ZPP_Flags.Broadphase_SPATIAL_HASH = new (getNape().space.Broadphase)();
+        ZPP_Flags.internal = false;
+      }
+      return ZPP_Flags.Broadphase_SPATIAL_HASH;
+    } else if (this.zpp_inner.bphase.is_sweep) {
       if (ZPP_Flags.Broadphase_SWEEP_AND_PRUNE == null) {
         ZPP_Flags.internal = true;
         ZPP_Flags.Broadphase_SWEEP_AND_PRUNE = new (getNape().space.Broadphase)();

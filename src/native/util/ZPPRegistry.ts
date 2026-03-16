@@ -108,6 +108,7 @@ import { ZPP_CbSetManager } from "../space/ZPP_CbSetManager";
 import { ZPP_Space } from "../space/ZPP_Space";
 import { ZPP_SweepData } from "../space/ZPP_SweepData";
 import { ZPP_SweepPhase } from "../space/ZPP_SweepPhase";
+import { ZPP_SpatialHashPhase } from "../space/ZPP_SpatialHashPhase";
 
 /**
  * Creates and returns the nape namespace object with all ZPP_* classes registered.
@@ -386,6 +387,10 @@ export function registerZPPClasses(): any {
   (ZPP_SweepPhase as any)._zpp = zpp;
   (ZPP_SweepPhase as any)._nape = nape;
   zpp.space.ZPP_SweepPhase = ZPP_SweepPhase;
+
+  (ZPP_SpatialHashPhase as any)._zpp = zpp;
+  (ZPP_SpatialHashPhase as any)._nape = nape;
+  zpp.space.ZPP_SpatialHashPhase = ZPP_SpatialHashPhase;
 
   // --- util (remaining) ---
   zpp.util.ZNPArray2_Float = ZNPArray2_Float;

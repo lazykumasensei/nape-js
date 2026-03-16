@@ -8,12 +8,12 @@ A fully typed TypeScript 2D physics engine — modernized rewrite of the origina
 - **Pure TypeScript**, `strict: true`, zero DOM dependencies (runs on Node.js + browser)
 - **Rigid body dynamics** — circles, convex polygons, compounds, static/dynamic/kinematic bodies
 - **Constraint system** — PivotJoint, DistanceJoint, AngleJoint, MotorJoint, LineJoint, PulleyJoint, WeldJoint, UserConstraint
-- **Collision detection** — broadphase (sweep-and-prune / dynamic AABB tree), narrowphase, CCD, raycasting, convex sweep
+- **Collision detection** — broadphase (sweep-and-prune / dynamic AABB tree / spatial hash grid), narrowphase, CCD, raycasting, convex sweep
 - **Callback system** — body/interaction/constraint listeners, pre-collision callbacks
 - **Fluid simulation** — buoyancy and drag via fluid-enabled shapes (unique among JS engines)
 - **Serialization** — JSON (`spaceToJSON` / `spaceFromJSON`) + binary (`spaceToBinary` / `spaceFromBinary`) for save/load/multiplayer rollback
 - **Debug draw** — abstract `DebugDraw` interface (Box2D pattern), reference impls for Canvas/Three.js/PixiJS/p5.js
-- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 3851 tests
+- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 3885 tests
 
 ## Build & Test
 
@@ -63,7 +63,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | What                     | Status |
 | ------------------------ | ------ |
 | Haxe modernization       | ✅ Complete — pure TypeScript, fully typed |
-| Test coverage            | 🔶 ~58% statements (3851 tests), target ≥80% |
+| Test coverage            | 🔶 ~58% statements (3885 tests), target ≥80% |
 | Serialization API        | ✅ Done — `@newkrok/nape-js/serialization` |
 | Binary snapshots         | ✅ Done — `spaceToBinary` / `spaceFromBinary` (P39) |
 | Debug draw API           | ✅ Done — abstract `DebugDraw` + `Space.debugDraw()` |
@@ -77,7 +77,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | Hot-path optimization    | ✅ Done — P46 (step/prestep dedup, pool bypass fix, O(1) pair removal, `any` narrowing) |
 | Deterministic mode       | ⬜ Planned — P48 (multiplayer) |
 | ECS adapter              | ⬜ Planned — P49 |
-| Spatial hash grid        | ⬜ Planned — P50 |
+| Spatial hash grid        | ✅ Done — P50 (`Broadphase.SPATIAL_HASH`, hourglass demo) |
 | Sub-stepping solver      | ⬜ Planned — P51 (long-term) |
 | Multiplayer demo         | ✅ Done — P52 (Railway WebSocket, `docs/multiplayer.html` + `server/`) |
 | Polygon-Polygon bug      | ✅ P53 — validated: polygon-polygon collision works correctly; reported tunneling not reproducible (22 tests confirm) |

@@ -118,7 +118,7 @@ Potential future priorities identified via competitive analysis and market gaps:
 | P47 — CJS bundle dedup (serialization)    | S      | bundle   | low    | ⬜ Not started |
 | P48 — Deterministic mode (soft)           | L      | critical | high   | ⬜ Not started |
 | P49 — ECS adapter layer                   | M      | DX       | medium | ⬜ Not started |
-| P50 — Spatial hash grid broadphase        | S-M    | perf     | low    | ⬜ Not started |
+| P50 — Spatial hash grid broadphase        | S-M    | perf     | low    | ✅ Done        |
 | P51 — Sub-stepping solver                 | XL     | stability| high   | ⬜ Not started |
 | P53 — Polygon-Polygon narrowphase bug fix | M      | critical | high   | ⬜ Not started |
 
@@ -363,16 +363,19 @@ Optional adapter for Entity Component System frameworks (bitECS, miniplex, Becsy
 
 ---
 
-## Planned: P50 — Spatial Hash Grid Broadphase
+## Done: P50 — Spatial Hash Grid Broadphase
 
-**Effort: S-M | Impact: perf (niche) | Risk: low**
+**Effort: S-M | Impact: perf (niche) | Risk: low | Status: ✅ Complete**
 
-Third broadphase algorithm option for dense, uniform-object scenes:
+Third broadphase algorithm for dense, uniform-object scenes:
 
-- O(1) expected lookup for nearby objects
+- `Broadphase.SPATIAL_HASH` — opt-in, default unchanged (`DYNAMIC_AABB_TREE`)
+- O(1) expected lookup for nearby objects via uniform grid hashing
+- Auto-tunes cell size to 2× average shape AABB (or accepts explicit cell size)
 - Best for: particle simulations, many same-sized objects, bounded worlds
-- Complements existing SAP (good for few moving objects) and AABB tree (general purpose)
 - Not useful for variable-size objects or sparse worlds
+- Includes hourglass demo (1000 particles pouring through funnel)
+- 34 integration tests covering collisions, spatial queries, raycasting, constraints
 
 ---
 
