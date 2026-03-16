@@ -2950,7 +2950,11 @@ export class ZPP_Collide {
    * Create or reuse a contact in the arbiter's contact list.
    * Returns the contact, or null if creation failed.
    */
-  private static _getOrCreateContact(arb: ZPP_ColArbiter, hash: number, stamp: number): ZPP_Contact {
+  private static _getOrCreateContact(
+    arb: ZPP_ColArbiter,
+    hash: number,
+    stamp: number,
+  ): ZPP_Contact {
     let c: ZPP_Contact | null = null;
     let cx_ite = arb.contacts.next;
     while (cx_ite != null) {
@@ -3014,7 +3018,13 @@ export class ZPP_Collide {
   }
 
   /** Circle vs Capsule contact generation. */
-  static _circleCapsuleContact(circ: any, cap: any, arb: ZPP_ColArbiter, rev: boolean, napeNs: any): boolean {
+  static _circleCapsuleContact(
+    circ: any,
+    cap: any,
+    arb: ZPP_ColArbiter,
+    rev: boolean,
+    napeNs: any,
+  ): boolean {
     // Find closest point on capsule spine to circle center
     const t = ZPP_Collide._closestT(
       cap.spine1x,
@@ -3282,7 +3292,13 @@ export class ZPP_Collide {
   }
 
   /** Polygon vs Capsule contact generation. */
-  static _polyCapsuleContact(poly: any, cap: any, arb: ZPP_ColArbiter, rev: boolean, napeNs: any): boolean {
+  static _polyCapsuleContact(
+    poly: any,
+    cap: any,
+    arb: ZPP_ColArbiter,
+    rev: boolean,
+    napeNs: any,
+  ): boolean {
     // SAT phase 1: polygon edge normals vs capsule
     // For each edge, the minimum separation is min(proj(spine1), proj(spine2)) - edge.gprojection - cap.radius
     let bestDist = -1e100;

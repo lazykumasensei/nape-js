@@ -3707,7 +3707,14 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== shapesInCircle ==========
 
-  shapesInCircle(x: number, y: number, r: number, containment: boolean, filter: any, output: any): any {
+  shapesInCircle(
+    x: number,
+    y: number,
+    r: number,
+    containment: boolean,
+    filter: any,
+    output: any,
+  ): any {
     this.sync_broadphase();
     (this as any).updateCircShape(x, y, r);
     const ab = this.circShape.zpp_inner.aabb;
@@ -3805,7 +3812,14 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== bodiesInCircle ==========
 
-  bodiesInCircle(x: number, y: number, r: number, containment: boolean, filter: any, output: any): any {
+  bodiesInCircle(
+    x: number,
+    y: number,
+    r: number,
+    containment: boolean,
+    filter: any,
+    output: any,
+  ): any {
     this.sync_broadphase();
     (this as any).updateCircShape(x, y, r);
     const ab = this.circShape.zpp_inner.aabb;
