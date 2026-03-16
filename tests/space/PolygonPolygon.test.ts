@@ -36,10 +36,7 @@ function isAboveFloor(body: Body, floorY: number, floorH: number): boolean {
 
 /** Returns true if body has settled (low velocity). */
 function hasSettled(body: Body, threshold = 5): boolean {
-  return (
-    Math.abs(body.velocity.x) < threshold &&
-    Math.abs(body.velocity.y) < threshold
-  );
+  return Math.abs(body.velocity.x) < threshold && Math.abs(body.velocity.y) < threshold;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,11 +102,7 @@ describe("P53 — Polygon-Polygon collision with multiple dynamic bodies", () =>
   it("three dynamic boxes should all land on static polygon floor", () => {
     const space = new Space(new Vec2(0, 400));
     const floor = staticFloor(0, 300, 500, 20);
-    const boxes = [
-      dynamicBox(-60, 0, 30, 30),
-      dynamicBox(0, 0, 30, 30),
-      dynamicBox(60, 0, 30, 30),
-    ];
+    const boxes = [dynamicBox(-60, 0, 30, 30), dynamicBox(0, 0, 30, 30), dynamicBox(60, 0, 30, 30)];
     for (const b of boxes) space.bodies.add(b);
     space.bodies.add(floor);
 
@@ -372,17 +365,8 @@ describe("P53 — Polygon-Polygon collision with multiple dynamic bodies", () =>
 
     const triangles: Body[] = [];
     for (let i = 0; i < 3; i++) {
-      const body = new Body(
-        BodyType.DYNAMIC,
-        new Vec2(-50 + i * 50, 0),
-      );
-      body.shapes.add(
-        new Polygon([
-          Vec2.get(0, -15),
-          Vec2.get(15, 15),
-          Vec2.get(-15, 15),
-        ]),
-      );
+      const body = new Body(BodyType.DYNAMIC, new Vec2(-50 + i * 50, 0));
+      body.shapes.add(new Polygon([Vec2.get(0, -15), Vec2.get(15, 15), Vec2.get(-15, 15)]));
       space.bodies.add(body);
       triangles.push(body);
     }
@@ -504,10 +488,7 @@ describe("P53 — Polygon-Polygon collision with multiple dynamic bodies", () =>
 
     const boxes: Body[] = [];
     for (let i = 0; i < 3; i++) {
-      const box = new Body(
-        BodyType.DYNAMIC,
-        new Vec2(-40 + i * 40, 0),
-      );
+      const box = new Body(BodyType.DYNAMIC, new Vec2(-40 + i * 40, 0));
       const boxShape = new Polygon(Polygon.box(20, 20));
       boxShape.material = slipperyMat;
       box.shapes.add(boxShape);
@@ -562,10 +543,7 @@ describe("P53 — Polygon-Polygon collision with multiple dynamic bodies", () =>
 
     const boxes: Body[] = [];
     for (let i = 0; i < 3; i++) {
-      const box = new Body(
-        BodyType.DYNAMIC,
-        new Vec2(-40 + i * 40, 0),
-      );
+      const box = new Body(BodyType.DYNAMIC, new Vec2(-40 + i * 40, 0));
       const boxShape = new Polygon(Polygon.box(20, 20));
       boxShape.material = bouncyMat;
       box.shapes.add(boxShape);
