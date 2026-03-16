@@ -279,15 +279,6 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
 
   // ========== Broadphase pair detection ==========
 
-  /** Encode a unique pair key from two shape indices for dedup. */
-  pairKey(idxA: number, idxB: number): number {
-    // Ensure order-independent: always put smaller index first.
-    // Use Szudzik's pairing for compact unique keys.
-    const a = idxA < idxB ? idxA : idxB;
-    const b = idxA < idxB ? idxB : idxA;
-    return b * b + a;
-  }
-
   broadphase(space: any, discrete: boolean): void {
     const n = this.shapes.length;
     if (n === 0) return;
@@ -313,59 +304,87 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
     const tested = this.testedPairs;
     tested.clear();
 
-    // Insert all shapes into grid cells
+    // Insert all shapes into grid cells and check pairs
     for (let i = 0; i < n; i++) {
       const shape = this.shapes[i];
       const aabb = shape.aabb;
+      const shIdx = shape.__shIdx as number;
 
-      const minCX = Math.floor(aabb.minx * inv) | 0;
-      const minCY = Math.floor(aabb.miny * inv) | 0;
-      const maxCX = Math.floor(aabb.maxx * inv) | 0;
-      const maxCY = Math.floor(aabb.maxy * inv) | 0;
+      const minCX = (aabb.minx * inv) | 0;
+      const minCY = (aabb.miny * inv) | 0;
+      const maxCX = (aabb.maxx * inv) | 0;
+      const maxCY = (aabb.maxy * inv) | 0;
 
-      for (let cx = minCX; cx <= maxCX; cx++) {
-        for (let cy = minCY; cy <= maxCY; cy++) {
-          const key = this.cellKey(cx, cy);
-          let cell = grid.get(key);
-          if (cell === undefined) {
-            // Grab from pool or allocate
-            cell = pool.length > 0 ? pool.pop()! : [];
-            grid.set(key, cell);
+      // Fast path: shape fits in a single cell — no dedup needed
+      const singleCell = minCX === maxCX && minCY === maxCY;
+
+      if (singleCell) {
+        const key = (minCX * 73856093) ^ (minCY * 19349663);
+        let cell = grid.get(key);
+        if (cell === undefined) {
+          cell = pool.length > 0 ? pool.pop()! : [];
+          grid.set(key, cell);
+        }
+        const cLen = cell.length;
+        const b1 = shape.body;
+        const b1type = b1.type;
+        const b1sleeping = b1.component.sleeping;
+        for (let j = 0; j < cLen; j++) {
+          const other = cell[j];
+          const b2 = other.body;
+          if (b2 === b1) continue;
+          if (b1type === 1 && b2.type === 1) continue;
+          if (b1sleeping && b2.component.sleeping) continue;
+          const a2 = other.aabb;
+          if (a2.miny > aabb.maxy || aabb.miny > a2.maxy) continue;
+          if (a2.minx > aabb.maxx || aabb.minx > a2.maxx) continue;
+          if (discrete) {
+            space.narrowPhase(shape, other, b1type !== 2 || b2.type !== 2, null, false);
+          } else {
+            space.continuousEvent(shape, other, b1type !== 2 || b2.type !== 2, null, false);
           }
-
-          // Check this shape against all shapes already in this cell
-          const cLen = cell.length;
-          for (let j = 0; j < cLen; j++) {
-            const other = cell[j];
-            const b1 = shape.body;
-            const b2 = other.body;
-
-            // Skip same body
-            if (b1 === b2) continue;
-            // Skip both static
-            if (b1.type === 1 && b2.type === 1) continue;
-            // Skip both sleeping
-            if (b1.component.sleeping && b2.component.sleeping) continue;
-
-            // Deduplicate: shapes spanning multiple cells produce the same pair
-            const pk = this.pairKey(shape.__shIdx as number, other.__shIdx as number);
-            if (tested.has(pk)) continue;
-            tested.add(pk);
-
-            // AABB overlap test
-            const a1 = shape.aabb;
-            const a2 = other.aabb;
-            if (a2.miny > a1.maxy || a1.miny > a2.maxy) continue;
-            if (a2.minx > a1.maxx || a1.minx > a2.maxx) continue;
-
-            if (discrete) {
-              space.narrowPhase(shape, other, b1.type !== 2 || b2.type !== 2, null, false);
-            } else {
-              space.continuousEvent(shape, other, b1.type !== 2 || b2.type !== 2, null, false);
+        }
+        cell.push(shape);
+      } else {
+        // Multi-cell path: shape spans cells, needs dedup
+        for (let cx = minCX; cx <= maxCX; cx++) {
+          for (let cy = minCY; cy <= maxCY; cy++) {
+            const key = (cx * 73856093) ^ (cy * 19349663);
+            let cell = grid.get(key);
+            if (cell === undefined) {
+              cell = pool.length > 0 ? pool.pop()! : [];
+              grid.set(key, cell);
             }
-          }
+            const cLen = cell.length;
+            const b1 = shape.body;
+            const b1type = b1.type;
+            const b1sleeping = b1.component.sleeping;
+            for (let j = 0; j < cLen; j++) {
+              const other = cell[j];
+              const b2 = other.body;
+              if (b2 === b1) continue;
+              if (b1type === 1 && b2.type === 1) continue;
+              if (b1sleeping && b2.component.sleeping) continue;
 
-          cell.push(shape);
+              // Szudzik pairing for dedup — inlined
+              const oIdx = other.__shIdx as number;
+              const pa = shIdx < oIdx ? shIdx : oIdx;
+              const pb = shIdx < oIdx ? oIdx : shIdx;
+              const pk = pb * pb + pa;
+              if (tested.has(pk)) continue;
+              tested.add(pk);
+
+              const a2 = other.aabb;
+              if (a2.miny > aabb.maxy || aabb.miny > a2.maxy) continue;
+              if (a2.minx > aabb.maxx || aabb.minx > a2.maxx) continue;
+              if (discrete) {
+                space.narrowPhase(shape, other, b1type !== 2 || b2.type !== 2, null, false);
+              } else {
+                space.continuousEvent(shape, other, b1type !== 2 || b2.type !== 2, null, false);
+              }
+            }
+            cell.push(shape);
+          }
         }
       }
     }
