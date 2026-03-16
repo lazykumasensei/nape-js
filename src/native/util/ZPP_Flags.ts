@@ -74,6 +74,7 @@ export class ZPP_Flags {
   // --- Broadphase ---
   static Broadphase_DYNAMIC_AABB_TREE: any = null;
   static Broadphase_SWEEP_AND_PRUNE: any = null;
+  static Broadphase_SPATIAL_HASH: any = null;
 
   // --- Arbiter type ---
   static ArbiterType_COLLISION: any = null;
@@ -128,6 +129,7 @@ export class ZPP_Flags {
   static id_ShapeType_CAPSULE = 2;
   static id_Broadphase_DYNAMIC_AABB_TREE = 0;
   static id_Broadphase_SWEEP_AND_PRUNE = 1;
+  static id_Broadphase_SPATIAL_HASH = 2;
   static id_ArbiterType_COLLISION = 1;
   static id_ArbiterType_SENSOR = 2;
   static id_ArbiterType_FLUID = 4;

@@ -20,6 +20,7 @@ export class ZPP_Broadphase {
   // --- Instance fields ---
   space: any = null; // ZPP_Space — circular
   is_sweep: boolean = false;
+  is_spatial_hash: boolean = false;
   sweep: any = null; // ZPP_SweepPhase — circular
   dynab: any = null; // ZPP_DynAABBPhase — circular
   aabbShape: any = null; // ZPP_Shape — circular
@@ -34,6 +35,7 @@ export class ZPP_Broadphase {
   static _initFields(self: any): void {
     self.space = null;
     self.is_sweep = false;
+    self.is_spatial_hash = false;
     self.sweep = null;
     self.dynab = null;
     self.aabbShape = null;
