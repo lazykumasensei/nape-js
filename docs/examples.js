@@ -136,7 +136,7 @@ function openInCodePen(demo) {
   const js   = `import {
   Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
-  Material, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
+  Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
 } from "${NAPE_CDN}";
 

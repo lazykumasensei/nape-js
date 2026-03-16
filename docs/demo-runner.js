@@ -235,8 +235,8 @@ export class DemoRunner {
     // Skipped during preview-only renders to avoid DOM side-effects.
     if (!preview) demoDef.init?.(this.#container, this.#W, this.#H);
 
-    // Build 3D meshes if already in 3D mode
-    if (this.#mode === "3d" && this.#threeScene) {
+    // Build 3D meshes if already in 3D mode (skip if demo has custom render3d)
+    if (this.#mode === "3d" && this.#threeScene && !demoDef.render3d) {
       this.#buildMeshes();
     }
   }
@@ -305,7 +305,7 @@ export class DemoRunner {
 
     if (mode === "3d") {
       this.#setup3d();
-      if (this.#space) this.#buildMeshes();
+      if (this.#space && !this.#demo?.render3d) this.#buildMeshes();
     } else {
       this.#teardown3d();
     }
