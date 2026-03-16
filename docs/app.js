@@ -19,6 +19,7 @@ import ragdoll     from "./demos/ragdoll.js?v=3.13.5";
 import strandbeast from "./demos/strandbeast.js?v=3.13.5";
 import softBody    from "./demos/soft-body.js?v=3.13.5";
 import asteroidField from "./demos/asteroid-field.js?v=3.13.5";
+import fluidBuoyancy from "./demos/fluid-buoyancy.js?v=3.13.5";
 
 // =========================================================================
 // Demo registry
@@ -26,7 +27,7 @@ import asteroidField from "./demos/asteroid-field.js?v=3.13.5";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints,
-  gravity, stacking, ragdoll, strandbeast, softBody, asteroidField,
+  gravity, stacking, ragdoll, strandbeast, softBody, asteroidField, fluidBuoyancy,
 ];
 
 const FEATURED = ALL_DEMOS

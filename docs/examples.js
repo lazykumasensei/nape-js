@@ -40,6 +40,7 @@ import capsule           from "./demos/capsule.js?v=3.13.5";
 import destructibleTerrain from "./demos/destructible-terrain.js?v=3.13.5";
 import webWorker           from "./demos/web-worker.js?v=3.13.5";
 import asteroidField       from "./demos/asteroid-field.js?v=3.13.5";
+import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.13.5";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -49,6 +50,7 @@ const ALL_DEMOS = [
   destructibleTerrain,
   webWorker,
   asteroidField,
+  fluidBuoyancy,
 ];
 
 const CW = 900;
