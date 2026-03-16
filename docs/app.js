@@ -18,7 +18,7 @@ import stacking    from "./demos/stacking.js?v=3.13.5";
 import ragdoll     from "./demos/ragdoll.js?v=3.13.5";
 import strandbeast from "./demos/strandbeast.js?v=3.13.5";
 import softBody    from "./demos/soft-body.js?v=3.13.5";
-import hourglass   from "./demos/hourglass.js?v=3.13.5";
+import asteroidField from "./demos/asteroid-field.js?v=3.13.5";
 
 // =========================================================================
 // Demo registry
@@ -26,7 +26,7 @@ import hourglass   from "./demos/hourglass.js?v=3.13.5";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints,
-  gravity, stacking, ragdoll, strandbeast, softBody, hourglass,
+  gravity, stacking, ragdoll, strandbeast, softBody, asteroidField,
 ];
 
 const FEATURED = ALL_DEMOS

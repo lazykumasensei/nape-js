@@ -39,7 +39,7 @@ import dropImageBody     from "./demos/drop-image-body.js?v=3.13.5";
 import capsule           from "./demos/capsule.js?v=3.13.5";
 import destructibleTerrain from "./demos/destructible-terrain.js?v=3.13.5";
 import webWorker           from "./demos/web-worker.js?v=3.13.5";
-import hourglass           from "./demos/hourglass.js?v=3.13.5";
+import asteroidField       from "./demos/asteroid-field.js?v=3.13.5";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -48,7 +48,7 @@ const ALL_DEMOS = [
   softBody, oneWayPlatforms, collisionFiltering, bodyFromGraphic, dropImageBody, capsule,
   destructibleTerrain,
   webWorker,
-  hourglass,
+  asteroidField,
 ];
 
 const CW = 900;
