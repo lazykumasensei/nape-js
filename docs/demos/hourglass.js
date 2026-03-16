@@ -14,60 +14,56 @@ export default {
     space.gravity = new Vec2(0, 600);
 
     const t = 10; // wall thickness
+    const cx = W / 2;
+    const cy = H / 2;
+    const gapHalf = 12; // half-width of the narrow neck opening
 
     // Outer walls (container)
-    const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - t / 2));
+    const floor = new Body(BodyType.STATIC, new Vec2(cx, H - t / 2));
     floor.shapes.add(new Polygon(Polygon.box(W, t)));
     floor.space = space;
 
-    const ceil = new Body(BodyType.STATIC, new Vec2(W / 2, t / 2));
+    const ceil = new Body(BodyType.STATIC, new Vec2(cx, t / 2));
     ceil.shapes.add(new Polygon(Polygon.box(W, t)));
     ceil.space = space;
 
-    const left = new Body(BodyType.STATIC, new Vec2(t / 2, H / 2));
+    const left = new Body(BodyType.STATIC, new Vec2(t / 2, cy));
     left.shapes.add(new Polygon(Polygon.box(t, H)));
     left.space = space;
 
-    const right = new Body(BodyType.STATIC, new Vec2(W - t / 2, H / 2));
+    const right = new Body(BodyType.STATIC, new Vec2(W - t / 2, cy));
     right.shapes.add(new Polygon(Polygon.box(t, H)));
     right.space = space;
 
-    // Hourglass funnel — two angled walls converging to a narrow gap
-    const cx = W / 2;
-    const cy = H / 2;
-    const gapHalf = 14; // half-gap width
-    const funnelLen = 180;
-    const angle = 0.45;
+    // Hourglass walls — 4 angled segments forming a proper neck
+    // Each wall runs from near an outer edge to the narrow center gap.
+    const margin = 30; // inset from outer walls
+    const wallDefs = [
+      // Upper-left:  top-left corner → left side of neck
+      { x1: margin, y1: margin, x2: cx - gapHalf, y2: cy },
+      // Upper-right: top-right corner → right side of neck
+      { x1: W - margin, y1: margin, x2: cx + gapHalf, y2: cy },
+      // Lower-left:  left side of neck → bottom-left corner
+      { x1: cx - gapHalf, y1: cy, x2: margin, y2: H - margin },
+      // Lower-right: right side of neck → bottom-right corner
+      { x1: cx + gapHalf, y1: cy, x2: W - margin, y2: H - margin },
+    ];
 
-    // Upper-left funnel wall
-    const ul = new Body(BodyType.STATIC, new Vec2(cx - gapHalf - 50, cy - 30));
-    ul.shapes.add(new Polygon(Polygon.box(funnelLen, t)));
-    ul.rotation = angle;
-    ul.space = space;
-
-    // Upper-right funnel wall
-    const ur = new Body(BodyType.STATIC, new Vec2(cx + gapHalf + 50, cy - 30));
-    ur.shapes.add(new Polygon(Polygon.box(funnelLen, t)));
-    ur.rotation = -angle;
-    ur.space = space;
-
-    // Lower-left funnel wall (mirrors upper)
-    const ll = new Body(BodyType.STATIC, new Vec2(cx - gapHalf - 50, cy + 30));
-    ll.shapes.add(new Polygon(Polygon.box(funnelLen, t)));
-    ll.rotation = -angle;
-    ll.space = space;
-
-    // Lower-right funnel wall
-    const lr = new Body(BodyType.STATIC, new Vec2(cx + gapHalf + 50, cy + 30));
-    lr.shapes.add(new Polygon(Polygon.box(funnelLen, t)));
-    lr.rotation = angle;
-    lr.space = space;
+    for (const { x1, y1, x2, y2 } of wallDefs) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const wall = new Body(BodyType.STATIC, new Vec2((x1 + x2) / 2, (y1 + y2) / 2));
+      wall.shapes.add(new Polygon(Polygon.box(len, t)));
+      wall.rotation = Math.atan2(dy, dx);
+      wall.space = space;
+    }
 
     // Spawn particles in the upper half
     const r = 3;
     for (let i = 0; i < 1000; i++) {
-      const px = cx + (Math.random() - 0.5) * (W - 80);
-      const py = 20 + Math.random() * (cy - 80);
+      const px = cx + (Math.random() - 0.5) * (W * 0.5);
+      const py = margin + t + Math.random() * (cy - margin - t - 30);
       const b = new Body(BodyType.DYNAMIC, new Vec2(px, py));
       b.shapes.add(new Circle(r));
       b.space = space;
@@ -88,27 +84,29 @@ export default {
 
   code2d: `// Hourglass with SPATIAL_HASH broadphase
 const space = new Space(new Vec2(0, 600), Broadphase.SPATIAL_HASH);
-
-// Walls
 addWalls();
 
-// Funnel walls (angled, forming hourglass shape)
-const cx = W / 2, cy = H / 2;
-for (const [dx, dy, angle] of [
-  [-64, -30, 0.45], [64, -30, -0.45],
-  [-64, 30, -0.45], [64, 30, 0.45],
-]) {
-  const wall = new Body(BodyType.STATIC, new Vec2(cx + dx, cy + dy));
-  wall.shapes.add(new Polygon(Polygon.box(180, 10)));
-  wall.rotation = angle;
+const cx = W / 2, cy = H / 2, gap = 12, m = 30;
+// 4 angled walls forming hourglass neck
+const wallDefs = [
+  [m, m, cx - gap, cy], [W - m, m, cx + gap, cy],
+  [cx - gap, cy, m, H - m], [cx + gap, cy, W - m, H - m],
+];
+for (const [x1, y1, x2, y2] of wallDefs) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const wall = new Body(BodyType.STATIC,
+    new Vec2((x1 + x2) / 2, (y1 + y2) / 2));
+  wall.shapes.add(new Polygon(
+    Polygon.box(Math.sqrt(dx*dx + dy*dy), 10)));
+  wall.rotation = Math.atan2(dy, dx);
   wall.space = space;
 }
 
-// 1000 small particles — ideal for spatial hash
+// 1000 small particles in upper half
 for (let i = 0; i < 1000; i++) {
   const body = new Body(BodyType.DYNAMIC, new Vec2(
-    cx + (Math.random() - 0.5) * (W - 80),
-    20 + Math.random() * (cy - 80),
+    cx + (Math.random() - 0.5) * W * 0.5,
+    40 + Math.random() * (cy - 70),
   ));
   body.shapes.add(new Circle(3));
   body.space = space;
