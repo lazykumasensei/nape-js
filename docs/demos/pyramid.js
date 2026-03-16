@@ -1,5 +1,4 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Material } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
 
 export default {
   id: "pyramid",
@@ -8,10 +7,11 @@ export default {
   featured: true,
   featuredOrder: 1,
   desc: 'A classic box-stacking pyramid. <b>Click</b> to drop a heavy ball onto it.',
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     const boxSize = 28;
     const rows = 14;

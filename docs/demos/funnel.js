@@ -7,6 +7,8 @@ export default {
   featured: false,
   tags: ["Polygon", "Static shapes"],
   desc: "Shapes pour through a funnel into a container. Click to add more shapes.",
+  walls: false,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

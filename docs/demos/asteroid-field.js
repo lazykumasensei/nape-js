@@ -1,5 +1,4 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Material } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
 
 export default {
   id: "asteroid-field",
@@ -9,10 +8,11 @@ export default {
   featuredOrder: 20,
   desc:
     "2000 asteroids drifting through space using the <b>SPATIAL_HASH</b> broadphase. Objects are spread out so most broadphase lookups skip narrowphase entirely — showcasing O(1) spatial hashing at scale. Click to spawn more.",
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 0); // zero-g — space!
-    addWalls(space, W, H);
 
     // Elastic, low-friction material so asteroids bounce and keep moving
     const mat = new Material(0.8, 0.6, 2, 0.01, 0.01);

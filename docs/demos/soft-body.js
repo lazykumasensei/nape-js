@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Polygon, PivotJoint } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 // All active soft bodies — each entry holds segment bodies and rest area
 const _softBodies = [];
@@ -301,6 +301,7 @@ export default {
   featuredOrder: 2,
   tags: ["PivotJoint", "Pressure", "Soft Body"],
   desc: "Pneumatic soft bodies: a trapezoidal shell with stiff outer skin, elastic inner skin, and gas-pressure volume conservation.",
+  walls: true,
 
   code2d: `// Pneumatic Soft Body — pressure-driven volume preservation
 const space = new Space(new Vec2(0, 400));
@@ -441,7 +442,6 @@ loop();`,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 400);
-    addWalls(space, W, H);
 
     _softBodies.length = 0;
 

@@ -6,6 +6,7 @@ export default {
   featured: false,
   tags: ["PivotJoint", "Material", "Impulse"],
   desc: "A heavy ball on a chain smashes into a tower of boxes. Click to reset the swing.",
+  walls: false,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

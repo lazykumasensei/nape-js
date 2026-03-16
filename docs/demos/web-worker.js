@@ -10,7 +10,7 @@
 import {
   Vec2,
 } from "../nape-js.esm.js";
-import { loadThree } from "../demo-runner.js";
+import { loadThree } from "../renderers/threejs-adapter.js";
 
 /* ── Constants ──────────────────────────────────────────────────────── */
 const BODY_COUNT      = 300;
@@ -304,6 +304,7 @@ export default {
     "Physics simulation runs <b>off the main thread</b> in a Web Worker. " +
     "300 bodies at 60 Hz — main thread only renders. " +
     "<b>Click</b> to spawn shapes + impulse blast.",
+  walls: false,
 
   setup(space, W, H) {
     cleanup();

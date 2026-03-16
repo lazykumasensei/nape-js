@@ -1,7 +1,7 @@
 import {
   Body, BodyType, Vec2, AABB, Polygon, MarchingSquares, PivotJoint,
 } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 // ---------------------------------------------------------------------------
 // IsoBody — generate a physics body from an image using MarchingSquares
@@ -254,6 +254,7 @@ export default {
   featured: false,
   tags: ["MarchingSquares", "Procedural", "Interactive"],
   desc: "Drag any image file onto the canvas — <b>MarchingSquares</b> extracts the physics contour instantly and spawns a dynamic body. <b>Drag</b> bodies with the mouse.",
+  walls: true,
 
   setup(space, W, H) {
     _space = space;
@@ -261,7 +262,6 @@ export default {
     _colorCounter = 0;
 
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     _mouseBody      = null;
     _grabJoint      = null;

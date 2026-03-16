@@ -4,9 +4,11 @@
  */
 import { VERSION } from "./nape-js.esm.js?v=3.13.5";
 import { installErrorOverlay } from "./renderer.js?v=3.13.5";
-import { DemoRunner, loadThree, highlightCode } from "./demo-runner.js?v=3.13.5";
-
-const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js/dist/index.js";
+import { DemoRunner, highlightCode } from "./demo-runner.js?v=3.13.5";
+import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.13.5";
+import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.13.5";
+import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.13.5";
+import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.13.5";
 
 // All demos
 import falling     from "./demos/falling.js?v=3.13.5";
@@ -57,119 +59,18 @@ const CW = 900;
 const CH = 500;
 
 // =========================================================================
-// CodePen helper
+// CodePen helper — uses shared codepen-templates.js
 // =========================================================================
 
-const RENDERER_2D = `// ── Renderer ────────────────────────────────────────────────────────────────
-const COLORS = [
-  { fill: "rgba(88,166,255,0.18)",  stroke: "#58a6ff" },
-  { fill: "rgba(210,153,34,0.18)",  stroke: "#d29922" },
-  { fill: "rgba(63,185,80,0.18)",   stroke: "#3fb950" },
-  { fill: "rgba(248,81,73,0.18)",   stroke: "#f85149" },
-  { fill: "rgba(163,113,247,0.18)", stroke: "#a371f7" },
-  { fill: "rgba(219,171,255,0.18)", stroke: "#dbabff" },
-];
-function bodyColor(body) {
-  if (body.isStatic()) return { fill: "rgba(120,160,200,0.15)", stroke: "#607888" };
-  const idx = (body.userData?._colorIdx ?? Math.abs(Math.round(body.position.x * 0.1))) % COLORS.length;
-  return COLORS[idx];
-}
-function drawBody(body) {
-  const px = body.position.x, py = body.position.y;
-  ctx.save(); ctx.translate(px, py); ctx.rotate(body.rotation);
-  const { fill, stroke } = bodyColor(body);
-  for (const shape of body.shapes) {
-    if (shape.isCircle()) {
-      const r = shape.castCircle.radius;
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke();
-    } else if (shape.isPolygon()) {
-      const verts = shape.castPolygon.localVerts;
-      const len = verts.length; if (len < 3) continue;
-      ctx.beginPath(); ctx.moveTo(verts.at(0).x, verts.at(0).y);
-      for (let i = 1; i < len; i++) ctx.lineTo(verts.at(i).x, verts.at(i).y);
-      ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke();
-    }
-  }
-  ctx.restore();
-}
-function drawGrid() {
-  ctx.strokeStyle = "#1a2030"; ctx.lineWidth = 0.5;
-  for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-}
-function drawConstraintLines() {
-  try {
-    const raw = space.constraints;
-    for (let i = 0; i < raw.length; i++) {
-      const c = raw.at(i);
-      if (c.body1 && c.body2) {
-        ctx.beginPath();
-        ctx.moveTo(c.body1.position.x, c.body1.position.y);
-        ctx.lineTo(c.body2.position.x, c.body2.position.y);
-        ctx.strokeStyle = "#d2992233"; ctx.lineWidth = 1; ctx.stroke();
-      }
-    }
-  } catch(_) {}
-}
-function addWalls() {
-  const t = 20;
-  const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - t / 2));
-  floor.shapes.add(new Polygon(Polygon.box(W, t))); floor.space = space;
-  const left = new Body(BodyType.STATIC, new Vec2(t / 2, H / 2));
-  left.shapes.add(new Polygon(Polygon.box(t, H))); left.space = space;
-  const right = new Body(BodyType.STATIC, new Vec2(W - t / 2, H / 2));
-  right.shapes.add(new Polygon(Polygon.box(t, H))); right.space = space;
-  const ceil = new Body(BodyType.STATIC, new Vec2(W / 2, t / 2));
-  ceil.shapes.add(new Polygon(Polygon.box(W, t))); ceil.space = space;
-}
-// ── End Renderer ─────────────────────────────────────────────────────────────
-
-`;
-
 function openInCodePen(demo) {
-  // Use code2d if available; otherwise fetch the raw module source
-  const code = demo.code2d ?? `// Source: ./demos/${demo.id}.js\n// (open the demo page to view full source)`;
-
-  const html = `<canvas id="demoCanvas" width="900" height="500" style="background:#0a0e14;display:block;max-width:100%;border:1px solid #30363d;border-radius:8px"></canvas>`;
-  const css  = `body { margin: 20px; background: #0d1117; font-family: sans-serif; color: #e6edf3; }`;
-  const js   = `import {
-  Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
-  Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
-  CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
-} from "${NAPE_CDN}";
-
-const canvas = document.getElementById("demoCanvas");
-const canvasWrap = canvas;
-const ctx = canvas.getContext("2d");
-
-${RENDERER_2D}${code}`;
-
-  const data = {
-    title: `nape-js — ${demo.label ?? demo.id}`,
-    description: `Interactive physics demo using nape-js TypeScript wrapper.\nhttps://github.com/NewKrok/nape-js`,
-    html, css, js, js_module: true,
-  };
-  const form  = document.createElement("form");
-  form.method = "POST";
-  form.action = "https://codepen.io/pen/define";
-  form.target = "_blank";
-  const input = document.createElement("input");
-  input.type  = "hidden";
-  input.name  = "data";
-  input.value = JSON.stringify(data);
-  form.appendChild(input);
-  document.body.appendChild(form);
-  form.submit();
-  document.body.removeChild(form);
+  _openInCodePen(demo, "canvas2d");
 }
 
 // =========================================================================
 // Card factory
 // =========================================================================
 
-let activeCardEntry = null; // Track the single running demo
+let activeCardEntry = null;
 
 function stopActiveDemo() {
   if (!activeCardEntry) return;
@@ -183,26 +84,26 @@ function stopActiveDemo() {
 }
 
 function createCard(demo, { onTagClick } = {}) {
-  // --- Card container ---
   const card = document.createElement("div");
   card.className = "example-card";
 
-  // --- Render container (holds canvas or WebGL canvas) ---
   const renderWrap = document.createElement("div");
   renderWrap.className = "example-card-canvas";
   renderWrap.style.position = "relative";
   card.appendChild(renderWrap);
 
-  // --- DemoRunner ---
+  // --- DemoRunner with adapters ---
   const runner = new DemoRunner(renderWrap, { W: CW, H: CH });
+  runner.registerAdapter(new Canvas2DAdapter());
+  // ThreeJS/PixiJS adapters are registered lazily on first use
+  let threeRegistered = false;
+  let pixiRegistered = false;
 
-  // --- Play overlay ---
   const overlay = document.createElement("div");
   overlay.className = "play-overlay";
   overlay.innerHTML = `<div class="play-btn" aria-label="Play"></div>`;
   renderWrap.appendChild(overlay);
 
-  // --- Stats bar ---
   const statsBar = document.createElement("div");
   statsBar.className = "card-stats";
   statsBar.hidden = true;
@@ -216,7 +117,7 @@ function createCard(demo, { onTagClick } = {}) {
   statsBar.append(fpsEl, " · ", bodiesEl, " · ", stepEl);
   card.appendChild(statsBar);
 
-  // --- Canvas overlay controls (top-right corner, always visible) ---
+  // --- Canvas overlay controls ---
   const canvasControls = document.createElement("div");
   canvasControls.className = "canvas-controls";
 
@@ -231,23 +132,42 @@ function createCard(demo, { onTagClick } = {}) {
   btn3d.className = "card-render-btn";
   btn3d.dataset.mode = "3d";
   btn3d.textContent = "3D";
-  renderToggle.append(btn2d, btn3d);
+  const btnPixi = document.createElement("button");
+  btnPixi.className = "card-render-btn";
+  btnPixi.dataset.mode = "pixi";
+  btnPixi.textContent = "PixiJS";
+  renderToggle.append(btn2d, btn3d, btnPixi);
 
   let cardMode = "2d";
+  const modeMap = { "2d": "canvas2d", "3d": "threejs", "pixi": "pixijs" };
+
   renderToggle.addEventListener("click", async (e) => {
     e.stopPropagation();
     const btn = e.target.closest(".card-render-btn");
     if (!btn || btn.dataset.mode === cardMode) return;
     const mode = btn.dataset.mode;
-    if (mode === "3d") await loadThree();
+    const adapterId = modeMap[mode] ?? mode;
+
+    if (adapterId === "threejs" && !threeRegistered) {
+      await loadThree();
+      runner.registerAdapter(new ThreeJSAdapter());
+      threeRegistered = true;
+    }
+    if (adapterId === "pixijs" && !pixiRegistered) {
+      await loadPixi();
+      runner.registerAdapter(new PixiJSAdapter());
+      pixiRegistered = true;
+    }
+
     cardMode = mode;
     btn2d.classList.toggle("active", mode === "2d");
     btn3d.classList.toggle("active", mode === "3d");
-    runner.setMode(mode);
+    btnPixi.classList.toggle("active", mode === "pixi");
+    runner.setMode(adapterId);
     updateUrlForCard(demo.id, { mode: cardMode, outline: runner.debugDraw });
   });
 
-  // Outline toggle (per-card)
+  // Outline toggle
   const outlineToggleBtn = document.createElement("button");
   outlineToggleBtn.className = "canvas-outline-btn active";
   outlineToggleBtn.title = "Toggle outlines";
@@ -277,7 +197,6 @@ function createCard(demo, { onTagClick } = {}) {
     cardRef._started = false;
     await runner.renderPreviewAsync(demo);
     previewReady = true;
-    // Auto-start after reset
     await startDemo();
   });
 
@@ -300,7 +219,6 @@ function createCard(demo, { onTagClick } = {}) {
     document.body.classList.toggle("has-expanded-demo", expand);
     fsBtn.title = expand ? "Exit fullscreen" : "Fullscreen";
     fsBtn.innerHTML = expand ? ICON_COLLAPSE : ICON_EXPAND;
-    // Scroll lock
     document.body.style.overflow = expand ? "hidden" : "";
   }
 
@@ -309,12 +227,28 @@ function createCard(demo, { onTagClick } = {}) {
     setExpanded(!isExpanded);
   });
 
-  // Escape key closes expanded mode
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && isExpanded) setExpanded(false);
   });
 
-  canvasControls.append(renderToggle, outlineToggleBtn, resetBtn, fsBtn);
+  // Worker toggle button (only for workerCompatible demos)
+  const workerBtn = document.createElement("button");
+  workerBtn.className = "canvas-fs-btn canvas-worker-btn";
+  workerBtn.title = "Toggle Web Worker physics";
+  workerBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="8" cy="8" r="6"/>
+    <path d="M8 4v4l3 2"/>
+  </svg>`;
+  workerBtn.style.display = demo.workerCompatible ? "" : "none";
+  workerBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const enable = !runner.workerMode;
+    await runner.toggleWorker(enable);
+    workerBtn.classList.toggle("active", runner.workerMode);
+    workerBtn.title = runner.workerMode ? "Worker ON — click to disable" : "Toggle Web Worker physics";
+  });
+
+  canvasControls.append(renderToggle, outlineToggleBtn, workerBtn, resetBtn, fsBtn);
   renderWrap.appendChild(canvasControls);
 
   runner.wireStats({ fps: fpsEl, step: stepEl, bodies: bodiesEl });
@@ -329,11 +263,9 @@ function createCard(demo, { onTagClick } = {}) {
   const h3 = document.createElement("h3");
   h3.textContent = demo.label;
 
-  // Action buttons (code toggle + codepen)
   const btnGroup = document.createElement("div");
   btnGroup.className = "card-btn-group";
 
-  // View Code button — always shown
   const codeToggle = document.createElement("button");
   codeToggle.className = "btn btn-small code-toggle-btn";
   codeToggle.textContent = "{ } Code";
@@ -348,14 +280,13 @@ function createCard(demo, { onTagClick } = {}) {
     codePanel.hidden = !codePanel.hidden;
     if (!codePanel.hidden && !rendered) {
       rendered = true;
-      const source = demo.code2d ?? await fetch(`./demos/${demo.id}.js`).then(r => r.text());
+      const source = getPreviewCode(demo, "canvas2d") ?? await fetch(`./demos/${demo.id}.js`).then(r => r.text());
       codePanel.innerHTML = `<code>${highlightCode(source)}</code>`;
     }
   });
 
   btnGroup.appendChild(codeToggle);
 
-  // CodePen button — shown for ALL demos
   const codepenBtn = document.createElement("button");
   codepenBtn.className = "btn btn-small btn-codepen";
   codepenBtn.textContent = "CodePen";
@@ -365,7 +296,6 @@ function createCard(demo, { onTagClick } = {}) {
   });
   btnGroup.appendChild(codepenBtn);
 
-  // Share / copy link button
   const shareBtn = document.createElement("button");
   shareBtn.className = "btn btn-small btn-share";
   shareBtn.title = "Copy link to this demo";
@@ -417,11 +347,11 @@ function createCard(demo, { onTagClick } = {}) {
   card.appendChild(info);
   card.appendChild(codePanel);
 
-  // --- Render a static preview frame (async-safe: awaits preload if present) ---
+  // --- Preview ---
   let previewReady = false;
   runner.renderPreviewAsync(demo).then(() => { previewReady = true; });
 
-  // --- Play overlay: start demo ---
+  // --- Play ---
   let started = false;
   let loading = false;
 
@@ -429,7 +359,6 @@ function createCard(demo, { onTagClick } = {}) {
 
   async function startDemo() {
     if (loading) return;
-    // Stop any other running demo first
     if (activeCardEntry && activeCardEntry !== cardRef) stopActiveDemo();
     loading = true;
     if (!previewReady) {
@@ -456,11 +385,22 @@ function createCard(demo, { onTagClick } = {}) {
     startDemo,
     setExpanded,
     setMode: async (mode) => {
-      if (mode === "3d") await loadThree();
+      const adapterId = modeMap[mode] ?? mode;
+      if (adapterId === "threejs" && !threeRegistered) {
+        await loadThree();
+        runner.registerAdapter(new ThreeJSAdapter());
+        threeRegistered = true;
+      }
+      if (adapterId === "pixijs" && !pixiRegistered) {
+        await loadPixi();
+        runner.registerAdapter(new PixiJSAdapter());
+        pixiRegistered = true;
+      }
       cardMode = mode;
       btn2d.classList.toggle("active", mode === "2d");
       btn3d.classList.toggle("active", mode === "3d");
-      runner.setMode(mode);
+      btnPixi.classList.toggle("active", mode === "pixi");
+      runner.setMode(adapterId);
       outlineToggleBtn.classList.toggle("active", runner.debugDraw);
     },
     setOutline: (val) => {
@@ -510,13 +450,11 @@ tagToggle.addEventListener("click", () => {
   tagToggle.textContent = tagsExpanded ? "Tags ▴" : "Tags ▾";
 });
 
-// Collect all unique tags across demos (sorted)
 const allTags = [...new Set(ALL_DEMOS.flatMap(d => d.tags ?? []))].sort();
 
 let activeTag    = null;
 let searchQuery  = "";
 
-// Build tag filter buttons
 function buildTagBar() {
   tagBar.innerHTML = "";
   for (const tag of allTags) {
@@ -537,7 +475,6 @@ function buildTagBar() {
 
 function setActiveTag(tag) {
   activeTag = tag;
-  // Auto-expand tags when a filter is active
   if (tag && !tagsExpanded) {
     tagsExpanded = true;
     tagBar.classList.remove("collapsed");
@@ -562,7 +499,6 @@ function applyFilter() {
     if (visible) anyVisible = true;
   }
 
-  // Show/hide no-results placeholder
   let noResults = grid.querySelector(".no-results");
   if (!anyVisible) {
     if (!noResults) {
@@ -577,13 +513,11 @@ function applyFilter() {
   }
 }
 
-// Wire search
 searchEl.addEventListener("input", () => {
   searchQuery = searchEl.value;
   applyFilter();
 });
 
-// Build cards (newest demos first — reverse order)
 const cardEntries = [...ALL_DEMOS].reverse().map((demo) => {
   const result = createCard(demo, {
     onTagClick: (tag) => setActiveTag(activeTag === tag ? null : tag),
@@ -609,13 +543,9 @@ buildTagBar();
   const urlMode    = urlParams.get("mode");
   const urlOutline = urlParams.get("outline");
 
-  // Apply outline before start
   if (urlOutline === "0") entry.setOutline(false);
-
-  // Apply mode (loads Three.js if needed), then start
   if (urlMode === "3d") await entry.setMode("3d");
 
-  // Scroll into view and expand to fullscreen
   entry.card.scrollIntoView({ behavior: "smooth", block: "center" });
   entry.setExpanded(true);
 })();
@@ -634,14 +564,13 @@ document.getElementById("gridSizeToggle").addEventListener("click", (e) => {
 });
 
 // =========================================================================
-// IntersectionObserver — pause/resume already-started demos
+// IntersectionObserver — pause/resume
 // =========================================================================
 
 const observer = new IntersectionObserver((entries) => {
   for (const entry of entries) {
     const match = cardEntries.find(c => c.card === entry.target);
     if (!match || !match.isStarted()) continue;
-    // Only pause/resume the active demo
     if (activeCardEntry && activeCardEntry === match.cardRef) {
       if (entry.isIntersecting) {
         match.runner.start();

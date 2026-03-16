@@ -6,6 +6,8 @@ export default {
   featured: false,
   tags: ["PivotJoint", "Momentum"],
   desc: "Classic Newton's Cradle demonstrating conservation of momentum and energy.",
+  walls: false,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

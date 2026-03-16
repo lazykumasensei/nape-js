@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Polygon } from "../nape-js.esm.js";
-import { addWalls, spawnRandomShape } from "../demo-runner.js";
+import { spawnRandomShape } from "../demo-runner.js";
 
 export default {
   id: "conveyor-belts",
@@ -7,10 +7,10 @@ export default {
   featured: false,
   tags: ["Kinematic", "surfaceVel"],
   desc: "Objects travel along conveyor belts using kinematic surface velocity.",
+  walls: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 500);
-    addWalls(space, W, H);
 
     // Conveyor 1: top, goes right
     const c1 = new Body(BodyType.KINEMATIC, new Vec2(W / 2 - 60, 80));

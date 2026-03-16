@@ -2,7 +2,7 @@ import {
   Body, BodyType, Vec2, Polygon,
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, PulleyJoint,
 } from '../nape-js.esm.js';
-import { addWalls } from '../demo-runner.js';
+
 import { drawBody, drawGrid } from '../renderer.js';
 
 // ── Layout ──────────────────────────────────────────────────────────────────
@@ -105,6 +105,7 @@ export default {
   featured: true,
   featuredOrder: 4,
   desc: 'All 7 built-in constraint types in a 3×3 grid (original nape layout). <b>Drag</b> any body to feel how each constraint reacts.',
+  walls: true,
 
   // Body refs for constraint rendering
   _bodies: {},
@@ -113,7 +114,6 @@ export default {
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     this._bodies = {};
     this._pinnedBodies = new Set();

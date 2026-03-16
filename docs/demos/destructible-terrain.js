@@ -250,6 +250,7 @@ export default {
   featured: false,
   tags: ["MarchingSquares", "Terrain", "Procedural", "Click"],
   desc: "Procedural terrain built with <b>MarchingSquares</b>. <b>Click</b> to blast holes. Dynamic shapes spawn and interact with the evolving terrain.",
+  walls: false,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

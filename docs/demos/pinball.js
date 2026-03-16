@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Material } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 export default {
   id: "pinball",
@@ -7,10 +7,11 @@ export default {
   featured: false,
   tags: ["Circle", "Restitution", "Bumpers"],
   desc: "A simple pinball table with bumpers and flippers. Click to launch balls.",
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 500);
-    addWalls(space, W, H);
 
     // Bumpers (static circles with high restitution)
     const bumperPositions = [

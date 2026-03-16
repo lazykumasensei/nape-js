@@ -6,6 +6,7 @@ export default {
   featured: false,
   tags: ["PivotJoint", "MotorJoint", "DistanceJoint"],
   desc: "A car with spring suspension and motor-driven wheels. Click to spawn obstacles.",
+  walls: false,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

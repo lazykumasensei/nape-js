@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, PivotJoint, AngleJoint } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 export default {
   id: "ragdoll",
@@ -8,10 +8,11 @@ export default {
   featured: true,
   featuredOrder: 7,
   desc: 'Ragdoll figures built from <code>PivotJoint</code> and <code>AngleJoint</code> constraints. <b>Click</b> to spawn a new ragdoll at the cursor.',
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
     spawnRagdoll(space, W / 2, 120, 0);
     spawnRagdoll(space, W / 2 - 150, 80, 2);
     spawnRagdoll(space, W / 2 + 150, 60, 4);

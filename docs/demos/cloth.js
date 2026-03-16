@@ -1,6 +1,6 @@
 import { Body, BodyType, Vec2, Circle, DistanceJoint, PivotJoint, InteractionFilter } from "../nape-js.esm.js";
 import { drawBody, drawGrid, drawConstraints } from "../renderer.js";
-import { loadThree } from "../demo-runner.js";
+import { loadThree } from "../renderers/threejs-adapter.js";
 
 // ── Module-level state for drag + texture ──────────────────────────────────
 let _mouseBody = null;
@@ -35,6 +35,7 @@ export default {
   featured: false,
   tags: ["DistanceJoint", "Springs", "Grid"],
   desc: "A grid of particles connected by springs, simulating cloth with a logo texture. <b>Drag</b> the cloth with the mouse. A circle obstacle drifts across.",
+  walls: false,
 
   code2d: `// Cloth Simulation — spring-connected particle grid
 const W = 900, H = 500;

@@ -1,5 +1,4 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Capsule, Material } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
 
 function spawnCapsule(space, x, y, idx) {
   const w = 40 + Math.random() * 60;
@@ -19,10 +18,11 @@ export default {
   tags: ["Capsule", "Circle", "Polygon", "Gravity", "Click"],
   featured: false,
   desc: 'Native capsule-shaped bodies (two semicircular end-caps + rectangle middle) collide and stack. <b>Click</b> to spawn more capsules.',
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
     const cols = 4;
     const rows = 4;
     const xStep = (W - 200) / cols;

@@ -6,6 +6,7 @@ export default {
   featured: false,
   tags: ["PivotJoint", "Impulse", "Mechanism"],
   desc: "A counterweight trebuchet that launches projectiles. Click to reload and fire.",
+  walls: false,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

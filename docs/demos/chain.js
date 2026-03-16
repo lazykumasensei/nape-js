@@ -1,5 +1,4 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Material, PivotJoint } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
 
 // Module-level drag state (reset in setup)
 let _mouseBody = null;
@@ -15,12 +14,12 @@ export default {
   tags: ["PivotJoint", "Chain", "Drag"],
   featured: false,
   desc: 'A pendulum chain with a heavy bob. <b>Drag</b> any link to grab and pull it.',
+  walls: true,
   velocityIterations: 10,
   positionIterations: 8,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 500);
-    addWalls(space, W, H);
 
     // Reset drag state
     _mouseBody = null;

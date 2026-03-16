@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, PivotJoint, DistanceJoint, MotorJoint, InteractionFilter, Material } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 export default {
   id: "strandbeast",
@@ -8,6 +8,7 @@ export default {
   featured: true,
   featuredOrder: 8,
   desc: 'A Theo Jansen-style walking mechanism with 6 legs (3 phase-offset pairs) driven by a <code>MotorJoint</code> crank. Reverses direction at the walls. <b>Click</b> to drop a ball.',
+  walls: true,
 
   _motor: null,
   _chassis: null,
@@ -20,7 +21,6 @@ export default {
     this._motorSpeed = 2.0;
     space.gravity = new Vec2(0, 400);
 
-    addWalls(space, W, H);
     const t = 20;
 
     // Theo Jansen mechanism geometry (from Box2D testbed)

@@ -6,6 +6,8 @@ export default {
   featured: false,
   tags: ["Stacking", "Chain Reaction"],
   desc: "A chain of thin dominos that topple one after another. Click to drop a ball.",
+  walls: false,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

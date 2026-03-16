@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon } from "../nape-js.esm.js";
-import { addWalls, spawnRandomShape } from "../demo-runner.js";
+import { spawnRandomShape } from "../demo-runner.js";
 
 export default {
   id: "explosion",
@@ -8,10 +8,11 @@ export default {
   featured: true,
   featuredOrder: 3,
   desc: '<b>Click</b> anywhere to create an impulse blast that pushes nearby bodies away.',
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 500);
-    addWalls(space, W, H);
     for (let i = 0; i < 120; i++) {
       spawnRandomShape(space, 100 + Math.random() * 700, 100 + Math.random() * 350);
     }

@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Polygon, CbType, InteractionType, PreListener, PreFlag } from "../nape-js.esm.js";
-import { addWalls, spawnRandomShape } from "../demo-runner.js";
+import { spawnRandomShape } from "../demo-runner.js";
 
 export default {
   id: "one-way-platforms",
@@ -7,10 +7,10 @@ export default {
   featured: false,
   tags: ["PreListener", "CbType", "Kinematic"],
   desc: "Bodies pass through platforms from below but rest on them from above using PreListener. Conveyors push shapes sideways.",
+  walls: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     const platformType = new CbType();
     const objectType = new CbType();

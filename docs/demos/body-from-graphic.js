@@ -1,7 +1,7 @@
 import {
   Body, BodyType, Vec2, AABB, Polygon, MarchingSquares, PivotJoint,
 } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 // ---------------------------------------------------------------------------
 // IsoBody — mirrors the Haxe IsoBody utility class
@@ -104,6 +104,7 @@ export default {
   featured: false,
   tags: ["MarchingSquares", "Procedural"],
   desc: "Uses <b>MarchingSquares</b> to extract physics bodies from the cog bitmap. Three sizes, each processed independently. <b>Drag</b> any cog with the mouse.",
+  walls: true,
 
   async preload() {
     // Load at the largest required size; smaller ones will be downscaled from this
@@ -112,7 +113,6 @@ export default {
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     // Reset drag state
     _mouseBody = null;

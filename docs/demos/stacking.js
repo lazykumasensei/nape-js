@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Material } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 export default {
   id: "stacking",
@@ -7,10 +7,11 @@ export default {
   tags: ["Stacking", "Stability", "Click"],
   featured: false,
   desc: 'Towers of various shapes testing stacking stability. <b>Click</b> to drop a heavy box.',
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     // Tower 1: boxes
     for (let i = 0; i < 12; i++) {

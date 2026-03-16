@@ -2,7 +2,7 @@ import {
   Body, BodyType, Vec2, Circle, Polygon, FluidProperties,
 } from "../nape-js.esm.js";
 import { drawBody, drawGrid, drawConstraints } from "../renderer.js";
-import { loadThree } from "../demo-runner.js";
+import { loadThree } from "../renderers/threejs-adapter.js";
 
 // ---------------------------------------------------------------------------
 // State
@@ -379,6 +379,7 @@ export default {
   featuredOrder: 6,
   tags: ["Fluid", "Buoyancy", "Density", "Boat", "Click"],
   desc: 'Objects with different densities interact with a fluid pool — light ones float, heavy ones sink. A small boat bobs on the waves. <b>Click</b> to drop objects.',
+  walls: false,
 
   setup(space, W, H) {
     _W = W;

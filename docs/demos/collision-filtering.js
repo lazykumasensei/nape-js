@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, InteractionFilter } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 export default {
   id: "collision-filtering",
@@ -7,10 +7,11 @@ export default {
   featured: false,
   tags: ["InteractionFilter", "Groups"],
   desc: "Three groups of shapes that only collide within their own group using InteractionFilter bitmasks.",
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 500);
-    addWalls(space, W, H);
 
     const groups = [
       { filter: new InteractionFilter(1, 1), colorIdx: 0, x: W * 0.25 },

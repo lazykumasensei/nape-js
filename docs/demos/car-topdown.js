@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Material } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 // Module-level state for top-down bodies (reset in setup)
 let _topDownBodies = [];
@@ -10,10 +10,10 @@ export default {
   featured: false,
   tags: ["PivotJoint", "Zero Gravity", "Friction"],
   desc: "Top-down car physics with friction-based steering. Bodies have no gravity.",
+  walls: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 0); // no gravity
-    addWalls(space, W, H);
 
     // Car chassis
     const car = new Body(BodyType.DYNAMIC, new Vec2(W / 2, H / 2));

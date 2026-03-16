@@ -6,6 +6,7 @@ export default {
   featured: false,
   tags: ["PivotJoint", "Chain"],
   desc: "A bridge made of planks connected by PivotJoints. Click to drop heavy objects onto it.",
+  walls: false,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 500);

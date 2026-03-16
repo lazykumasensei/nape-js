@@ -6,6 +6,7 @@ export default {
   featured: false,
   tags: ["PreListener", "One-Way", "CbType"],
   desc: "A character bouncing between one-way platforms. Uses PreListener for pass-through logic.",
+  walls: false,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

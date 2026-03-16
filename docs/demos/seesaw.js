@@ -6,6 +6,8 @@ export default {
   featured: false,
   tags: ["PivotJoint", "Balance"],
   desc: "A balanced seesaw that tilts when objects land on it. Click to drop heavy balls.",
+  walls: false,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
