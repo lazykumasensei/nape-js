@@ -9535,7 +9535,7 @@ export class ZPP_Space {
     }
   }
 
-  iteratePos(times: any) {
+  iteratePos(times: number) {
     let _g = 0;
     const _g1 = times;
     while (_g < _g1) {

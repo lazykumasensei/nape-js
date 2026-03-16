@@ -3805,7 +3805,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== bodiesInCircle ==========
 
-  bodiesInCircle(x: any, y: any, r: any, containment: any, filter: any, output: any): any {
+  bodiesInCircle(x: number, y: number, r: number, containment: boolean, filter: any, output: any): any {
     this.sync_broadphase();
     (this as any).updateCircShape(x, y, r);
     const ab = this.circShape.zpp_inner.aabb;
@@ -3927,7 +3927,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== shapesInShape ==========
 
-  shapesInShape(shp: any, containment: any, filter: any, output: any): any {
+  shapesInShape(shp: any, containment: boolean, filter: any, output: any): any {
     this.sync_broadphase();
     (this as any).validateShape(shp);
     const ab = shp.aabb;
@@ -4025,7 +4025,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== bodiesInShape ==========
 
-  bodiesInShape(shp: any, containment: any, filter: any, output: any): any {
+  bodiesInShape(shp: any, containment: boolean, filter: any, output: any): any {
     this.sync_broadphase();
     (this as any).validateShape(shp);
     const ab = shp.aabb;
@@ -4141,7 +4141,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== rayCast ==========
 
-  rayCast(ray: any, inner: any, filter: any): any {
+  rayCast(ray: any, inner: boolean, filter: any): any {
     if (this.openlist == null) {
       this.openlist = new ZPP_DynAABBPhase._zpp.util.ZNPList_ZPP_AABBNode();
     }
@@ -4351,7 +4351,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
 
   // ========== rayMultiCast ==========
 
-  rayMultiCast(ray: any, inner: any, filter: any, output: any): any {
+  rayMultiCast(ray: any, inner: boolean, filter: any, output: any): any {
     if (this.openlist == null) {
       this.openlist = new ZPP_DynAABBPhase._zpp.util.ZNPList_ZPP_AABBNode();
     }

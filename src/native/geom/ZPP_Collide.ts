@@ -3034,7 +3034,7 @@ export class ZPP_Collide {
 
     if (distSqr > minDist * minDist) return false;
 
-    let co: any;
+    let co: ZPP_Contact;
     if (distSqr < napeNs.Config.epsilon * napeNs.Config.epsilon) {
       // Overlapping centers
       const cpx = (circ.worldCOMx + cx) * 0.5;
@@ -3094,7 +3094,7 @@ export class ZPP_Collide {
   static _capsuleCapsuleContact(
     cap1: any,
     cap2: any,
-    arb: any,
+    arb: ZPP_ColArbiter,
     rev: boolean,
     napeNs: any,
   ): boolean {
@@ -3282,7 +3282,7 @@ export class ZPP_Collide {
   }
 
   /** Polygon vs Capsule contact generation. */
-  static _polyCapsuleContact(poly: any, cap: any, arb: any, rev: boolean, napeNs: any): boolean {
+  static _polyCapsuleContact(poly: any, cap: any, arb: ZPP_ColArbiter, rev: boolean, napeNs: any): boolean {
     // SAT phase 1: polygon edge normals vs capsule
     // For each edge, the minimum separation is min(proj(spine1), proj(spine2)) - edge.gprojection - cap.radius
     let bestDist = -1e100;
@@ -3638,7 +3638,7 @@ export class ZPP_Collide {
 
     if (other.type == 2) {
       // capsule-capsule fluid: simple overlap estimation
-      const cap2 = other.type == 2 ? (other as any).capsule : other;
+      const cap2 = other.capsule;
       const [t1, t2] = ZPP_Collide._closestTT(
         cap.spine1x,
         cap.spine1y,
@@ -3670,7 +3670,7 @@ export class ZPP_Collide {
     // and approximate overlap
     if (other.type == 0) {
       // capsule-circle fluid
-      const circ = other.circle || (other as any).circle;
+      const circ = other.circle;
       const t = ZPP_Collide._closestT(
         cap.spine1x,
         cap.spine1y,
@@ -3696,7 +3696,7 @@ export class ZPP_Collide {
 
     // capsule-polygon fluid: simplified
     // Test if capsule overlaps polygon using SAT, estimate overlap area
-    const poly = other.polygon || (other as any).polygon;
+    const poly = other.polygon;
     let minPen = 1e100;
     let penNx = 0,
       penNy = 0;
