@@ -1,5 +1,6 @@
 import { Body, BodyType, Vec2, Circle, DistanceJoint, PivotJoint, InteractionFilter } from "../nape-js.esm.js";
 import { drawBody, drawGrid, drawConstraints } from "../renderer.js";
+import { loadThree } from "../demo-runner.js";
 
 // ── Module-level state for drag + texture ──────────────────────────────────
 let _mouseBody = null;
@@ -11,6 +12,10 @@ let _clothBodies = null;   // 2D grid [row][col] of particle bodies
 let _clothCols = 0;
 let _clothRows = 0;
 let _logoImg = null;
+let _THREE = null;
+let _clothMesh3d = null;
+let _lastScene3d = null;
+let _bodyMeshes3d = [];
 
 function loadLogo() {
   return new Promise((resolve) => {
@@ -400,6 +405,148 @@ frame();
       if (isCloth) continue;
       drawBody(ctx, body, showOutlines);
     }
+  },
+
+  render3d(renderer, scene, camera, space, W, H) {
+    // Reset 3D state when scene changes (e.g. 2d→3d→2d→3d toggle)
+    if (scene !== _lastScene3d) {
+      _clothMesh3d = null;
+      _bodyMeshes3d = [];
+      _lastScene3d = scene;
+    }
+
+    // Lazy-load THREE
+    if (!_THREE) {
+      loadThree().then(mod => { _THREE = mod; });
+      renderer.render(scene, camera);
+      return;
+    }
+
+    const rows = _clothRows;
+    const cols = _clothCols;
+
+    // Build cloth mesh (subdivided plane with logo texture)
+    if (!_clothMesh3d && _clothBodies) {
+      // Create texture from logo on white background
+      const texCanvas = document.createElement("canvas");
+      texCanvas.width = 512;
+      texCanvas.height = 512;
+      const tc = texCanvas.getContext("2d");
+      tc.fillStyle = "#ffffff";
+      tc.fillRect(0, 0, 512, 512);
+      if (_logoImg) {
+        tc.drawImage(_logoImg, 0, 0, 512, 512);
+      }
+      const texture = new _THREE.CanvasTexture(texCanvas);
+      texture.minFilter = _THREE.LinearFilter;
+      texture.magFilter = _THREE.LinearFilter;
+
+      // Build a PlaneGeometry with (cols) x (rows) vertices
+      const geom = new _THREE.PlaneGeometry(1, 1, cols - 1, rows - 1);
+      const positions = geom.attributes.position;
+
+      // Initialize vertex positions from cloth body positions
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const idx = r * cols + c;
+          const body = _clothBodies[r][c];
+          positions.setXYZ(idx, body.position.x, -body.position.y, 0);
+        }
+      }
+      positions.needsUpdate = true;
+
+      // MeshBasicMaterial — no lighting dependency, so no triangle-shaped
+      // shadow artifacts on the flat deforming cloth mesh.
+      const mat = new _THREE.MeshBasicMaterial({
+        map: texture,
+        side: _THREE.DoubleSide,
+      });
+      _clothMesh3d = new _THREE.Mesh(geom, mat);
+      scene.add(_clothMesh3d);
+    }
+
+    // Update cloth vertex positions each frame
+    if (_clothMesh3d && _clothBodies) {
+      const positions = _clothMesh3d.geometry.attributes.position;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const idx = r * cols + c;
+          const body = _clothBodies[r][c];
+          positions.setXYZ(idx, body.position.x, -body.position.y, 0);
+        }
+      }
+      positions.needsUpdate = true;
+    }
+
+    // Sync non-cloth body meshes (obstacle etc.)
+    const COLORS = [0x4fc3f7, 0xffb74d, 0x81c784, 0xef5350, 0xce93d8, 0x4dd0e1, 0xfff176, 0xff8a65];
+    const clothSet = new Set();
+    if (_clothBodies) {
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) clothSet.add(_clothBodies[r][c]);
+      }
+    }
+
+    // Remove stale meshes
+    const spaceBodies = new Set();
+    for (const body of space.bodies) spaceBodies.add(body);
+    for (let i = _bodyMeshes3d.length - 1; i >= 0; i--) {
+      if (!spaceBodies.has(_bodyMeshes3d[i].body)) {
+        scene.remove(_bodyMeshes3d[i].mesh);
+        _bodyMeshes3d[i].mesh.traverse(c => {
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) {
+            if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+            else c.material.dispose();
+          }
+        });
+        _bodyMeshes3d.splice(i, 1);
+      }
+    }
+
+    // Add new body meshes (skip cloth particles and mouse body)
+    const tracked = new Set(_bodyMeshes3d.map(m => m.body));
+    for (const body of space.bodies) {
+      if (tracked.has(body) || clothSet.has(body) || body === _mouseBody) continue;
+      for (const shape of body.shapes) {
+        let geom;
+        if (shape.isCircle()) {
+          geom = new _THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
+        } else if (shape.isPolygon()) {
+          const verts = shape.castPolygon.localVerts;
+          if (verts.length < 3) continue;
+          const pts = [];
+          for (let i = 0; i < verts.length; i++) pts.push(new _THREE.Vector2(verts.at(i).x, verts.at(i).y));
+          geom = new _THREE.ExtrudeGeometry(new _THREE.Shape(pts), {
+            depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2,
+          });
+          geom.applyMatrix4(new _THREE.Matrix4().makeScale(1, -1, 1));
+          geom.computeVertexNormals();
+          geom.translate(0, 0, -15);
+        }
+        if (!geom) continue;
+        const cIdx = (body.userData?._colorIdx ?? 0) % COLORS.length;
+        const color = body.isStatic() ? 0x455a64 : COLORS[cIdx];
+        const mesh = new _THREE.Mesh(geom, new _THREE.MeshPhongMaterial({
+          color, shininess: 80, specular: 0x444444, side: _THREE.DoubleSide,
+        }));
+        scene.add(mesh);
+        const edges = new _THREE.LineSegments(
+          new _THREE.EdgesGeometry(geom, 15),
+          new _THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }),
+        );
+        mesh.add(edges);
+        _bodyMeshes3d.push({ mesh, body, edges });
+      }
+    }
+
+    // Update positions
+    for (const { mesh, body } of _bodyMeshes3d) {
+      mesh.position.set(body.position.x, -body.position.y, 0);
+      mesh.rotation.z = -body.rotation;
+    }
+
+    renderer.render(scene, camera);
   },
 };
 
