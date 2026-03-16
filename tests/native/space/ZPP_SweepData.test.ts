@@ -49,7 +49,9 @@ describe("ZPP_SweepData", () => {
   });
 
   it("static pool should start as null", () => {
-    expect(ZPP_SweepData.zpp_pool === null || ZPP_SweepData.zpp_pool instanceof ZPP_SweepData).toBe(true);
+    expect(ZPP_SweepData.zpp_pool === null || ZPP_SweepData.zpp_pool instanceof ZPP_SweepData).toBe(
+      true,
+    );
   });
 
   it("doubly-linked list wiring", () => {

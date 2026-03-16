@@ -210,9 +210,19 @@ describe("ZPP_AABBTree", () => {
   it("clear with nodes calls removedFromSpace", () => {
     let removedCount = 0;
     const a = createLeaf(0, 0, 10, 10);
-    a.shape = { node: a, removedFromSpace: () => { removedCount++; } };
+    a.shape = {
+      node: a,
+      removedFromSpace: () => {
+        removedCount++;
+      },
+    };
     const b = createLeaf(20, 20, 30, 30);
-    b.shape = { node: b, removedFromSpace: () => { removedCount++; } };
+    b.shape = {
+      node: b,
+      removedFromSpace: () => {
+        removedCount++;
+      },
+    };
     tree.insertLeaf(a);
     tree.insertLeaf(b);
     tree.clear();
@@ -245,16 +255,25 @@ describe("ZPP_AABBTree", () => {
     const f = createLeaf(10, 10, 15, 15);
     const g = createLeaf(20, 20, 25, 25);
 
-    a.child1 = b; a.child2 = c;
-    b.parent = a; c.parent = a;
-    c.child1 = f; c.child2 = g;
-    f.parent = c; g.parent = c;
+    a.child1 = b;
+    a.child2 = c;
+    b.parent = a;
+    c.parent = a;
+    c.child1 = f;
+    c.child2 = g;
+    f.parent = c;
+    g.parent = c;
 
-    b.height = 0; f.height = 0; g.height = 0;
-    c.height = 1; a.height = 2;
+    b.height = 0;
+    f.height = 0;
+    g.height = 0;
+    c.height = 1;
+    a.height = 2;
 
-    c.aabb!.minx = 10; c.aabb!.miny = 10;
-    c.aabb!.maxx = 25; c.aabb!.maxy = 25;
+    c.aabb!.minx = 10;
+    c.aabb!.miny = 10;
+    c.aabb!.maxx = 25;
+    c.aabb!.maxy = 25;
 
     const result = tree.balance(a);
     expect(result).not.toBeNull();
@@ -269,16 +288,25 @@ describe("ZPP_AABBTree", () => {
     const f = createLeaf(0, 0, 5, 5);
     const g = createLeaf(10, 10, 15, 15);
 
-    a.child1 = b; a.child2 = c;
-    b.parent = a; c.parent = a;
-    b.child1 = f; b.child2 = g;
-    f.parent = b; g.parent = b;
+    a.child1 = b;
+    a.child2 = c;
+    b.parent = a;
+    c.parent = a;
+    b.child1 = f;
+    b.child2 = g;
+    f.parent = b;
+    g.parent = b;
 
-    c.height = 0; f.height = 0; g.height = 0;
-    b.height = 1; a.height = 2;
+    c.height = 0;
+    f.height = 0;
+    g.height = 0;
+    b.height = 1;
+    a.height = 2;
 
-    b.aabb!.minx = 0; b.aabb!.miny = 0;
-    b.aabb!.maxx = 15; b.aabb!.maxy = 15;
+    b.aabb!.minx = 0;
+    b.aabb!.miny = 0;
+    b.aabb!.maxx = 15;
+    b.aabb!.maxy = 15;
 
     const result = tree.balance(a);
     expect(result).not.toBeNull();
