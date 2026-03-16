@@ -1,5 +1,5 @@
-import { Body, BodyType, Vec2, Circle, DistanceJoint, PivotJoint } from "../nape-js.esm.js";
-import { drawBody, drawGrid } from "../renderer.js";
+import { Body, BodyType, Vec2, Circle, DistanceJoint, PivotJoint, InteractionFilter } from "../nape-js.esm.js";
+import { drawBody, drawGrid, drawConstraints } from "../renderer.js";
 
 // ── Module-level state for drag + texture ──────────────────────────────────
 let _mouseBody = null;
@@ -14,9 +14,12 @@ let _logoImg = null;
 
 function loadLogo() {
   return new Promise((resolve) => {
+    let resolved = false;
+    const done = () => { if (!resolved) { resolved = true; resolve(); } };
     const img = new Image();
-    img.onload = () => { _logoImg = img; resolve(); };
-    img.onerror = () => resolve(); // graceful fallback — no texture
+    img.onload = () => { _logoImg = img; done(); };
+    img.onerror = done;
+    setTimeout(done, 2000);
     img.src = "./logo.svg";
   });
 }
@@ -28,6 +31,131 @@ export default {
   tags: ["DistanceJoint", "Springs", "Grid"],
   desc: "A grid of particles connected by springs, simulating cloth with a logo texture. <b>Drag</b> the cloth with the mouse. A circle obstacle drifts across.",
 
+  code2d: `// Cloth Simulation — spring-connected particle grid
+const W = 900, H = 500;
+const space = new Space(new Vec2(0, 300));
+
+const cols = 20, rows = 14, gap = 20;
+const startX = W / 2 - (cols * gap) / 2;
+const startY = 30;
+const clothBodies = [];
+
+for (let r = 0; r < rows; r++) {
+  clothBodies[r] = [];
+  for (let c = 0; c < cols; c++) {
+    const isTop = r === 0 && (c % 4 === 0 || c === cols - 1);
+    const b = new Body(isTop ? BodyType.STATIC : BodyType.DYNAMIC, new Vec2(startX + c * gap, startY + r * gap));
+    const circle = new Circle(2);
+    circle.filter = new InteractionFilter(2, ~2);
+    b.shapes.add(circle);
+    b.userData._colorIdx = isTop ? 3 : (r + c) % 6;
+    b.space = space;
+    clothBodies[r][c] = b;
+  }
+}
+
+function connect(b1, b2, rest) {
+  const dj = new DistanceJoint(b1, b2, new Vec2(0, 0), new Vec2(0, 0), rest * 0.9, rest * 1.1);
+  dj.stiff = false; dj.frequency = 20; dj.damping = 0.3; dj.space = space;
+}
+for (let r = 0; r < rows; r++) {
+  for (let c = 0; c < cols; c++) {
+    if (c < cols - 1) connect(clothBodies[r][c], clothBodies[r][c + 1], gap);
+    if (r < rows - 1) connect(clothBodies[r][c], clothBodies[r + 1][c], gap);
+  }
+}
+
+// Moving circle obstacle
+const obstacleR = 29;
+const obstacle = new Body(BodyType.KINEMATIC, new Vec2(obstacleR + 20, H * 0.55 - 50));
+obstacle.shapes.add(new Circle(obstacleR));
+obstacle.userData._colorIdx = 4;
+obstacle.space = space;
+
+// Drag state
+let mouseBody = new Body(BodyType.KINEMATIC, new Vec2(-1000, -1000));
+mouseBody.space = space;
+let grabJoint = null, dragX = 0, dragY = 0;
+
+canvas.addEventListener("pointerdown", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  dragX = (e.clientX - rect.left) * (W / rect.width);
+  dragY = (e.clientY - rect.top) * (H / rect.height);
+  let best = null, bestDist = 40;
+  for (const body of space.bodies) {
+    if (!body.isDynamic()) continue;
+    const dx = body.position.x - dragX, dy = body.position.y - dragY;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < bestDist) { bestDist = d; best = body; }
+  }
+  if (!best) return;
+  if (grabJoint) { grabJoint.space = null; grabJoint = null; }
+  mouseBody.position.setxy(dragX, dragY);
+  grabJoint = new PivotJoint(mouseBody, best, new Vec2(0, 0), best.worldPointToLocal(new Vec2(dragX, dragY)));
+  grabJoint.stiff = false; grabJoint.frequency = 8; grabJoint.damping = 0.9;
+  grabJoint.space = space;
+});
+canvas.addEventListener("pointermove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  dragX = (e.clientX - rect.left) * (W / rect.width);
+  dragY = (e.clientY - rect.top) * (H / rect.height);
+});
+canvas.addEventListener("pointerup", () => {
+  if (grabJoint) { grabJoint.space = null; grabJoint = null; }
+  mouseBody.position.setxy(-1000, -1000); mouseBody.velocity.setxy(0, 0);
+});
+
+// Build cloth body lookup set
+const clothSet = new Set();
+for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) clothSet.add(clothBodies[r][c]);
+
+function frame() {
+  // Animate obstacle
+  const range = W / 2 - obstacleR - 20;
+  const t = performance.now() / 1000;
+  const targetX = W / 2 + Math.sin(t * 0.35 - Math.PI / 2) * range;
+  obstacle.velocity = new Vec2((targetX - obstacle.position.x) * 5, 0);
+
+  // Move mouse body
+  if (grabJoint) {
+    const dx = dragX - mouseBody.position.x, dy = dragY - mouseBody.position.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 1) {
+      const spd = Math.min(dist * 60, 600);
+      mouseBody.velocity.setxy(dx / dist * spd, dy / dist * spd);
+    } else mouseBody.velocity.setxy(0, 0);
+  }
+
+  space.step(1 / 60, 8, 3);
+  ctx.clearRect(0, 0, W, H);
+  drawGrid();
+
+  // Draw cloth quads
+  for (let r = 0; r < rows - 1; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      const tl = clothBodies[r][c].position, tr = clothBodies[r][c + 1].position;
+      const bl = clothBodies[r + 1][c].position, br = clothBodies[r + 1][c + 1].position;
+      ctx.beginPath();
+      ctx.moveTo(tl.x, tl.y); ctx.lineTo(tr.x, tr.y);
+      ctx.lineTo(br.x, br.y); ctx.lineTo(bl.x, bl.y);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(88,166,255,0.15)"; ctx.fill();
+      ctx.strokeStyle = "rgba(88,166,255,0.5)"; ctx.lineWidth = 0.5; ctx.stroke();
+    }
+  }
+
+  drawConstraintLines();
+
+  // Draw non-cloth bodies
+  for (const body of space.bodies) {
+    if (body === mouseBody || clothSet.has(body)) continue;
+    drawBody(body);
+  }
+  requestAnimationFrame(frame);
+}
+frame();
+`,
+
   async preload() {
     await loadLogo();
   },
@@ -35,7 +163,7 @@ export default {
   setup(space, W, H) {
     space.gravity = new Vec2(0, 300);
 
-    const cols = 20, rows = 14, gap = 16;
+    const cols = 20, rows = 14, gap = 20;
     _clothCols = cols;
     _clothRows = rows;
     const startX = W / 2 - (cols * gap) / 2;
@@ -45,12 +173,14 @@ export default {
     for (let r = 0; r < rows; r++) {
       bodies[r] = [];
       for (let c = 0; c < cols; c++) {
-        const isTop = r === 0 && (c % 4 === 0);
+        const isTop = r === 0 && (c % 4 === 0 || c === cols - 1);
         const b = new Body(
           isTop ? BodyType.STATIC : BodyType.DYNAMIC,
           new Vec2(startX + c * gap, startY + r * gap),
         );
-        b.shapes.add(new Circle(2));
+        const circle = new Circle(2);
+        circle.filter = new InteractionFilter(2, ~2);
+        b.shapes.add(circle);
         try { b.userData._colorIdx = isTop ? 3 : (r + c) % 6; } catch(_) {}
         b.space = space;
         bodies[r][c] = b;
@@ -73,9 +203,9 @@ export default {
       }
     }
 
-    // Moving circle obstacle — 100px higher, 10% smaller (radius 36)
-    const obstacleR = 36;
-    const obstacle = new Body(BodyType.KINEMATIC, new Vec2(W / 2, H * 0.55 - 100));
+    // Moving circle obstacle
+    const obstacleR = 29;
+    const obstacle = new Body(BodyType.KINEMATIC, new Vec2(obstacleR + 20, H * 0.55 - 50));
     obstacle.shapes.add(new Circle(obstacleR));
     try { obstacle.userData._colorIdx = 4; } catch(_) {}
     try { obstacle.userData._clothObstacle = true; } catch(_) {}
@@ -91,16 +221,16 @@ export default {
 
   step(space, W, H) {
     // Animate the kinematic obstacle — full canvas width
-    const obstacleR = 36;
+    const obstacleR = 29;
     for (const body of space.bodies) {
       try {
         if (!body.userData._clothObstacle) continue;
       } catch(_) { continue; }
       const range = W / 2 - obstacleR - 20; // go near the edges (20px margin)
       const cx = W / 2;
-      const speed = 0.5;
+      const speed = 0.35;
       const t = performance.now() / 1000;
-      const targetX = cx + Math.sin(t * speed) * range;
+      const targetX = cx + Math.sin(t * speed - Math.PI / 2) * range;
       body.velocity = new Vec2((targetX - body.position.x) * 5, 0);
       break;
     }
@@ -181,6 +311,25 @@ export default {
       const cols = _clothCols;
       const rows = _clothRows;
 
+      // White background behind the logo texture
+      for (let r = 0; r < rows - 1; r++) {
+        for (let c = 0; c < cols - 1; c++) {
+          const tl = _clothBodies[r][c].position;
+          const tr = _clothBodies[r][c + 1].position;
+          const bl = _clothBodies[r + 1][c].position;
+          const br = _clothBodies[r + 1][c + 1].position;
+          ctx.beginPath();
+          ctx.moveTo(tl.x, tl.y);
+          ctx.lineTo(tr.x, tr.y);
+          ctx.lineTo(br.x, br.y);
+          ctx.lineTo(bl.x, bl.y);
+          ctx.closePath();
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
+        }
+      }
+
+      // Logo texture on top
       for (let r = 0; r < rows - 1; r++) {
         for (let c = 0; c < cols - 1; c++) {
           const tl = _clothBodies[r][c].position;
@@ -206,7 +355,7 @@ export default {
         }
       }
     } else if (_clothBodies) {
-      // Fallback: draw white quads without texture
+      // Fallback: light cloth with visible grid lines (no texture available)
       const cols = _clothCols;
       const rows = _clothRows;
       for (let r = 0; r < rows - 1; r++) {
@@ -221,13 +370,18 @@ export default {
           ctx.lineTo(br.x, br.y);
           ctx.lineTo(bl.x, bl.y);
           ctx.closePath();
-          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          ctx.fillStyle = "rgba(88,166,255,0.15)";
           ctx.fill();
-          ctx.strokeStyle = "rgba(255,255,255,0.15)";
+          ctx.strokeStyle = "rgba(88,166,255,0.5)";
           ctx.lineWidth = 0.5;
           ctx.stroke();
         }
       }
+    }
+
+    // Draw constraint debug lines (springs) when outlines enabled
+    if (showOutlines) {
+      drawConstraints(ctx, space);
     }
 
     // Draw non-cloth bodies (obstacle, static anchors) on top
