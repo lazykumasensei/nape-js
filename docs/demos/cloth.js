@@ -5,7 +5,7 @@ export default {
   label: "Cloth Simulation",
   featured: false,
   tags: ["DistanceJoint", "Springs", "Grid"],
-  desc: "A grid of particles connected by springs, simulating cloth. Click to disturb it.",
+  desc: "A grid of particles connected by springs, simulating cloth. Click to gently push it. A circle obstacle drifts left and right.",
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 300);
@@ -44,16 +44,39 @@ export default {
         if (r < rows - 1) connect(bodies[r][c], bodies[r + 1][c], gap);
       }
     }
+
+    // Moving circle obstacle
+    const obstacle = new Body(BodyType.KINEMATIC, new Vec2(W / 2, H * 0.55));
+    obstacle.shapes.add(new Circle(40));
+    try { obstacle.userData._colorIdx = 4; } catch(_) {}
+    try { obstacle.userData._clothObstacle = true; } catch(_) {}
+    obstacle.space = space;
+  },
+
+  step(space, W, H) {
+    // Animate the kinematic obstacle left-right
+    for (const body of space.bodies) {
+      try {
+        if (!body.userData._clothObstacle) continue;
+      } catch(_) { continue; }
+      const cx = W / 2;
+      const range = 150;
+      const speed = 0.8;
+      const t = performance.now() / 1000;
+      const targetX = cx + Math.sin(t * speed) * range;
+      body.velocity = new Vec2((targetX - body.position.x) * 5, 0);
+      break;
+    }
   },
 
   click(x, y, space, W, H) {
     for (const body of space.bodies) {
-      if (body.isStatic()) continue;
+      if (body.isStatic() || body.isKinematic()) continue;
       const dx = body.position.x - x;
       const dy = body.position.y - y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 60) {
-        const force = 300 * (1 - dist / 60);
+        const force = 30 * (1 - dist / 60);
         body.applyImpulse(new Vec2(dx / dist * force, dy / dist * force));
       }
     }
