@@ -236,11 +236,17 @@ export function openInCodePen(demo, adapterId) {
 /**
  * Get the active code for preview/copy based on demo + current adapter.
  *
+ * Returns the full, self-contained code (imports + helpers + demo code)
+ * so that the preview panel shows copy-pasteable, runnable code.
+ *
  * @param {Object} demo — demo definition
  * @param {string} adapterId — current adapter ID
  * @returns {string}
  */
 export function getPreviewCode(demo, adapterId) {
   const code = getDemoCode(demo, adapterId);
-  return code ?? "// No source code available for this demo.";
+  if (!code) return "// No source code available for this demo.";
+
+  const template = TEMPLATES[adapterId] ?? TEMPLATES.canvas2d;
+  return template.buildJS(code);
 }
