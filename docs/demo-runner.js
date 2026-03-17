@@ -483,12 +483,14 @@ export class DemoRunner {
         // Worker mode: read transforms from bridge, render via adapter
         const state = this.#workerBridge.getState();
         if (state.ready) {
-          if (this.#statsStep)   this.#statsStep.textContent   = `Step: ${state.stepMs.toFixed(2)}ms (worker)`;
-          if (this.#statsBodies) this.#statsBodies.textContent = `Bodies: ${state.bodyCount}`;
+          const renderStart = performance.now();
           this.#activeAdapter.renderFromTransforms(
             state.transforms, state.shapeDescs, this.#W, this.#H,
             { showOutlines: this.#debugDraw, overrides: this.#demo?.renderOverrides ?? null },
           );
+          const renderMs = performance.now() - renderStart;
+          if (this.#statsStep)   this.#statsStep.textContent   = `Step: ${state.stepMs.toFixed(2)}ms (worker) | Render: ${renderMs.toFixed(2)}ms`;
+          if (this.#statsBodies) this.#statsBodies.textContent = `Bodies: ${state.bodyCount}`;
         }
       } else if (this.#space) {
         // Main-thread mode: step physics locally, render via adapter
@@ -502,13 +504,15 @@ export class DemoRunner {
         );
         const stepMs = performance.now() - stepStart;
 
-        if (this.#statsStep)   this.#statsStep.textContent   = `Step: ${stepMs.toFixed(2)}ms`;
-        if (this.#statsBodies) this.#statsBodies.textContent = `Bodies: ${this.#space.bodies.length}`;
-
+        const renderStart = performance.now();
         this.#activeAdapter.renderFrame(this.#space, this.#W, this.#H, {
           showOutlines: this.#debugDraw,
           overrides: this.#demo?.renderOverrides ?? null,
         });
+        const renderMs = performance.now() - renderStart;
+
+        if (this.#statsStep)   this.#statsStep.textContent   = `Step: ${stepMs.toFixed(2)}ms | Render: ${renderMs.toFixed(2)}ms`;
+        if (this.#statsBodies) this.#statsBodies.textContent = `Bodies: ${this.#space.bodies.length}`;
       }
     }
 
