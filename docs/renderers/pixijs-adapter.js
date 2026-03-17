@@ -324,7 +324,19 @@ export class PixiJSAdapter {
     this.#drawBodyShapes(body, gfx, showOutlines);
   }
 
+  #lastWorkerDescs = null;
+
   #ensureWorkerGraphics(shapeDescs) {
+    // Rebuild all graphics when shapeDescs changes (body order may shift)
+    if (this.#lastWorkerDescs !== shapeDescs) {
+      this.#lastWorkerDescs = shapeDescs;
+      for (const [, gfx] of this.#bodyGraphics) {
+        this.#app.stage.removeChild(gfx);
+        gfx.destroy();
+      }
+      this.#bodyGraphics.clear();
+    }
+
     const entries = [...this.#bodyGraphics.values()];
     for (let i = entries.length; i < shapeDescs.length; i++) {
       const sd = shapeDescs[i];

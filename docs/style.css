@@ -657,6 +657,9 @@ a:hover { text-decoration: underline; }
 .canvas-outline-btn:hover { color: #fff; background: rgba(31,111,235,0.6); }
 .canvas-outline-btn.active { color: var(--accent); }
 
+/* Worker toggle button */
+.canvas-worker-btn.active { color: var(--accent); }
+
 /* Reset button */
 .canvas-reset-btn {
   color: var(--text-dim);

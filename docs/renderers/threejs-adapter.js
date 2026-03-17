@@ -437,7 +437,19 @@ export class ThreeJSAdapter {
     }
   }
 
+  #lastWorkerDescs = null;
+
   #ensureWorkerMeshes(shapeDescs) {
+    // Rebuild all meshes when shapeDescs changes (body order may shift)
+    if (this.#lastWorkerDescs !== shapeDescs) {
+      this.#lastWorkerDescs = shapeDescs;
+      for (const { mesh } of this.#meshes) {
+        this.#scene.remove(mesh);
+        this.#disposeMesh(mesh);
+      }
+      this.#meshes = [];
+    }
+
     // Build meshes for shapes that don't have a mesh yet
     for (let i = this.#meshes.length; i < shapeDescs.length; i++) {
       const sd = shapeDescs[i];

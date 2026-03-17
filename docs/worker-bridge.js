@@ -85,11 +85,10 @@ export class WorkerPhysicsBridge {
           if (!this.#useShared && msg.buffer) {
             this.#transforms = msg.buffer;
           }
-          if (this.#transforms) this.#stepMs = this.#transforms[2] || 0;
-        } else if (msg.type === "spawned") {
-          if (this.#shapeDescs && msg.shapeDescs) {
-            for (const sd of msg.shapeDescs) this.#shapeDescs.push(sd);
+          if (msg.shapeDescs) {
+            this.#shapeDescs = msg.shapeDescs;
           }
+          if (this.#transforms) this.#stepMs = this.#transforms[2] || 0;
         }
       };
 
@@ -202,6 +201,7 @@ let maxBodies = ${DEFAULT_MAX_BODIES};
 let setupFn = null;
 let stepFn = null;
 let clickFn = null;
+let knownShapeCount = 0;
 
 async function loadNape(url) {
   const mod = await import(url);
@@ -217,6 +217,15 @@ async function loadNape(url) {
   InteractionType = mod.InteractionType; InteractionListener = mod.InteractionListener;
   PreListener = mod.PreListener; PreFlag = mod.PreFlag;
   MarchingSquares = mod.MarchingSquares; AABB = mod.AABB;
+
+  // Expose on globalThis so new Function()-reconstructed demo code can access them
+  Object.assign(self, {
+    Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
+    PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
+    Material, FluidProperties, InteractionFilter, InteractionGroup,
+    CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
+    MarchingSquares, AABB,
+  });
 }
 
 function addWalls(sp, W, H) {
@@ -230,6 +239,26 @@ function addWalls(sp, W, H) {
   const ceil = new Body(BodyType.STATIC, new Vec2(W / 2, t / 2));
   ceil.shapes.add(new Polygon(Polygon.box(W, t))); ceil.space = sp;
 }
+
+// Mirror of demo-runner.js spawnRandomShape — used by many worker-compatible demos
+const _spaceCounts = new WeakMap();
+function spawnRandomShape(sp, x, y, opts = {}) {
+  const { minR = 5, maxR = 20, minW = 8, maxW = 34 } = opts;
+  const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+  if (Math.random() < 0.5) {
+    body.shapes.add(new Circle(minR + Math.random() * (maxR - minR)));
+  } else {
+    const w = minW + Math.random() * (maxW - minW);
+    const h = minW + Math.random() * (maxW - minW);
+    body.shapes.add(new Polygon(Polygon.box(w, h)));
+  }
+  const count = _spaceCounts.get(sp) ?? 0;
+  _spaceCounts.set(sp, count + 1);
+  try { body.userData._colorIdx = count; } catch (_) {}
+  body.space = sp;
+  return body;
+}
+self.spawnRandomShape = spawnRandomShape;
 
 function collectShapeDescs() {
   const descs = [];
@@ -296,12 +325,25 @@ function doStep() {
   const ms = performance.now() - t0;
   writeTransforms();
   if (transforms) transforms[2] = ms;
+
+  // Only send shape descriptors when the count changes (bodies added/removed)
+  const currentCount = transforms[0] | 0;
+  let descs = null;
+  if (currentCount !== knownShapeCount) {
+    descs = collectShapeDescs();
+    knownShapeCount = currentCount;
+  }
+
   if (!useShared) {
     const copy = new Float32Array(transforms.length);
     copy.set(transforms);
-    self.postMessage({ type: "frame", buffer: copy }, [copy.buffer]);
+    const msg = { type: "frame", buffer: copy };
+    if (descs) msg.shapeDescs = descs;
+    self.postMessage(msg, [copy.buffer]);
   } else {
-    self.postMessage({ type: "frame" });
+    const msg = { type: "frame" };
+    if (descs) msg.shapeDescs = descs;
+    self.postMessage(msg);
   }
 }
 
@@ -328,10 +370,22 @@ self.onmessage = async (e) => {
       space = new Space();
       if (msg.walls) addWalls(space, msg.W, msg.H);
 
-      // Reconstruct the demo functions
-      try { setupFn = new Function("return " + msg.setupCode)(); } catch(_) {}
-      try { stepFn = msg.stepCode ? new Function("return " + msg.stepCode)() : null; } catch(_) {}
-      try { clickFn = msg.clickCode ? new Function("return " + msg.clickCode)() : null; } catch(_) {}
+      // Reconstruct the demo functions.
+      // Object shorthand methods (e.g. "setup(s,W,H){…}") need a "function" prefix
+      // to be valid standalone function expressions.
+      function rebuildFn(code) {
+        if (!code) return null;
+        const trimmed = code.trimStart();
+        // Already a function expression / arrow — use as-is
+        if (trimmed.startsWith("function") || trimmed.startsWith("(") || trimmed.startsWith("async")) {
+          return new Function("return " + code)();
+        }
+        // Shorthand method: "name(args){…}" → "function name(args){…}"
+        return new Function("return function " + code)();
+      }
+      try { setupFn = rebuildFn(msg.setupCode); } catch(_) {}
+      try { stepFn = rebuildFn(msg.stepCode); } catch(_) {}
+      try { clickFn = rebuildFn(msg.clickCode); } catch(_) {}
 
       // Run setup
       if (setupFn) {
@@ -340,6 +394,7 @@ self.onmessage = async (e) => {
 
       writeTransforms();
       const shapeDescs = collectShapeDescs();
+      knownShapeCount = shapeDescs.length;
       self.postMessage({ type: "ready", shapeDescs });
       break;
     }
@@ -355,11 +410,6 @@ self.onmessage = async (e) => {
       try {
         clickFn(msg.x, msg.y, space, self._W, self._H);
       } catch(_) {}
-      // Collect updated shape descs after spawn
-      const newDescs = collectShapeDescs();
-      if (newDescs.length > 0) {
-        self.postMessage({ type: "spawned", shapeDescs: newDescs });
-      }
       break;
     }
     case "destroy":

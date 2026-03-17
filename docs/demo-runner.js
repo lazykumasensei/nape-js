@@ -175,6 +175,9 @@ export class DemoRunner {
     this.stop();
 
     if (enable && this.#demo) {
+      // Clear adapter state from main-thread mode before switching to worker
+      this.#activeAdapter?.onDemoUnload();
+
       // Create and init worker bridge
       this.#workerBridge = new WorkerPhysicsBridge(this.#demo, {
         W: this.#W,
