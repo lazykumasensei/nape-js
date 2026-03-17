@@ -2,47 +2,47 @@
  * nape-js Examples Page — grid of interactive physics demos with play overlay,
  * per-card stats, search/tag filtering, size toggle, outline toggle, and View Code.
  */
-import { VERSION } from "./nape-js.esm.js?v=3.13.5";
-import { installErrorOverlay } from "./renderer.js?v=3.13.5";
-import { DemoRunner, highlightCode } from "./demo-runner.js?v=3.13.5";
-import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.13.5";
-import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.13.5";
-import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.13.5";
-import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.13.5";
+import { VERSION } from "./nape-js.esm.js?v=3.15.5";
+import { installErrorOverlay } from "./renderer.js?v=3.15.5";
+import { DemoRunner } from "./demo-runner.js?v=3.15.5";
+import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.15.5";
+import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.15.5";
+import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.15.5";
+import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.15.5";
 
 // All demos
-import falling     from "./demos/falling.js?v=3.13.5";
-import pyramid     from "./demos/pyramid.js?v=3.13.5";
-import chain       from "./demos/chain.js?v=3.13.5";
-import explosion   from "./demos/explosion.js?v=3.13.5";
-import constraints from "./demos/constraints.js?v=3.13.5";
-import gravity     from "./demos/gravity.js?v=3.13.5";
-import stacking    from "./demos/stacking.js?v=3.13.5";
-import ragdoll     from "./demos/ragdoll.js?v=3.13.5";
-import strandbeast from "./demos/strandbeast.js?v=3.13.5";
-import carSideview    from "./demos/car-sideview.js?v=3.13.5";
-import carTopdown     from "./demos/car-topdown.js?v=3.13.5";
-import platformer     from "./demos/platformer.js?v=3.13.5";
-import ropeBridge     from "./demos/rope-bridge.js?v=3.13.5";
-import wreckingBall   from "./demos/wrecking-ball.js?v=3.13.5";
-import newtonsCradle  from "./demos/newtons-cradle.js?v=3.13.5";
-import dominos        from "./demos/dominos.js?v=3.13.5";
-import conveyorBelts  from "./demos/conveyor-belts.js?v=3.13.5";
-import trebuchet      from "./demos/trebuchet.js?v=3.13.5";
-import seesaw         from "./demos/seesaw.js?v=3.13.5";
-import pinball        from "./demos/pinball.js?v=3.13.5";
-import cloth          from "./demos/cloth.js?v=3.13.5";
-import funnel         from "./demos/funnel.js?v=3.13.5";
-import softBody       from "./demos/soft-body.js?v=3.13.5";
-import oneWayPlatforms from "./demos/one-way-platforms.js?v=3.13.5";
-import collisionFiltering from "./demos/collision-filtering.js?v=3.13.5";
-import bodyFromGraphic    from "./demos/body-from-graphic.js?v=3.13.5";
-import dropImageBody     from "./demos/drop-image-body.js?v=3.13.5";
-import capsule           from "./demos/capsule.js?v=3.13.5";
-import destructibleTerrain from "./demos/destructible-terrain.js?v=3.13.5";
-import webWorker           from "./demos/web-worker.js?v=3.13.5";
-import asteroidField       from "./demos/asteroid-field.js?v=3.13.5";
-import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.13.5";
+import falling     from "./demos/falling.js?v=3.15.5";
+import pyramid     from "./demos/pyramid.js?v=3.15.5";
+import chain       from "./demos/chain.js?v=3.15.5";
+import explosion   from "./demos/explosion.js?v=3.15.5";
+import constraints from "./demos/constraints.js?v=3.15.5";
+import gravity     from "./demos/gravity.js?v=3.15.5";
+import stacking    from "./demos/stacking.js?v=3.15.5";
+import ragdoll     from "./demos/ragdoll.js?v=3.15.5";
+import strandbeast from "./demos/strandbeast.js?v=3.15.5";
+import carSideview    from "./demos/car-sideview.js?v=3.15.5";
+import carTopdown     from "./demos/car-topdown.js?v=3.15.5";
+import platformer     from "./demos/platformer.js?v=3.15.5";
+import ropeBridge     from "./demos/rope-bridge.js?v=3.15.5";
+import wreckingBall   from "./demos/wrecking-ball.js?v=3.15.5";
+import newtonsCradle  from "./demos/newtons-cradle.js?v=3.15.5";
+import dominos        from "./demos/dominos.js?v=3.15.5";
+import conveyorBelts  from "./demos/conveyor-belts.js?v=3.15.5";
+import trebuchet      from "./demos/trebuchet.js?v=3.15.5";
+import seesaw         from "./demos/seesaw.js?v=3.15.5";
+import pinball        from "./demos/pinball.js?v=3.15.5";
+import cloth          from "./demos/cloth.js?v=3.15.5";
+import funnel         from "./demos/funnel.js?v=3.15.5";
+import softBody       from "./demos/soft-body.js?v=3.15.5";
+import oneWayPlatforms from "./demos/one-way-platforms.js?v=3.15.5";
+import collisionFiltering from "./demos/collision-filtering.js?v=3.15.5";
+import bodyFromGraphic    from "./demos/body-from-graphic.js?v=3.15.5";
+import dropImageBody     from "./demos/drop-image-body.js?v=3.15.5";
+import capsule           from "./demos/capsule.js?v=3.15.5";
+import destructibleTerrain from "./demos/destructible-terrain.js?v=3.15.5";
+import webWorker           from "./demos/web-worker.js?v=3.15.5";
+import asteroidField       from "./demos/asteroid-field.js?v=3.15.5";
+import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.15.5";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -281,7 +281,9 @@ function createCard(demo, { onTagClick } = {}) {
     if (!codePanel.hidden && !rendered) {
       rendered = true;
       const source = getPreviewCode(demo, "canvas2d") ?? await fetch(`./demos/${demo.id}.js`).then(r => r.text());
-      codePanel.innerHTML = `<code>${highlightCode(source)}</code>`;
+      const escaped = source.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      codePanel.innerHTML = `<pre class="line-numbers"><code class="language-javascript">${escaped}</code></pre>`;
+      Prism.highlightAllUnder(codePanel);
     }
   });
 
