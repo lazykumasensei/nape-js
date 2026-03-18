@@ -490,29 +490,76 @@ frame();`,
     // Cloth particles are skipped via _hidden3d flag
     adapter.syncBodies(space);
 
-    // Lazy-create cloth mesh Graphics (behind body graphics)
-    if (!app.stage._clothGfx) {
-      app.stage._clothGfx = new PIXI.Graphics();
-      app.stage.addChildAt(app.stage._clothGfx, 0);
-    }
-    const gfx = app.stage._clothGfx;
-    gfx.clear();
-
     if (_clothBodies) {
       const cols = _clothCols;
       const rows = _clothRows;
 
-      for (let r = 0; r < rows - 1; r++) {
-        for (let c = 0; c < cols - 1; c++) {
-          const tl = _clothBodies[r][c].position;
-          const tr = _clothBodies[r][c + 1].position;
-          const bl = _clothBodies[r + 1][c].position;
-          const br = _clothBodies[r + 1][c + 1].position;
+      // Lazy-create textured Mesh or Graphics fallback
+      if (!app.stage._clothMesh && _logoImg) {
+        // Build UV coords and triangle indices (static — only positions change)
+        const uvs = new Float32Array(cols * rows * 2);
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const idx = (r * cols + c) * 2;
+            uvs[idx]     = c / (cols - 1);
+            uvs[idx + 1] = r / (rows - 1);
+          }
+        }
+        const indices = [];
+        for (let r = 0; r < rows - 1; r++) {
+          for (let c = 0; c < cols - 1; c++) {
+            const tl = r * cols + c;
+            const tr = tl + 1;
+            const bl = tl + cols;
+            const br = bl + 1;
+            indices.push(tl, tr, bl, tr, br, bl);
+          }
+        }
 
-          gfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
-          gfx.fill({ color: 0x58a6ff, alpha: 0.15 });
-          gfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
-          gfx.stroke({ color: 0x58a6ff, width: 0.5, alpha: 0.5 });
+        const positions = new Float32Array(cols * rows * 2);
+        const texture = PIXI.Texture.from(_logoImg);
+        const geom = new PIXI.MeshGeometry({
+          positions,
+          uvs,
+          indices: new Uint32Array(indices),
+        });
+        const mesh = new PIXI.Mesh({ geometry: geom, texture });
+        app.stage.addChildAt(mesh, 0);
+        app.stage._clothMesh = mesh;
+        app.stage._clothPositions = positions;
+      }
+
+      if (app.stage._clothMesh) {
+        // Update vertex positions from physics bodies
+        const positions = app.stage._clothPositions;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const idx = (r * cols + c) * 2;
+            const pos = _clothBodies[r][c].position;
+            positions[idx]     = pos.x;
+            positions[idx + 1] = pos.y;
+          }
+        }
+        app.stage._clothMesh.geometry.getAttribute("aPosition").buffer.update();
+      } else {
+        // Fallback: draw cloth quads as colored polygons (no texture)
+        if (!app.stage._clothGfx) {
+          app.stage._clothGfx = new PIXI.Graphics();
+          app.stage.addChildAt(app.stage._clothGfx, 0);
+        }
+        const gfx = app.stage._clothGfx;
+        gfx.clear();
+        for (let r = 0; r < rows - 1; r++) {
+          for (let c = 0; c < cols - 1; c++) {
+            const tl = _clothBodies[r][c].position;
+            const tr = _clothBodies[r][c + 1].position;
+            const bl = _clothBodies[r + 1][c].position;
+            const br = _clothBodies[r + 1][c + 1].position;
+            gfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
+            gfx.fill({ color: 0x58a6ff, alpha: 0.15 });
+            gfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
+            gfx.stroke({ color: 0x58a6ff, width: 0.5, alpha: 0.5 });
+          }
         }
       }
     }
