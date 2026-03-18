@@ -546,7 +546,7 @@ export default {
         gfx.fill({ color, alpha });
         gfx.circle(0, 0, sd.radius);
         gfx.stroke({ color, width: 1.2, alpha: 0.8 });
-      } else if (sd.box) {
+      } else if (sd.box || sd.wall) {
         gfx.rect(-sd.hw, -sd.hh, sd.hw * 2, sd.hh * 2);
         gfx.fill({ color, alpha });
         gfx.rect(-sd.hw, -sd.hh, sd.hw * 2, sd.hh * 2);
@@ -589,11 +589,6 @@ export default {
 // 4. Main thread reads the buffer for rendering (zero-copy)
 // 5. Click to spawn shapes + impulse blast
 
-import {
-  Space, Body, BodyType, Vec2, Circle, Polygon,
-} from "https://cdn.jsdelivr.net/npm/@newkrok/nape-js/dist/index.js";
-
-const W = canvas.width, H = canvas.height;
 const BODY_COUNT = 300;
 const FLOATS_PER_BODY = 3;
 const HEADER_FLOATS = 3;
