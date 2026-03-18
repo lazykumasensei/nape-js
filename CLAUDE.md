@@ -72,7 +72,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | Capsule shape            | ✅ Done — P41 (`Capsule.create` / `Capsule.createVertical`) |
 | Web Worker helper        | ✅ Done — P42 (`@newkrok/nape-js/worker`, `PhysicsWorkerManager`) |
 | Concave polygon helper   | ✅ Done — P43 (`createConcaveBody`) |
-| PixiJS integration       | ⬜ Planned — P44 |
+| PixiJS integration       | 🔶 Partial — P44 (CodePen demos + Sprite adapter done; public npm package pending) |
 | Character controller     | ⬜ Planned — P45 |
 | Hot-path optimization    | ✅ Done — P46 (step/prestep dedup, pool bypass fix, O(1) pair removal, `any` narrowing) |
 | Deterministic mode       | ⬜ Planned — P48 (multiplayer) |

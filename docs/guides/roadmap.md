@@ -112,7 +112,7 @@ Potential future priorities identified via competitive analysis and market gaps:
 | P52 — Multiplayer demo                    | M      | adoption | low    | ✅ Done        |
 | P42 — Web Worker helper                   | M      | perf/DX  | medium | ✅ Done        |
 | P43 — Concave polygon helper              | M      | high     | low    | ✅ Done        |
-| P44 — PixiJS integration package          | M      | adoption | low    | ⬜ Not started |
+| P44 — PixiJS integration package          | M      | adoption | low    | 🔶 Phase 1 done |
 | P45 — Character controller                | M      | DX       | medium | ⬜ Not started |
 | P46 — Hot-path optimization               | M      | perf     | low    | ✅ Done        |
 | P47 — CJS bundle dedup (serialization)    | S      | bundle   | low    | ⬜ Not started |
@@ -283,16 +283,31 @@ Convenience API for creating bodies from concave polygon vertices. Wraps
 
 ---
 
-## Planned: P44 — PixiJS Integration Package
+## In Progress: P44 — PixiJS Integration Package
 
-**Effort: M | Impact: adoption | Risk: low**
+**Effort: M | Impact: adoption | Risk: low | Status: 🔶 Phase 1 done**
 
 PixiJS (~46.6k stars, ~403k npm/week) is the #1 pure 2D renderer and the most natural
-pairing for an external physics engine. Package: `@newkrok/nape-pixi`
+pairing for an external physics engine.
 
-- Auto-sync body transforms → PixiJS DisplayObject transforms
-- Debug draw implementation using PixiJS Graphics API
-- Example scenes with common game patterns (platformer, top-down, etc.)
+### Phase 1 — Demo & CodePen support (✅ Done)
+
+- ✅ PixiJS adapter rewritten to Sprite + `generateTexture` pattern (real game architecture)
+- ✅ `RENDERER_PIXI` CodePen helper with body→Sprite sync, grid, constraint overlays
+- ✅ 28 demos have native `codePixi` snippets (PixiJS v8 API, not canvas2d fallback)
+- ✅ CodePen template with `PIXI.Application` init, proper imports, `addWalls` helper
+- ✅ Fixed `getDemoCode` fallback: pixijs/threejs never fall back to incompatible code2d
+- 4 demos excluded (destructible-terrain, body-from-graphic, drop-image-body, web-worker) — canvas bitmap APIs
+
+### Phase 2 — Public npm package (⬜ Pending)
+
+Target: `@newkrok/nape-pixi` or `@newkrok/nape-js/pixi` subpath export
+
+- Auto-sync body transforms → PixiJS Sprite/Container transforms (`NapePixiSync`)
+- Create/destroy hooks for body lifecycle (spawn sprite, remove sprite)
+- Texture atlas / sprite sheet support (vs current per-body `generateTexture`)
+- Typed API with full TSDoc
+- Example scenes: platformer, top-down, falling shapes
 
 ---
 
