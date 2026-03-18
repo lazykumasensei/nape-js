@@ -325,6 +325,28 @@ export default {
     drawBlastCursor(ctx);
   },
 
+  renderPixi(adapter, space, W, H) {
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    // Sync body graphics (dynamic bodies + walls)
+    adapter.syncBodies(space);
+
+    // Terrain bitmap → PixiJS Sprite
+    const wasDirty = _terrainDirty;
+    updateTerrainImage(W, H);
+    if (!app.stage._terrainSprite) {
+      const texture = PIXI.Texture.from(_terrainCanvas);
+      const sprite = new PIXI.Sprite(texture);
+      app.stage.addChildAt(sprite, 0);
+      app.stage._terrainSprite = sprite;
+    } else if (wasDirty) {
+      app.stage._terrainSprite.texture.source.update();
+    }
+
+    app.render();
+  },
+
   hover(x, y) {
     _lastMouseX = x;
     _lastMouseY = y;
