@@ -179,7 +179,7 @@ present, with automatic `postMessage` fallback otherwise.
 ```bash
 npm install
 npm run build      # tsup → dist/ (ESM + CJS + DTS)
-npm test           # vitest — 4315 tests across 188 files
+npm test           # vitest — 4461 tests across 195 files
 npm run benchmark  # Performance benchmarks
 ```
 
