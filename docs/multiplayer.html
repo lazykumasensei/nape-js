@@ -383,13 +383,17 @@ function handleBinaryFrame(buf) {
     const rot = view.getFloat32(offset, true);    offset += 4;
 
     const prev = bodyState.get(id);
+    // If the previous update was too long ago (>500ms), snap directly to the
+    // new position instead of interpolating — this prevents visual "jumps"
+    // when a body receives a resync after being idle.
+    const stale = prev && (now - prev.ts) > 500;
     bodyState.set(id, {
       x, y, rot,
-      px: prev ? prev.x : x,
-      py: prev ? prev.y : y,
-      prot: prev ? prev.rot : rot,
-      ts: now,          // when this snapshot arrived
-      pts: prev ? prev.ts : now - TICK_MS,
+      px: (prev && !stale) ? prev.x : x,
+      py: (prev && !stale) ? prev.y : y,
+      prot: (prev && !stale) ? prev.rot : rot,
+      ts: now,
+      pts: (prev && !stale) ? prev.ts : now - TICK_MS,
     });
   }
   lastServerFrame = now;
