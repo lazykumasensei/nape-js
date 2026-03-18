@@ -248,29 +248,6 @@ function renderFluid(ctx, space, W, H, showOutlines) {
     ctx.restore();
   }
 
-  // Legend
-  ctx.save();
-  ctx.font = "11px monospace";
-  const labels = [
-    { color: "#58a6ff", text: "Light (0.3)" },
-    { color: "#d29922", text: "Wood (0.7)" },
-    { color: "#dbabff", text: "Rubber (0.5)" },
-    { color: "#f85149", text: "Steel (3.0)" },
-    { color: "#a371f7", text: "Anchor (7.0)" },
-    { color: "#c8a060", text: "Boat (0.25)" },
-  ];
-  const lx = 30;
-  let ly = 24;
-  for (const l of labels) {
-    ctx.fillStyle = l.color;
-    ctx.fillRect(lx, ly - 8, 10, 10);
-    ctx.fillStyle = "rgba(200,220,255,0.7)";
-    ctx.fillText(l.text, lx + 14, ly);
-    ly += 14;
-  }
-  ctx.fillStyle = "rgba(200,220,255,0.5)";
-  ctx.fillText("Click to drop objects", lx, ly + 6);
-  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------
@@ -576,7 +553,6 @@ export default {
   },
 
   render3dOverlay(ctx, space, W, H) {
-    // Draw legend on the 2D overlay in 3D mode
     ctx.save();
     ctx.font = "11px monospace";
     const labels = [
@@ -587,8 +563,8 @@ export default {
       { color: "#a371f7", text: "Anchor (7.0)" },
       { color: "#c8a060", text: "Boat (0.25)" },
     ];
-    const lx = 10;
-    let ly = 20;
+    const lx = 30;
+    let ly = 24;
     for (const l of labels) {
       ctx.fillStyle = l.color;
       ctx.fillRect(lx, ly - 8, 10, 10);
@@ -596,7 +572,67 @@ export default {
       ctx.fillText(l.text, lx + 14, ly);
       ly += 14;
     }
+    ctx.fillStyle = "rgba(200,220,255,0.5)";
+    ctx.fillText("Click to drop objects", lx, ly + 6);
     ctx.restore();
+  },
+
+  renderPixi(adapter, space, W, H) {
+    _time += 1 / 60;
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    // Sync body sprites (add/remove/update positions)
+    adapter.syncBodies(space);
+
+    // Lazy-create a Graphics overlay for the water
+    if (!app.stage._waterGfx) {
+      app.stage._waterGfx = new PIXI.Graphics();
+      app.stage.addChild(app.stage._waterGfx);
+    }
+    const gfx = app.stage._waterGfx;
+
+    // Keep water overlay on top of body sprites
+    app.stage.setChildIndex(gfx, app.stage.children.length - 1);
+
+    // Animated wave water surface
+    gfx.clear();
+    const pts = [20, H - 10];
+    for (let x = 20; x <= W - 20; x += 3) {
+      pts.push(x, _waterY + waveY(x, _time));
+    }
+    pts.push(W - 20, H - 10);
+    gfx.poly(pts, true);
+    gfx.fill({ color: 0x1e90ff, alpha: 0.3 });
+
+    // Wave surface line
+    gfx.moveTo(20, _waterY + waveY(20, _time));
+    for (let x = 22; x <= W - 20; x += 2) {
+      gfx.lineTo(x, _waterY + waveY(x, _time));
+    }
+    gfx.stroke({ color: 0x64c8ff, width: 2.5, alpha: 0.9 });
+
+    // Boat mast + flag
+    if (!app.stage._boatGfx) {
+      app.stage._boatGfx = new PIXI.Graphics();
+      app.stage.addChild(app.stage._boatGfx);
+    }
+    const boatGfx = app.stage._boatGfx;
+    boatGfx.clear();
+    for (const body of space.bodies) {
+      if (!body.userData?._isBoat) continue;
+      boatGfx.position.set(body.position.x, body.position.y);
+      boatGfx.rotation = body.rotation;
+      // Mast
+      boatGfx.moveTo(-5, -18);
+      boatGfx.lineTo(-5, -55);
+      boatGfx.stroke({ color: 0xc8a060, width: 2.5, alpha: 1 });
+      // Flag (triangle)
+      boatGfx.poly([-5, -55, 15, -47, -5, -40], true);
+      boatGfx.fill({ color: 0xf85149, alpha: 0.8 });
+    }
+
+    app.render();
   },
 
   click(x, y, space) {
@@ -607,7 +643,6 @@ export default {
 
   code2d: `// Fluid & Buoyancy — objects + boat in a fluid pool
 const space = new Space(new Vec2(0, 600));
-const W = 900, H = 500;
 
 // Walls
 const t = 20;

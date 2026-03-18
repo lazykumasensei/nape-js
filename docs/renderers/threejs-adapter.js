@@ -98,7 +98,7 @@ export class ThreeJSAdapter {
     this.#overlay.width = W;
     this.#overlay.height = H;
     this.#overlay.style.cssText =
-      "display:block;position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1";
+      "display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;z-index:1";
     this.#overlayCtx = this.#overlay.getContext("2d");
     container.appendChild(this.#overlay);
 
@@ -149,6 +149,11 @@ export class ThreeJSAdapter {
   isAttached() {
     return this.#renderer !== null;
   }
+
+  /** Expose internals for legacy render3d() callbacks. */
+  getRenderer() { return this.#renderer; }
+  getScene()    { return this.#scene; }
+  getCamera()   { return this.#camera; }
 
   // ---------------------------------------------------------------------------
   // Per-demo hooks

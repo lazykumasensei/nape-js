@@ -50,6 +50,10 @@ export class PixiJSAdapter {
   #app = null;
   #bodySprites = new Map(); // Body|number -> PIXI.Sprite
 
+  // 2D overlay canvas for HUD (legend, cursor hints, etc.)
+  #overlay = null;
+  #overlayCtx = null;
+
   // ---------------------------------------------------------------------------
   // Lifecycle
   // ---------------------------------------------------------------------------
@@ -76,11 +80,25 @@ export class PixiJSAdapter {
     this.#app.ticker.stop();
 
     this.#app.canvas.style.cssText =
-      "display:block;position:absolute;inset:0;width:100%;height:100%";
+      "display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:contain";
     container.appendChild(this.#app.canvas);
+
+    // 2D overlay canvas for HUD (legend, density labels, etc.)
+    this.#overlay = document.createElement("canvas");
+    this.#overlay.width = W;
+    this.#overlay.height = H;
+    this.#overlay.style.cssText =
+      "display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;z-index:1";
+    this.#overlayCtx = this.#overlay.getContext("2d");
+    container.appendChild(this.#overlay);
   }
 
   detach() {
+    if (this.#overlay && this.#container) {
+      this.#container.removeChild(this.#overlay);
+      this.#overlay = null;
+      this.#overlayCtx = null;
+    }
     if (this.#app && this.#container) {
       this.#container.removeChild(this.#app.canvas);
       this.#app.destroy(true);
@@ -125,21 +143,28 @@ export class PixiJSAdapter {
 
     if (overrides?.pixijs) {
       overrides.pixijs(this, space, W, H, showOutlines);
-      return;
+    } else {
+      // Sync bodies: add new, remove stale
+      this.#syncBodies(space);
+
+      // Update positions
+      for (const [body, sprite] of this.#bodySprites) {
+        sprite.x = body.position.x;
+        sprite.y = body.position.y;
+        sprite.rotation = body.rotation;
+      }
+
+      // Ticker is stopped; we drive rendering manually from DemoRunner's rAF loop
+      this.#app.render();
     }
 
-    // Sync bodies: add new, remove stale
-    this.#syncBodies(space);
-
-    // Update positions
-    for (const [body, sprite] of this.#bodySprites) {
-      sprite.x = body.position.x;
-      sprite.y = body.position.y;
-      sprite.rotation = body.rotation;
+    // 2D overlay (legend, HUD, etc.)
+    if (this.#overlayCtx) {
+      this.#overlayCtx.clearRect(0, 0, W, H);
+      if (overrides?.overlay) {
+        overrides.overlay(this.#overlayCtx, space, W, H);
+      }
     }
-
-    // Ticker is stopped; we drive rendering manually from DemoRunner's rAF loop
-    this.#app.render();
   }
 
   renderPreview(space, W, H) {
@@ -215,11 +240,11 @@ export class PixiJSAdapter {
   }
 
   // ---------------------------------------------------------------------------
-  // Overlay (not supported in PixiJS mode — returns null)
+  // Overlay
   // ---------------------------------------------------------------------------
 
   getOverlayCtx() {
-    return null;
+    return this.#overlayCtx;
   }
 
   // ---------------------------------------------------------------------------
@@ -232,6 +257,17 @@ export class PixiJSAdapter {
 
   getElement() {
     return this.#app?.canvas ?? null;
+  }
+
+  /** Sync body sprites with the current space (add new, remove stale, update positions). */
+  syncBodies(space) {
+    if (!this.#app) return;
+    this.#syncBodies(space);
+    for (const [body, sprite] of this.#bodySprites) {
+      sprite.x = body.position.x;
+      sprite.y = body.position.y;
+      sprite.rotation = body.rotation;
+    }
   }
 
   // ---------------------------------------------------------------------------

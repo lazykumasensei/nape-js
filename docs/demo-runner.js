@@ -312,11 +312,40 @@ export class DemoRunner {
     // Optional init hook (DOM-level listeners, overlays)
     if (!preview) demoDef.init?.(this.#container, this.#W, this.#H);
 
-    // Tell the active adapter about the new demo
+    // Bridge legacy render/render3d/render3dOverlay → renderOverrides
+    if (!demoDef.renderOverrides) {
+      const ro = {};
+      if (demoDef.render) {
+        ro.canvas2d = (ctx, sp, w, h, outlines) => demoDef.render(ctx, sp, w, h, outlines);
+      }
+      if (demoDef.render3d) {
+        ro.threejs = (adapter, sp, w, h, outlines) => {
+          const r = adapter.getRenderer(), s = adapter.getScene(), c = adapter.getCamera();
+          demoDef.render3d(r, s, c, sp, w, h);
+        };
+      }
+      if (demoDef.renderPixi) {
+        ro.pixijs = (adapter, sp, w, h, outlines) => demoDef.renderPixi(adapter, sp, w, h, outlines);
+      }
+      if (demoDef.render3dOverlay) {
+        // overlay is used by threejs and pixijs modes (canvas2d custom render
+        // already includes the legend, so we skip it there to avoid duplication)
+        ro.overlay = (ctx, sp, w, h) => demoDef.render3dOverlay(ctx, sp, w, h);
+      }
+      if (Object.keys(ro).length > 0) {
+        demoDef.renderOverrides = ro;
+      }
+    }
+
+    // Tell the active adapter about the new demo.
+    // Skip onDemoLoad only for adapters where the override fully replaces
+    // rendering (threejs custom render3d builds its own meshes).
+    // For PixiJS, always call onDemoLoad — additive overrides (e.g. fluid
+    // water overlay) rely on the default body sprites being created.
     if (this.#activeAdapter) {
       const adapterId = this.#activeAdapter.id;
       const hasOverride = demoDef.renderOverrides?.[adapterId];
-      if (!hasOverride) {
+      if (!hasOverride || adapterId === "pixijs") {
         this.#activeAdapter.onDemoLoad(space, this.#W, this.#H);
       }
     }
