@@ -305,6 +305,7 @@ export default {
     "300 bodies at 60 Hz — main thread only renders. " +
     "<b>Click</b> to spawn shapes + impulse blast.",
   walls: false,
+  noCodePen: true,
 
   setup(space, W, H) {
     cleanup();

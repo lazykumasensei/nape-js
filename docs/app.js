@@ -127,6 +127,7 @@ async function startDemo(id) {
   runner.start();
   updateCodePreview();
   updateWorkerBtnVisibility();
+  codepenBtn.style.display = demo.noCodePen ? "none" : "";
 }
 
 document.getElementById("demoTabs").addEventListener("click", (e) => {
@@ -213,7 +214,7 @@ copyCodeBtn.addEventListener("click", () => {
 codepenBtn.addEventListener("click", () => {
   gtag("event", "click", { event_category: "code_action", event_label: "open_codepen", demo: currentDemoId });
   const demo = runner.currentDemo;
-  if (demo) _openInCodePen(demo, runner.mode);
+  if (demo && !demo.noCodePen) _openInCodePen(demo, runner.mode);
 });
 
 

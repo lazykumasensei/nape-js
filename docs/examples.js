@@ -289,14 +289,16 @@ function createCard(demo, { onTagClick } = {}) {
 
   btnGroup.appendChild(codeToggle);
 
-  const codepenBtn = document.createElement("button");
-  codepenBtn.className = "btn btn-small btn-codepen";
-  codepenBtn.textContent = "CodePen";
-  codepenBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    openInCodePen(demo);
-  });
-  btnGroup.appendChild(codepenBtn);
+  if (!demo.noCodePen) {
+    const codepenBtn = document.createElement("button");
+    codepenBtn.className = "btn btn-small btn-codepen";
+    codepenBtn.textContent = "CodePen";
+    codepenBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openInCodePen(demo);
+    });
+    btnGroup.appendChild(codepenBtn);
+  }
 
   const shareBtn = document.createElement("button");
   shareBtn.className = "btn btn-small btn-share";
