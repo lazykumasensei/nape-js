@@ -74,4 +74,34 @@ function loop() {
   requestAnimationFrame(loop);
 }
 loop();`,
+
+  codePixi: `// Create a Space with downward gravity
+const space = new Space(new Vec2(0, 600));
+
+addWalls();
+
+// Spawn capsule-shaped bodies
+for (let i = 0; i < 40; i++) {
+  const w = 40 + Math.random() * 60;
+  const h = 16 + Math.random() * 20;
+
+  const body = new Body();
+  body.shapes.add(new Capsule(w + h, h));
+
+  body.position.setxy(
+    100 + Math.random() * 700,
+    50 + Math.random() * 250,
+  );
+  body.rotation = Math.random() * Math.PI * 2;
+  body.space = space;
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
 };

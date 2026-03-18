@@ -440,6 +440,143 @@ function loop() {
 }
 loop();`,
 
+  codePixi: `// Pneumatic Soft Body — pressure-driven volume preservation
+const space = new Space(new Vec2(0, 400));
+addWalls();
+
+// Geometry helpers
+function polyArea(verts) {
+  let a = 0;
+  for (let i = 0; i < verts.length; i++) {
+    const j = (i + 1) % verts.length;
+    a += verts[i].x * verts[j].y - verts[j].x * verts[i].y;
+  }
+  return Math.abs(a) * 0.5;
+}
+function deflate(perim, t) {
+  const n = perim.length;
+  return perim.map((_, i) => {
+    const prev = perim[(i - 1 + n) % n], next = perim[(i + 1) % n];
+    const e1x = perim[i].x - prev.x, e1y = perim[i].y - prev.y;
+    const l1 = Math.sqrt(e1x * e1x + e1y * e1y);
+    const e2x = next.x - perim[i].x, e2y = next.y - perim[i].y;
+    const l2 = Math.sqrt(e2x * e2x + e2y * e2y);
+    let nx = e1y / l1 + e2y / l2, ny = -e1x / l1 + -e2x / l2;
+    const nl = Math.sqrt(nx * nx + ny * ny);
+    if (nl > 1e-6) { nx /= nl; ny /= nl; }
+    return { x: perim[i].x + nx * t, y: perim[i].y + ny * t };
+  });
+}
+function boxVerts(w, h) {
+  const hw = w / 2, hh = h / 2;
+  return [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }];
+}
+function regularVerts(rx, ry, sides) {
+  const v = [];
+  for (let i = 0; i < sides; i++) {
+    const a = (2 * Math.PI * i) / sides - Math.PI / 2;
+    v.push({ x: rx * Math.cos(a), y: ry * Math.sin(a) });
+  }
+  return v;
+}
+
+const softBodies = [];
+
+function createSoftBody(cx, cy, template, thickness, discr, colorIdx) {
+  const outer = template.map(v => ({ x: cx + v.x, y: cy + v.y }));
+  const inner = deflate(outer, thickness);
+  const n = outer.length;
+  const segments = [], allSegs = [];
+
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const oA = outer[i], oB = outer[j], iA = inner[i], iB = inner[j];
+    const edgeLen = Math.sqrt((oB.x - oA.x) ** 2 + (oB.y - oA.y) ** 2);
+    const numSegs = Math.max(1, Math.ceil(edgeLen / discr));
+    const ex = oB.x - oA.x, ey = oB.y - oA.y;
+    const el = Math.sqrt(ex * ex + ey * ey);
+    const enx = ey / el, eny = -ex / el;
+
+    for (let s = 0; s < numSegs; s++) {
+      const t0 = s / numSegs, t1 = (s + 1) / numSegs;
+      const olx = oA.x + t0 * (oB.x - oA.x), oly = oA.y + t0 * (oB.y - oA.y);
+      const orx = oA.x + t1 * (oB.x - oA.x), ory = oA.y + t1 * (oB.y - oA.y);
+      const ilx = iA.x + t0 * (iB.x - iA.x), ily = iA.y + t0 * (iB.y - iA.y);
+      const irx = iA.x + t1 * (iB.x - iA.x), iry = iA.y + t1 * (iB.y - iA.y);
+      const bx = (olx + orx + ilx + irx) / 4, by = (oly + ory + ily + iry) / 4;
+      const body = new Body(BodyType.DYNAMIC, new Vec2(bx, by));
+      body.shapes.add(new Polygon([
+        new Vec2(olx - bx, oly - by), new Vec2(orx - bx, ory - by),
+        new Vec2(irx - bx, iry - by), new Vec2(ilx - bx, ily - by),
+      ]));
+      body.userData._colorIdx = colorIdx;
+      body.userData._omx = (olx + orx) / 2 - bx;
+      body.userData._omy = (oly + ory) / 2 - by;
+      body.userData._enx = enx; body.userData._eny = eny;
+      body.userData._olx = olx - bx; body.userData._oly = oly - by;
+      body.space = space;
+      segments.push(body);
+      allSegs.push({
+        body, olx: olx - bx, oly: oly - by, orx: orx - bx, ory: ory - by,
+        ilx: ilx - bx, ily: ily - by, irx: irx - bx, iry: iry - by,
+      });
+    }
+  }
+
+  for (let k = 0; k < allSegs.length; k++) {
+    const A = allSegs[k], B = allSegs[(k + 1) % allSegs.length];
+    const oj = new PivotJoint(A.body, B.body, new Vec2(A.orx, A.ory), new Vec2(B.olx, B.oly));
+    oj.stiff = true; oj.space = space;
+    const ij = new PivotJoint(A.body, B.body, new Vec2(A.irx, A.iry), new Vec2(B.ilx, B.ily));
+    ij.stiff = false; ij.frequency = 30; ij.damping = 10; ij.ignore = true; ij.space = space;
+  }
+  return { segments, restArea: polyArea(outer) };
+}
+
+function applyPressure(dt) {
+  for (const sb of softBodies) {
+    const verts = sb.segments.map(b => {
+      const c = Math.cos(b.rotation), s = Math.sin(b.rotation);
+      return { x: b.position.x + b.userData._olx * c - b.userData._oly * s,
+               y: b.position.y + b.userData._olx * s + b.userData._oly * c };
+    });
+    const pressure = dt * (sb.restArea - polyArea(verts));
+    for (const b of sb.segments) {
+      const c = Math.cos(b.rotation), s = Math.sin(b.rotation);
+      const mx = b.position.x + b.userData._omx * c - b.userData._omy * s;
+      const my = b.position.y + b.userData._omx * s + b.userData._omy * c;
+      const nx = b.userData._enx * c - b.userData._eny * s;
+      const ny = b.userData._enx * s + b.userData._eny * c;
+      b.applyImpulse(new Vec2(nx * pressure, ny * pressure), new Vec2(mx, my), false);
+    }
+  }
+}
+
+// Initial soft bodies
+softBodies.push(createSoftBody(W / 2 - 80, 120, boxVerts(80, 80), 10, 15, 0));
+softBodies.push(createSoftBody(W / 2 + 90, 100, regularVerts(40, 40, 5), 10, 15, 2));
+
+// Click to spawn
+app.canvas.addEventListener("click", (e) => {
+  const rect = app.canvas.getBoundingClientRect();
+  const sx = W / rect.width, sy = H / rect.height;
+  const x = (e.clientX - rect.left) * sx;
+  const y = (e.clientY - rect.top) * sy;
+  const shapes = [boxVerts(70, 70), regularVerts(38, 38, 6), regularVerts(35, 35, 8)];
+  softBodies.push(createSoftBody(x, y, shapes[Math.floor(Math.random() * 3)], 10, 15,
+    Math.floor(Math.random() * 6)));
+});
+
+function loop() {
+  applyPressure(1 / 60);
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
+
   setup(space, W, H) {
     space.gravity = new Vec2(0, 400);
 

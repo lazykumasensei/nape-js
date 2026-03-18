@@ -94,4 +94,52 @@ function loop() {
   requestAnimationFrame(loop);
 }
 loop();`,
+
+  codePixi: `// Seesaw — balanced plank on a fulcrum
+const space = new Space(new Vec2(0, 600));
+
+// Floor
+const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - 10));
+floor.shapes.add(new Polygon(Polygon.box(W, 20)));
+floor.space = space;
+
+// Fulcrum (static triangle)
+const fulcrum = new Body(BodyType.STATIC, new Vec2(W / 2, H - 40));
+fulcrum.shapes.add(new Polygon(Polygon.regular(18, 18, 3)));
+fulcrum.space = space;
+
+// Plank
+const plank = new Body(BodyType.DYNAMIC, new Vec2(W / 2, H - 58));
+plank.shapes.add(new Polygon(Polygon.box(200, 8)));
+plank.space = space;
+
+const pivot = new PivotJoint(fulcrum, plank, new Vec2(0, -18), new Vec2(0, 0));
+pivot.space = space;
+
+// Balls on one side
+for (let i = 0; i < 3; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(W / 2 + 60 + i * 22, H - 80 - i * 30));
+  b.shapes.add(new Circle(10, undefined, new Material(0.3, 0.4, 0.3, 2)));
+  b.space = space;
+}
+
+// Click to drop heavy balls
+app.canvas.addEventListener("click", (e) => {
+  const r = app.canvas.getBoundingClientRect();
+  const sx = W / r.width, sy = H / r.height;
+  const x = (e.clientX - r.left) * sx, y = (e.clientY - r.top) * sy;
+  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+  b.shapes.add(new Circle(14, undefined, new Material(0.3, 0.3, 0.3, 5)));
+  b.space = space;
+});
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  drawConstraintLines();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
 };

@@ -141,4 +141,62 @@ function loop() {
   requestAnimationFrame(loop);
 }
 loop();`,
+
+  codePixi: `// Wrecking Ball — chain smashes a tower
+const space = new Space(new Vec2(0, 600));
+
+// Floor
+const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - 10));
+floor.shapes.add(new Polygon(Polygon.box(W, 20)));
+floor.space = space;
+
+// Tower of boxes
+const towerX = W * 0.65;
+for (let row = 0; row < 10; row++) {
+  for (let col = 0; col < 3; col++) {
+    const b = new Body(BodyType.DYNAMIC, new Vec2(
+      towerX - 22 + col * 22, H - 30 - row * 18 - 9,
+    ));
+    b.shapes.add(new Polygon(Polygon.box(20, 16)));
+    b.space = space;
+  }
+}
+
+// Chain anchor
+const anchor = new Body(BodyType.STATIC, new Vec2(W * 0.3, 30));
+anchor.shapes.add(new Circle(6));
+anchor.space = space;
+
+// Chain links
+let prev = anchor;
+for (let i = 0; i < 12; i++) {
+  const link = new Body(BodyType.DYNAMIC, new Vec2(W * 0.3, 30 + (i + 1) * 16));
+  link.shapes.add(new Circle(4));
+  link.space = space;
+  const j = new PivotJoint(
+    prev, link,
+    i === 0 ? new Vec2(0, 0) : new Vec2(0, 8),
+    new Vec2(0, -8),
+  );
+  j.space = space;
+  prev = link;
+}
+
+// Wrecking ball (heavy)
+const ball = new Body(BodyType.DYNAMIC, new Vec2(W * 0.3, 30 + 13 * 16));
+ball.shapes.add(new Circle(22, undefined, new Material(0.1, 0.2, 0.2, 10)));
+ball.space = space;
+const ballJoint = new PivotJoint(prev, ball, new Vec2(0, 8), new Vec2(0, -22));
+ballJoint.space = space;
+ball.applyImpulse(new Vec2(2000, 0));
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  drawConstraintLines();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
 };

@@ -56,6 +56,38 @@ function loop() {
 }
 loop();`,
 
+  codePixi: `// Create a Space with downward gravity
+const space = new Space(new Vec2(0, 600));
+
+addWalls();
+
+// Spawn random shapes
+for (let i = 0; i < 80; i++) {
+  const body = new Body(BodyType.DYNAMIC, new Vec2(
+    100 + Math.random() * 700,
+    50 + Math.random() * 200,
+  ));
+
+  if (Math.random() < 0.5) {
+    body.shapes.add(new Circle(6 + Math.random() * 14));
+  } else {
+    const w = 10 + Math.random() * 24;
+    const h = 10 + Math.random() * 24;
+    body.shapes.add(new Polygon(Polygon.box(w, h)));
+  }
+
+  body.space = space;
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
+
   code3d: `// Setup Three.js scene
 const container = document.getElementById("container");
 const W = 900, H = 500;

@@ -1,8 +1,10 @@
 /**
  * PixiJSAdapter — PixiJS renderer for nape-js demos.
  *
- * Implements the RendererAdapter interface using PixiJS (lazy-loaded via CDN).
- * This is the first extensibility proof for the pluggable renderer system.
+ * Uses Sprite + generateTexture pattern: shapes are drawn into a temporary
+ * Graphics, baked into a GPU texture, then rendered as batched Sprite quads.
+ * This is how real PixiJS games work — far more efficient than per-frame
+ * Graphics tessellation.
  */
 
 // ---------------------------------------------------------------------------
@@ -46,7 +48,7 @@ export class PixiJSAdapter {
   #H = 0;
   #showOutlines = true;
   #app = null;
-  #bodyGraphics = new Map(); // Body -> PIXI.Graphics
+  #bodySprites = new Map(); // Body|number -> PIXI.Sprite
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -84,7 +86,7 @@ export class PixiJSAdapter {
       this.#app.destroy(true);
       this.#app = null;
     }
-    this.#bodyGraphics.clear();
+    this.#bodySprites.clear();
     this.#container = null;
   }
 
@@ -98,20 +100,20 @@ export class PixiJSAdapter {
 
   onDemoLoad(space, _W, _H) {
     if (!this.#app) return;
-    // Build graphics for all existing bodies
+    // Build sprites for all existing bodies
     for (const body of space.bodies) {
-      this.#addBodyGraphics(body);
+      this.#addBodySprite(body);
     }
   }
 
   onDemoUnload() {
     if (!this.#app) return;
-    // Remove all body graphics
-    for (const [, gfx] of this.#bodyGraphics) {
-      this.#app.stage.removeChild(gfx);
-      gfx.destroy();
+    for (const [, sprite] of this.#bodySprites) {
+      this.#app.stage.removeChild(sprite);
+      sprite.texture.destroy(true);
+      sprite.destroy();
     }
-    this.#bodyGraphics.clear();
+    this.#bodySprites.clear();
   }
 
   // ---------------------------------------------------------------------------
@@ -130,10 +132,10 @@ export class PixiJSAdapter {
     this.#syncBodies(space);
 
     // Update positions
-    for (const [body, gfx] of this.#bodyGraphics) {
-      gfx.x = body.position.x;
-      gfx.y = body.position.y;
-      gfx.rotation = body.rotation;
+    for (const [body, sprite] of this.#bodySprites) {
+      sprite.x = body.position.x;
+      sprite.y = body.position.y;
+      sprite.rotation = body.rotation;
     }
 
     // Ticker is stopped; we drive rendering manually from DemoRunner's rAF loop
@@ -156,22 +158,22 @@ export class PixiJSAdapter {
       return;
     }
 
-    // Ensure graphics exist for all shapes
-    this.#ensureWorkerGraphics(shapeDescs);
+    // Ensure sprites exist for all shapes
+    this.#ensureWorkerSprites(shapeDescs);
 
     const HEADER = 3;
     const STRIDE = 3;
     const bodyCount = transforms[0] | 0;
-    const entries = [...this.#bodyGraphics.values()];
+    const entries = [...this.#bodySprites.values()];
     const count = Math.min(bodyCount, entries.length);
 
     for (let i = 0; i < count; i++) {
       const off = HEADER + i * STRIDE;
-      const gfx = entries[i];
-      gfx.x = transforms[off];
-      gfx.y = transforms[off + 1];
-      gfx.rotation = transforms[off + 2];
-      gfx.visible = true;
+      const sprite = entries[i];
+      sprite.x = transforms[off];
+      sprite.y = transforms[off + 1];
+      sprite.rotation = transforms[off + 2];
+      sprite.visible = true;
     }
     for (let i = count; i < entries.length; i++) {
       entries[i].visible = false;
@@ -186,11 +188,19 @@ export class PixiJSAdapter {
 
   setOutlines(show) {
     this.#showOutlines = show;
-    // Rebuild graphics with/without outlines
-    if (this.#app) {
-      for (const [body, gfx] of this.#bodyGraphics) {
-        this.#redrawBodyGraphics(body, gfx, show);
-      }
+    if (!this.#app) return;
+    // Regenerate all textures with/without outlines
+    for (const [body, sprite] of this.#bodySprites) {
+      if (typeof body === "number") continue; // worker mode index keys
+      const oldTex = sprite.texture;
+      const gfx = new _PIXI.Graphics();
+      this.#drawBodyShapes(body, gfx, show);
+      const bounds = gfx.getLocalBounds();
+      const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2 });
+      sprite.texture = texture;
+      sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
+      gfx.destroy();
+      oldTex.destroy(true);
     }
   }
 
@@ -225,22 +235,29 @@ export class PixiJSAdapter {
   }
 
   // ---------------------------------------------------------------------------
-  // Internal: body graphics management
+  // Internal: body sprite management (Sprite + generateTexture pattern)
   // ---------------------------------------------------------------------------
 
-  #addBodyGraphics(body) {
-    if (this.#bodyGraphics.has(body)) return;
-    if (body.userData?._hidden3d) return; // Reuse the hidden flag
+  #addBodySprite(body) {
+    if (this.#bodySprites.has(body)) return;
+    if (body.userData?._hidden3d) return;
 
     const gfx = new _PIXI.Graphics();
     this.#drawBodyShapes(body, gfx, this.#showOutlines);
 
-    gfx.x = body.position.x;
-    gfx.y = body.position.y;
-    gfx.rotation = body.rotation;
+    // Bake Graphics → Texture → Sprite
+    const bounds = gfx.getLocalBounds();
+    const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2 });
+    const sprite = new _PIXI.Sprite(texture);
+    sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
 
-    this.#app.stage.addChild(gfx);
-    this.#bodyGraphics.set(body, gfx);
+    sprite.x = body.position.x;
+    sprite.y = body.position.y;
+    sprite.rotation = body.rotation;
+
+    gfx.destroy();
+    this.#app.stage.addChild(sprite);
+    this.#bodySprites.set(body, sprite);
   }
 
   #syncBodies(space) {
@@ -248,18 +265,19 @@ export class PixiJSAdapter {
     const spaceBodies = new Set();
     for (const body of space.bodies) spaceBodies.add(body);
 
-    for (const [body, gfx] of this.#bodyGraphics) {
+    for (const [body, sprite] of this.#bodySprites) {
       if (!spaceBodies.has(body)) {
-        this.#app.stage.removeChild(gfx);
-        gfx.destroy();
-        this.#bodyGraphics.delete(body);
+        this.#app.stage.removeChild(sprite);
+        sprite.texture.destroy(true);
+        sprite.destroy();
+        this.#bodySprites.delete(body);
       }
     }
 
     // Add new
     for (const body of space.bodies) {
-      if (!this.#bodyGraphics.has(body)) {
-        this.#addBodyGraphics(body);
+      if (!this.#bodySprites.has(body)) {
+        this.#addBodySprite(body);
       }
     }
   }
@@ -309,7 +327,6 @@ export class PixiJSAdapter {
         const hl = cap.halfLength;
         const r = cap.radius;
 
-        // Draw capsule as a rounded rectangle approximation
         gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r);
         gfx.fill({ color: fillColor, alpha: fillAlpha });
         if (showOutlines) {
@@ -320,24 +337,21 @@ export class PixiJSAdapter {
     }
   }
 
-  #redrawBodyGraphics(body, gfx, showOutlines) {
-    this.#drawBodyShapes(body, gfx, showOutlines);
-  }
-
   #lastWorkerDescs = null;
 
-  #ensureWorkerGraphics(shapeDescs) {
-    // Rebuild all graphics when shapeDescs changes (body order may shift)
+  #ensureWorkerSprites(shapeDescs) {
+    // Rebuild all sprites when shapeDescs changes (body order may shift)
     if (this.#lastWorkerDescs !== shapeDescs) {
       this.#lastWorkerDescs = shapeDescs;
-      for (const [, gfx] of this.#bodyGraphics) {
-        this.#app.stage.removeChild(gfx);
-        gfx.destroy();
+      for (const [, sprite] of this.#bodySprites) {
+        this.#app.stage.removeChild(sprite);
+        sprite.texture.destroy(true);
+        sprite.destroy();
       }
-      this.#bodyGraphics.clear();
+      this.#bodySprites.clear();
     }
 
-    const entries = [...this.#bodyGraphics.values()];
+    const entries = [...this.#bodySprites.values()];
     for (let i = entries.length; i < shapeDescs.length; i++) {
       const sd = shapeDescs[i];
       const gfx = new _PIXI.Graphics();
@@ -361,9 +375,16 @@ export class PixiJSAdapter {
         }
       }
 
-      this.#app.stage.addChild(gfx);
+      // Bake to texture + sprite
+      const bounds = gfx.getLocalBounds();
+      const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2 });
+      const sprite = new _PIXI.Sprite(texture);
+      sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
+      gfx.destroy();
+
+      this.#app.stage.addChild(sprite);
       // Use index as key since we don't have body references in worker mode
-      this.#bodyGraphics.set(i, gfx);
+      this.#bodySprites.set(i, sprite);
     }
   }
 }

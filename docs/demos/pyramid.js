@@ -73,6 +73,39 @@ function loop() {
 }
 loop();`,
 
+  codePixi: `// Pyramid stress test — stacking many boxes
+const space = new Space(new Vec2(0, 600));
+
+addWalls();
+
+// Build a pyramid of boxes
+const boxSize = 28;
+const rows = 14;
+const startX = W / 2;
+const startY = H - 30 - boxSize / 2;
+
+for (let row = 0; row < rows; row++) {
+  const cols = rows - row;
+  const offsetX = startX - (cols * boxSize) / 2 + boxSize / 2;
+  for (let col = 0; col < cols; col++) {
+    const b = new Body(BodyType.DYNAMIC, new Vec2(
+      offsetX + col * boxSize,
+      startY - row * boxSize,
+    ));
+    b.shapes.add(new Polygon(Polygon.box(boxSize - 2, boxSize - 2)));
+    b.space = space;
+  }
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
+
   code3d: `// Setup Three.js scene
 const container = document.getElementById("container");
 const W = 900, H = 500;

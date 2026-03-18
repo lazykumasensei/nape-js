@@ -83,6 +83,56 @@ function loop() {
 }
 loop();`,
 
+  codePixi: `// Impulse blast — apply radial impulse on click
+const space = new Space(new Vec2(0, 500));
+
+addWalls();
+
+// Fill with mixed shapes
+for (let i = 0; i < 120; i++) {
+  const body = new Body(BodyType.DYNAMIC, new Vec2(
+    100 + Math.random() * 700,
+    100 + Math.random() * 350,
+  ));
+  if (Math.random() < 0.5) {
+    body.shapes.add(new Circle(6 + Math.random() * 14));
+  } else {
+    body.shapes.add(new Polygon(
+      Polygon.box(10 + Math.random() * 24, 10 + Math.random() * 24)
+    ));
+  }
+  body.space = space;
+}
+
+// On click: radial impulse blast
+app.canvas.addEventListener("click", (e) => {
+  const rect = app.canvas.getBoundingClientRect();
+  const sx = W / rect.width, sy = H / rect.height;
+  const clickX = (e.clientX - rect.left) * sx;
+  const clickY = (e.clientY - rect.top) * sy;
+  for (const body of space.bodies) {
+    if (body.isStatic()) continue;
+    const dx = body.position.x - clickX;
+    const dy = body.position.y - clickY;
+    const distSq = dx * dx + dy * dy;
+    const maxDist = 200;
+    if (distSq < maxDist * maxDist && distSq > 1) {
+      const dist = Math.sqrt(distSq);
+      const force = 2000 * (1 - dist / maxDist);
+      body.applyImpulse(new Vec2(dx / dist * force, dy / dist * force));
+    }
+  }
+});
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
+
   code3d: `// Setup Three.js scene
 const container = document.getElementById("container");
 const W = 900, H = 500;

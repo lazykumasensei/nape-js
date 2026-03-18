@@ -192,6 +192,52 @@ function loop() {
 }
 loop();`,
 
+  codePixi: `// Pendulum chain — grab and drag any link
+const space = new Space(new Vec2(0, 500));
+
+// Static anchor point
+const anchor = new Body(BodyType.STATIC, new Vec2(W / 2, 50));
+anchor.shapes.add(new Circle(6));
+anchor.space = space;
+
+// 14 links hanging straight down
+const links = 14, linkLen = 20;
+let prev = anchor;
+for (let i = 0; i < links; i++) {
+  const link = new Body(BodyType.DYNAMIC,
+    new Vec2(W / 2, 50 + (i + 1) * linkLen));
+  link.shapes.add(new Circle(5));
+  link.space = space;
+  new PivotJoint(
+    prev, link,
+    i === 0 ? new Vec2(0, 0) : new Vec2(0, linkLen / 2),
+    new Vec2(0, -linkLen / 2),
+  ).space = space;
+  prev = link;
+}
+
+// Heavy bob
+const bob = new Body(BodyType.DYNAMIC,
+  new Vec2(W / 2, 50 + (links + 1) * linkLen + 18));
+bob.shapes.add(new Circle(18, undefined,
+  new Material(0.3, 0.2, 0.5, 10)));
+bob.space = space;
+new PivotJoint(prev, bob,
+  new Vec2(0, linkLen / 2), new Vec2(0, -18)).space = space;
+
+// Initial nudge
+bob.applyImpulse(new Vec2(220, 0));
+
+function loop() {
+  space.step(1 / 60, 10, 8);
+  drawGrid();
+  drawConstraintLines();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
+
   code3d: `// Setup Three.js scene
 const container = document.getElementById("container");
 const W = 900, H = 500;

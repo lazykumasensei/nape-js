@@ -123,4 +123,65 @@ function loop() {
   requestAnimationFrame(loop);
 }
 loop();`,
+
+  codePixi: `// Rope Bridge — planks connected by PivotJoints
+const space = new Space(new Vec2(0, 500));
+
+// Floor
+const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - 10));
+floor.shapes.add(new Polygon(Polygon.box(W, 20)));
+floor.space = space;
+
+// Bridge anchors
+const leftAnchor = new Body(BodyType.STATIC, new Vec2(40, H / 2));
+leftAnchor.shapes.add(new Polygon(Polygon.box(20, 30)));
+leftAnchor.space = space;
+
+const rightAnchor = new Body(BodyType.STATIC, new Vec2(W - 40, H / 2));
+rightAnchor.shapes.add(new Polygon(Polygon.box(20, 30)));
+rightAnchor.space = space;
+
+// Bridge planks
+const plankCount = 14;
+const plankW = (W - 120) / plankCount;
+let prev = leftAnchor;
+
+for (let i = 0; i < plankCount; i++) {
+  const px = 60 + plankW / 2 + i * plankW;
+  const plank = new Body(BodyType.DYNAMIC, new Vec2(px, H / 2));
+  plank.shapes.add(new Polygon(Polygon.box(plankW - 2, 6)));
+  plank.space = space;
+
+  const joint = new PivotJoint(
+    prev, plank,
+    prev === leftAnchor ? new Vec2(10, 0) : new Vec2(plankW / 2 - 1, 0),
+    new Vec2(-plankW / 2 + 1, 0),
+  );
+  joint.space = space;
+  prev = plank;
+}
+
+// Connect last plank to right anchor
+const lastJoint = new PivotJoint(prev, rightAnchor, new Vec2(plankW / 2 - 1, 0), new Vec2(-10, 0));
+lastJoint.space = space;
+
+// Click to drop heavy objects
+app.canvas.addEventListener("click", (e) => {
+  const r = app.canvas.getBoundingClientRect();
+  const sx = W / r.width, sy = H / r.height;
+  const x = (e.clientX - r.left) * sx, y = (e.clientY - r.top) * sy;
+  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+  b.shapes.add(new Circle(15, undefined, new Material(0.3, 0.3, 0.3, 5)));
+  b.space = space;
+});
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  drawConstraintLines();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
 };

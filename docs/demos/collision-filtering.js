@@ -98,4 +98,41 @@ function loop() {
   requestAnimationFrame(loop);
 }
 loop();`,
+
+  codePixi: `// Collision Filtering — three independent groups via bitmasks
+const space = new Space(new Vec2(0, 500));
+
+addWalls();
+
+// Each group only collides with its own bitmask
+const groups = [
+  { filter: new InteractionFilter(1, 1), x: W * 0.25 },
+  { filter: new InteractionFilter(2, 2), x: W * 0.5 },
+  { filter: new InteractionFilter(4, 4), x: W * 0.75 },
+];
+
+for (const g of groups) {
+  for (let i = 0; i < 15; i++) {
+    const b = new Body(BodyType.DYNAMIC, new Vec2(
+      g.x + (Math.random() - 0.5) * (W * 0.2),
+      30 + Math.random() * (H * 0.4),
+    ));
+    if (Math.random() < 0.5) {
+      b.shapes.add(new Circle(6 + Math.random() * 8, undefined, undefined, g.filter));
+    } else {
+      const sz = 8 + Math.random() * 12;
+      b.shapes.add(new Polygon(Polygon.box(sz, sz), undefined, g.filter));
+    }
+    b.space = space;
+  }
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
 };

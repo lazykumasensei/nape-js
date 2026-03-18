@@ -71,6 +71,118 @@ function drawConstraintLines() {
 // ── End Renderer ─────────────────────────────────────────────────────────────
 `;
 
+const RENDERER_PIXI = `// ── PixiJS Renderer (Sprite + Texture) ──────────────────────────────────────
+const FILL_COLORS = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0xdbabff];
+const STATIC_FILL = 0x607888;
+const bodySprites = new Map();
+
+function bodyFill(body) {
+  if (body.isStatic()) return STATIC_FILL;
+  const idx = (body.userData?._colorIdx ?? Math.abs(Math.round(body.position.x * 0.1))) % FILL_COLORS.length;
+  return FILL_COLORS[idx];
+}
+
+// Draw body shapes into a temporary Graphics, bake to texture, return Sprite
+function addGfx(body) {
+  if (bodySprites.has(body)) return bodySprites.get(body);
+
+  const gfx = new PIXI.Graphics();
+  const color = bodyFill(body);
+  const alpha = body.isStatic() ? 0.15 : 0.25;
+
+  for (const shape of body.shapes) {
+    if (shape.isCircle()) {
+      const r = shape.castCircle.radius;
+      gfx.circle(0, 0, r);
+      gfx.fill({ color, alpha });
+      gfx.circle(0, 0, r);
+      gfx.stroke({ color, width: 1.2, alpha: 0.8 });
+      gfx.moveTo(0, 0); gfx.lineTo(r, 0);
+      gfx.stroke({ color, width: 1, alpha: 0.4 });
+    } else if (shape.isPolygon()) {
+      const verts = shape.castPolygon.localVerts;
+      const len = verts.length; if (len < 3) continue;
+      const pts = [];
+      for (let i = 0; i < len; i++) pts.push(verts.at(i).x, verts.at(i).y);
+      gfx.poly(pts, true);
+      gfx.fill({ color, alpha });
+      gfx.poly(pts, true);
+      gfx.stroke({ color, width: 1.2, alpha: 0.8 });
+    } else if (shape.isCapsule()) {
+      const cap = shape.castCapsule;
+      const hl = cap.halfLength, r = cap.radius;
+      gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r);
+      gfx.fill({ color, alpha });
+      gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r);
+      gfx.stroke({ color, width: 1.2, alpha: 0.8 });
+    }
+  }
+
+  // Bake Graphics → Texture → Sprite (GPU-friendly batched quad)
+  const bounds = gfx.getLocalBounds();
+  const texture = app.renderer.generateTexture({ target: gfx, resolution: 2 });
+  const sprite = new PIXI.Sprite(texture);
+  sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
+  sprite.x = body.position.x;
+  sprite.y = body.position.y;
+  sprite.rotation = body.rotation;
+
+  gfx.destroy();
+  app.stage.addChild(sprite);
+  bodySprites.set(body, sprite);
+  return sprite;
+}
+
+function syncBodies(space) {
+  const alive = new Set();
+  for (const body of space.bodies) alive.add(body);
+  for (const [body, sprite] of bodySprites) {
+    if (!alive.has(body)) {
+      app.stage.removeChild(sprite);
+      sprite.texture.destroy(true);
+      sprite.destroy();
+      bodySprites.delete(body);
+    }
+  }
+  for (const body of space.bodies) {
+    const sprite = addGfx(body);
+    sprite.x = body.position.x;
+    sprite.y = body.position.y;
+    sprite.rotation = body.rotation;
+  }
+  // Keep overlays on top of body sprites
+  if (constraintGfx) app.stage.addChild(constraintGfx);
+}
+
+let gridGfx = null;
+function drawGrid() {
+  if (gridGfx) return;
+  gridGfx = new PIXI.Graphics();
+  for (let x = 0; x < W; x += 50) { gridGfx.moveTo(x, 0); gridGfx.lineTo(x, H); }
+  for (let y = 0; y < H; y += 50) { gridGfx.moveTo(0, y); gridGfx.lineTo(W, y); }
+  gridGfx.stroke({ color: 0x1a2030, width: 0.5 });
+  app.stage.addChildAt(gridGfx, 0);
+}
+
+let constraintGfx = null;
+function drawConstraintLines() {
+  if (!constraintGfx) { constraintGfx = new PIXI.Graphics(); app.stage.addChild(constraintGfx); }
+  constraintGfx.clear();
+  try {
+    const raw = space.constraints;
+    for (let i = 0; i < raw.length; i++) {
+      const c = raw.at(i);
+      if (c.body1 && c.body2) {
+        constraintGfx.moveTo(c.body1.position.x, c.body1.position.y);
+        constraintGfx.lineTo(c.body2.position.x, c.body2.position.y);
+      }
+    }
+    constraintGfx.stroke({ color: 0xd29922, width: 1, alpha: 0.2 });
+  } catch(_) {}
+}
+// ── End PixiJS Renderer ─────────────────────────────────────────────────────
+`;
+
 const WALLS_HELPER = `function addWalls() {
   const t = 20;
   const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - t / 2));
@@ -104,6 +216,7 @@ const TEMPLATES = {
 const canvas = document.getElementById("demoCanvas");
 const canvasWrap = canvas;
 const ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height;
 
 ${RENDERER_2D}
 ${WALLS_HELPER}
@@ -128,7 +241,6 @@ ${code}`;
     },
   },
 
-  // PixiJS template — ready for Phase E
   pixijs: {
     html: `<div id="container" style="width:900px;max-width:100%;height:500px;border:1px solid #30363d;border-radius:8px;overflow:hidden"></div>`,
 
@@ -137,10 +249,17 @@ ${code}`;
 import {
   Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
-  Material, FluidProperties, InteractionFilter, InteractionGroup, AABB,
+  Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
 } from "${NAPE_CDN}";
 
+const container = document.getElementById("container");
+const W = 900, H = 500;
+const app = new PIXI.Application();
+await app.init({ width: W, height: H, backgroundColor: 0x0d1117, antialias: true });
+container.appendChild(app.canvas);
+
+${RENDERER_PIXI}
 ${WALLS_HELPER}
 ${code}`;
     },
@@ -162,9 +281,9 @@ const CODEPEN_CSS = `body { margin: 20px; background: #0d1117; font-family: sans
  *
  * Priority:
  *   1. demo.codepenOverride — complete custom CodePen code (escape hatch)
- *   2. For threejs mode: demo.code3d (legacy) → demo.code
- *   3. For canvas2d mode: demo.code2d (legacy) → demo.code
- *   4. For pixijs mode: demo.code → demo.code2d
+ *   2. For threejs mode: demo.code3d → demo.code (never falls back to code2d)
+ *   3. For canvas2d mode: demo.code2d → demo.code
+ *   4. For pixijs mode: demo.codePixi → demo.code (never falls back to code2d)
  *
  * @param {Object} demo — demo definition
  * @param {string} adapterId — "canvas2d" | "threejs" | "pixijs"
@@ -174,10 +293,10 @@ export function getDemoCode(demo, adapterId) {
   if (demo.codepenOverride) return demo.codepenOverride;
 
   if (adapterId === "threejs") {
-    return demo.code3d ?? demo.code ?? demo.code2d ?? null;
+    return demo.code3d ?? demo.code ?? null;
   }
   if (adapterId === "pixijs") {
-    return demo.code ?? demo.code2d ?? null;
+    return demo.codePixi ?? demo.code ?? null;
   }
   // canvas2d (default)
   return demo.code ?? demo.code2d ?? null;

@@ -94,6 +94,41 @@ function loop() {
 }
 loop();`,
 
+  codePixi: `// Stacking stability test — towers of various shapes
+const space = new Space(new Vec2(0, 600));
+
+addWalls();
+
+// Tower of boxes
+for (let i = 0; i < 12; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(200, H - 30 - 25 * i - 12.5));
+  b.shapes.add(new Polygon(Polygon.box(40, 25)));
+  b.space = space;
+}
+
+// Tower of circles
+for (let i = 0; i < 10; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(400, H - 30 - 24 * i - 12));
+  b.shapes.add(new Circle(12));
+  b.space = space;
+}
+
+// Tower of hexagons
+for (let i = 0; i < 10; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(600, H - 30 - 28 * i - 14));
+  b.shapes.add(new Polygon(Polygon.regular(18, 18, 6)));
+  b.space = space;
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
+
   code3d: `// Setup Three.js scene
 const container = document.getElementById("container");
 const W = 900, H = 500;

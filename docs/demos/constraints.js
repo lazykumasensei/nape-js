@@ -640,6 +640,67 @@ format(new AngleJoint(a1, a2, -Math.PI*1.5, Math.PI*1.5, 2));
 const m1 = box(350, 500, true), m2 = box(450, 500, true);
 format(new MotorJoint(m1, m2, 10, 3));`,
 
+  codePixi: `// Constraints Showcase — original nape layout (3×3 grid)
+const space = new Space(new Vec2(0, 600));
+
+// Common constraint settings
+const frequency = 20, damping = 1;
+function format(c) {
+  c.stiff = false;
+  c.frequency = frequency;
+  c.damping = damping;
+  c.space = space;
+}
+function box(x, y, pinned) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+  b.shapes.add(new Polygon(Polygon.box(28, 28)));
+  b.space = space;
+  if (pinned) new PivotJoint(space.world, b, new Vec2(x,y), new Vec2(0,0)).space = space;
+  return b;
+}
+
+// PivotJoint — two bodies share a pivot point
+const p1 = box(250, 100), p2 = box(350, 100);
+format(new PivotJoint(p1, p2,
+  p1.worldPointToLocal(new Vec2(300, 100)),
+  p2.worldPointToLocal(new Vec2(300, 100))));
+
+// WeldJoint — rigid connection with 45° phase offset
+const w1 = box(550, 100), w2 = box(650, 100);
+format(new WeldJoint(w1, w2,
+  w1.worldPointToLocal(new Vec2(600, 100)),
+  w2.worldPointToLocal(new Vec2(600, 100)), Math.PI/4));
+
+// DistanceJoint — spring between two bodies
+const d1 = box(100, 300), d2 = box(180, 300);
+format(new DistanceJoint(d1, d2,
+  new Vec2(0, -14), new Vec2(0, -14), 60, 100));
+
+// LineJoint — constrained to slide along an axis
+const l1 = box(350, 300), l2 = box(450, 300);
+format(new LineJoint(l1, l2,
+  l1.worldPointToLocal(new Vec2(400, 300)),
+  l2.worldPointToLocal(new Vec2(400, 300)),
+  new Vec2(0, 1), -14, 14));
+
+// AngleJoint — limits relative rotation
+const a1 = box(100, 500, true), a2 = box(200, 500, true);
+format(new AngleJoint(a1, a2, -Math.PI*1.5, Math.PI*1.5, 2));
+
+// MotorJoint — drives angular velocity
+const m1 = box(350, 500, true), m2 = box(450, 500, true);
+format(new MotorJoint(m1, m2, 10, 3));
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  drawConstraintLines();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
+
   code3d: `// 3D view of constraints demo
 const container = document.getElementById("container");
 const W = 900, H = 600;

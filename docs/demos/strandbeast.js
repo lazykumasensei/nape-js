@@ -250,6 +250,90 @@ function loop() {
 }
 loop();`,
 
+  codePixi: `// Strand Beast — Theo Jansen walking mechanism (6 legs)
+const space = new Space(new Vec2(0, 400));
+addWalls();
+const t = 20;
+
+const S = Math.min(W, H) * 0.05 * 0.6;
+const PIVOT_Y = 0.8, WHEEL_R = 1.6, CRANK_R = PIVOT_Y * S;
+const CHASSIS_HW = 2.5, CHASSIS_HH = 1.0;
+const P = {
+  p1x: 5.4, p1y: 6.1, p2x: 7.2, p2y: 1.2,
+  p3x: 4.3, p3y: 1.9, p4x: 3.1, p4y: -0.8,
+  p5x: 6.0, p5y: -1.5, p6x: 2.5, p6y: -3.7,
+};
+
+const ox = W * 0.15, oy = (H - t) - P.p1y * S;
+const mf = new InteractionFilter(2, 1);
+
+// Random obstacles (60% of original size)
+const obstacleMinX = ox + CHASSIS_HW*4*S, obstacleMaxX = W - t - 40;
+for (let i = 0; i < 5; i++) {
+  const rx = obstacleMinX + (obstacleMaxX - obstacleMinX) * (i + 0.5 + (Math.random()-0.5)*0.7) / 5;
+  const rh = (15 + Math.random()*30)*0.6, rw = (10 + Math.random()*20)*0.6;
+  const obs = new Body(BodyType.DYNAMIC, new Vec2(rx, H - t - rh/2));
+  obs.shapes.add(new Polygon(Polygon.box(rw, rh)));
+  obs.space = space;
+}
+
+const chassis = new Body(BodyType.DYNAMIC, new Vec2(ox, oy - PIVOT_Y * S));
+chassis.shapes.add(new Polygon(Polygon.box(CHASSIS_HW*2*S, CHASSIS_HH*2*S), undefined, mf));
+chassis.space = space;
+const wheel = new Body(BodyType.DYNAMIC, new Vec2(ox, oy - PIVOT_Y * S));
+wheel.shapes.add(new Circle(WHEEL_R * S, undefined, undefined, mf));
+wheel.space = space;
+new PivotJoint(chassis, wheel, new Vec2(0,0), new Vec2(0,0)).space = space;
+new MotorJoint(chassis, wheel, 2.0).space = space;
+
+const D12 = Math.sqrt((P.p2x-P.p5x)**2+(P.p2y-P.p5y)**2)*S;
+const D34 = Math.sqrt((P.p3x-P.p4x)**2+(P.p3y-P.p4y)**2)*S;
+const D3W = Math.sqrt(P.p3x**2+P.p3y**2)*S;
+const D6W = Math.sqrt(P.p6x**2+P.p6y**2)*S;
+
+function makeDJ(b1, b2, a1x, a1y, a2x, a2y, d) {
+  const dj = new DistanceJoint(b1, b2, new Vec2(a1x,a1y), new Vec2(a2x,a2y), d, d);
+  dj.stiff = true;
+  dj.space = space;
+}
+function createLeg(side, phase) {
+  const p1x=P.p1x*side, p2x=P.p2x*side, p3x=P.p3x*side;
+  const p4x=P.p4x*side, p5x=P.p5x*side, p6x=P.p6x*side;
+  const wax = CRANK_R*Math.sin(phase), way = CRANK_R*Math.cos(phase);
+  const c1x=(p1x+p2x+p3x)/3*S, c1y=(P.p1y+P.p2y+P.p3y)/3*S;
+  const body1 = new Body(BodyType.DYNAMIC, new Vec2(ox+c1x, oy+c1y));
+  const v1 = side > 0
+    ? [new Vec2(p1x*S-c1x,P.p1y*S-c1y), new Vec2(p3x*S-c1x,P.p3y*S-c1y), new Vec2(p2x*S-c1x,P.p2y*S-c1y)]
+    : [new Vec2(p1x*S-c1x,P.p1y*S-c1y), new Vec2(p2x*S-c1x,P.p2y*S-c1y), new Vec2(p3x*S-c1x,P.p3y*S-c1y)];
+  body1.shapes.add(new Polygon(v1, undefined, mf));
+  body1.space = space;
+  const lp5x=(p5x-p4x)*S, lp5y=(P.p5y-P.p4y)*S;
+  const lp6x=(p6x-p4x)*S, lp6y=(P.p6y-P.p4y)*S;
+  const c2x=(lp5x+lp6x)/3, c2y=(lp5y+lp6y)/3;
+  const body2 = new Body(BodyType.DYNAMIC, new Vec2(ox+p4x*S+c2x, oy+P.p4y*S+c2y));
+  const v2 = side > 0
+    ? [new Vec2(-c2x,-c2y), new Vec2(lp6x-c2x,lp6y-c2y), new Vec2(lp5x-c2x,lp5y-c2y)]
+    : [new Vec2(-c2x,-c2y), new Vec2(lp5x-c2x,lp5y-c2y), new Vec2(lp6x-c2x,lp6y-c2y)];
+  body2.shapes.add(new Polygon(v2, undefined, mf));
+  body2.space = space;
+  makeDJ(body1, body2, p2x*S-c1x, P.p2y*S-c1y, lp5x-c2x, lp5y-c2y, D12);
+  makeDJ(body1, body2, p3x*S-c1x, P.p3y*S-c1y, -c2x, -c2y, D34);
+  makeDJ(body1, wheel, p3x*S-c1x, P.p3y*S-c1y, wax, way, D3W);
+  makeDJ(body2, wheel, lp6x-c2x, lp6y-c2y, wax, way, D6W);
+  new PivotJoint(body2, chassis, new Vec2(-c2x,-c2y), new Vec2(p4x*S,(P.p4y+PIVOT_Y)*S)).space = space;
+}
+[0, Math.PI*2/3, Math.PI*4/3].forEach(ph => { createLeg(1,ph); createLeg(-1,ph); });
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  drawConstraintLines();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
+
   code3d: `// Setup Three.js scene
 const container = document.getElementById("container");
 const W = 900, H = 500;
