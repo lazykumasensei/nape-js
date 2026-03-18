@@ -305,7 +305,6 @@ export default {
 
   code2d: `// Pneumatic Soft Body — pressure-driven volume preservation
 const space = new Space(new Vec2(0, 400));
-const W = 900, H = 500;
 addWalls();
 
 // Geometry helpers

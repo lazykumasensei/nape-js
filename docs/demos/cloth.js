@@ -38,7 +38,6 @@ export default {
   walls: false,
 
   code2d: `// Cloth Simulation — spring-connected particle grid
-const W = 900, H = 500;
 const space = new Space(new Vec2(0, 300));
 
 const cols = 20, rows = 14, gap = 20;

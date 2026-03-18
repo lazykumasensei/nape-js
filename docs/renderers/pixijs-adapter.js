@@ -221,7 +221,8 @@ export class PixiJSAdapter {
       const gfx = new _PIXI.Graphics();
       this.#drawBodyShapes(body, gfx, show);
       const bounds = gfx.getLocalBounds();
-      const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2 });
+      const frame = new _PIXI.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
+      const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2, frame });
       sprite.texture = texture;
       sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
       gfx.destroy();
@@ -283,8 +284,10 @@ export class PixiJSAdapter {
 
     // Bake Graphics → Texture → Sprite
     const bounds = gfx.getLocalBounds();
-    const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2 });
+    const frame = new _PIXI.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
+    const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2, frame });
     const sprite = new _PIXI.Sprite(texture);
+    // Anchor maps the body origin (0,0) within the baked texture
     sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
 
     sprite.x = body.position.x;

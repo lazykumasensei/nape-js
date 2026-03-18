@@ -337,7 +337,6 @@ export default {
 
   code2d: `// Destructible Terrain — MarchingSquares + bitmap erosion
 const space = new Space(new Vec2(0, 600));
-const W = 900, H = 500;
 
 // Value noise for terrain generation
 function hash(x, y) {
