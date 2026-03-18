@@ -515,6 +515,72 @@ export default {
     renderer.render(scene, camera);
   },
 
+  /* ── PixiJS render ─────────────────────────────────────────────────── */
+  renderPixi(adapter, _space, W, H) {
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    if (!transforms || !workerReady || !shapeData) {
+      app.render();
+      return;
+    }
+
+    // Lazy-create Graphics objects matching shapeData
+    if (!app.stage._workerGfx) app.stage._workerGfx = [];
+    const gfxList = app.stage._workerGfx;
+
+    const PIXI_COLORS = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0x4dd0e1];
+    const WALL_COLOR = 0x607888;
+
+    // Ensure we have enough Graphics objects
+    while (gfxList.length < shapeData.length) {
+      const i = gfxList.length;
+      const sd = shapeData[i];
+      const gfx = new PIXI.Graphics();
+      const isWall = !!sd.wall;
+      const color = isWall ? WALL_COLOR : PIXI_COLORS[i % PIXI_COLORS.length];
+      const alpha = isWall ? 0.15 : 0.25;
+
+      if (sd.circle) {
+        gfx.circle(0, 0, sd.radius);
+        gfx.fill({ color, alpha });
+        gfx.circle(0, 0, sd.radius);
+        gfx.stroke({ color, width: 1.2, alpha: 0.8 });
+      } else if (sd.box) {
+        gfx.rect(-sd.hw, -sd.hh, sd.hw * 2, sd.hh * 2);
+        gfx.fill({ color, alpha });
+        gfx.rect(-sd.hw, -sd.hh, sd.hw * 2, sd.hh * 2);
+        gfx.stroke({ color, width: 1.2, alpha: 0.8 });
+      }
+
+      app.stage.addChild(gfx);
+      gfxList.push(gfx);
+    }
+
+    // Update positions from transforms buffer
+    const bodyCount = transforms[0] | 0;
+    const count = Math.min(bodyCount, gfxList.length);
+    for (let i = 0; i < count; i++) {
+      const off = HEADER_FLOATS + i * FLOATS_PER_BODY;
+      const gfx = gfxList[i];
+      gfx.x = transforms[off];
+      gfx.y = transforms[off + 1];
+      gfx.rotation = transforms[off + 2];
+      gfx.visible = true;
+    }
+    for (let i = count; i < gfxList.length; i++) {
+      gfxList[i].visible = false;
+    }
+
+    // Update worker info badges
+    const bodiesEl = document.getElementById("__worker_bodies");
+    if (bodiesEl) bodiesEl.textContent = `Bodies: ${count}`;
+    const stepEl = document.getElementById("__worker_step");
+    if (stepEl) stepEl.textContent = `Step: ${workerStepMs.toFixed(2)}ms`;
+
+    app.render();
+  },
+
   code2d: `// Web Worker Physics — off-thread simulation
 //
 // 1. Build an inline Blob worker that imports nape-js
