@@ -167,6 +167,7 @@ export default {
   },
 
   code2d: `// Strand Beast — Theo Jansen walking mechanism (6 legs)
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 400));
 addWalls();
 const t = 20;

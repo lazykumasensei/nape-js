@@ -70,6 +70,7 @@ export default {
   },
 
   code2d: `// Orbital gravity — Mario Galaxy style
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 0)); // no global gravity!
 
 // Static "planet" at center

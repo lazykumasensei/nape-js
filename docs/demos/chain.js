@@ -147,6 +147,7 @@ export default {
   },
 
   code2d: `// Pendulum chain — grab and drag any link
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 500));
 
 // Static anchor point

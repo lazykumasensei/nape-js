@@ -590,6 +590,7 @@ export default {
   },
 
   code2d: `// Constraints Showcase — original nape layout (3\u00D73 grid)
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 // Common constraint settings

@@ -216,7 +216,6 @@ const TEMPLATES = {
 const canvas = document.getElementById("demoCanvas");
 const canvasWrap = canvas;
 const ctx = canvas.getContext("2d");
-const W = canvas.width, H = canvas.height;
 
 ${RENDERER_2D}
 ${WALLS_HELPER}

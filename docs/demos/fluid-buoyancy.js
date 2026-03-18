@@ -642,6 +642,7 @@ export default {
   },
 
   code2d: `// Fluid & Buoyancy — objects + boat in a fluid pool
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 // Walls

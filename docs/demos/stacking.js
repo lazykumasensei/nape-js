@@ -60,6 +60,7 @@ export default {
   },
 
   code2d: `// Stacking stability test — towers of various shapes
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 addWalls();

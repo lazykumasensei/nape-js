@@ -304,6 +304,7 @@ export default {
   walls: true,
 
   code2d: `// Pneumatic Soft Body — pressure-driven volume preservation
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 400));
 addWalls();
 

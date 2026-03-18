@@ -34,6 +34,7 @@ export default {
   },
 
   code2d: `// Impulse blast — apply radial impulse on click
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 500));
 
 addWalls();

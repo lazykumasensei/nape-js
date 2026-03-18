@@ -41,6 +41,7 @@ export default {
   },
 
   code2d: `// Pyramid stress test — stacking many boxes
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 addWalls();

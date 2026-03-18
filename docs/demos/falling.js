@@ -25,6 +25,7 @@ export default {
   },
 
   code2d: `// Create a Space with downward gravity
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 addWalls();

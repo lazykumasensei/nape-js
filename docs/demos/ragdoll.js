@@ -23,6 +23,7 @@ export default {
   },
 
   code2d: `// Ragdoll using PivotJoint + AngleJoint constraints
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 addWalls();

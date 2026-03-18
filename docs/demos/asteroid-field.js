@@ -51,6 +51,7 @@ export default {
   },
 
   code2d: `// Asteroid field with SPATIAL_HASH broadphase
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 0), Broadphase.SPATIAL_HASH);
 addWalls();
 
