@@ -258,7 +258,10 @@ frame();`,
         const circle = new Circle(2);
         circle.filter = new InteractionFilter(2, ~2);
         b.shapes.add(circle);
-        try { b.userData._colorIdx = isTop ? 3 : (r + c) % 6; } catch(_) {}
+        try {
+          b.userData._colorIdx = isTop ? 3 : (r + c) % 6;
+          b.userData._hidden3d = true;
+        } catch(_) {}
         b.space = space;
         bodies[r][c] = b;
       }
@@ -477,6 +480,44 @@ frame();`,
       if (isCloth) continue;
       drawBody(ctx, body, showOutlines);
     }
+  },
+
+  renderPixi(adapter, space, W, H) {
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    // Sync non-cloth body graphics (obstacle, walls)
+    // Cloth particles are skipped via _hidden3d flag
+    adapter.syncBodies(space);
+
+    // Lazy-create cloth mesh Graphics (behind body graphics)
+    if (!app.stage._clothGfx) {
+      app.stage._clothGfx = new PIXI.Graphics();
+      app.stage.addChildAt(app.stage._clothGfx, 0);
+    }
+    const gfx = app.stage._clothGfx;
+    gfx.clear();
+
+    if (_clothBodies) {
+      const cols = _clothCols;
+      const rows = _clothRows;
+
+      for (let r = 0; r < rows - 1; r++) {
+        for (let c = 0; c < cols - 1; c++) {
+          const tl = _clothBodies[r][c].position;
+          const tr = _clothBodies[r][c + 1].position;
+          const bl = _clothBodies[r + 1][c].position;
+          const br = _clothBodies[r + 1][c + 1].position;
+
+          gfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
+          gfx.fill({ color: 0x58a6ff, alpha: 0.15 });
+          gfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
+          gfx.stroke({ color: 0x58a6ff, width: 0.5, alpha: 0.5 });
+        }
+      }
+    }
+
+    app.render();
   },
 
   render3d(renderer, scene, camera, space, W, H) {
