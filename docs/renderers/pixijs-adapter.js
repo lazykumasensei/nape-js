@@ -126,10 +126,9 @@ export class PixiJSAdapter {
 
   onDemoUnload() {
     if (!this.#app) return;
-    for (const [, sprite] of this.#bodySprites) {
-      this.#app.stage.removeChild(sprite);
-      sprite.texture.destroy(true);
-      sprite.destroy();
+    for (const [, gfx] of this.#bodySprites) {
+      this.#app.stage.removeChild(gfx);
+      gfx.destroy();
     }
     this.#bodySprites.clear();
   }
@@ -183,8 +182,8 @@ export class PixiJSAdapter {
       return;
     }
 
-    // Ensure sprites exist for all shapes
-    this.#ensureWorkerSprites(shapeDescs);
+    // Ensure graphics exist for all shapes
+    this.#ensureWorkerGfx(shapeDescs);
 
     const HEADER = 3;
     const STRIDE = 3;
@@ -214,19 +213,10 @@ export class PixiJSAdapter {
   setOutlines(show) {
     this.#showOutlines = show;
     if (!this.#app) return;
-    // Regenerate all textures with/without outlines
-    for (const [body, sprite] of this.#bodySprites) {
+    // Redraw all Graphics with/without outlines
+    for (const [body, gfx] of this.#bodySprites) {
       if (typeof body === "number") continue; // worker mode index keys
-      const oldTex = sprite.texture;
-      const gfx = new _PIXI.Graphics();
       this.#drawBodyShapes(body, gfx, show);
-      const bounds = gfx.getLocalBounds();
-      const frame = new _PIXI.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
-      const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2, frame });
-      sprite.texture = texture;
-      sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
-      gfx.destroy();
-      oldTex.destroy(true);
     }
   }
 
@@ -260,19 +250,19 @@ export class PixiJSAdapter {
     return this.#app?.canvas ?? null;
   }
 
-  /** Sync body sprites with the current space (add new, remove stale, update positions). */
+  /** Sync body graphics with the current space (add new, remove stale, update positions). */
   syncBodies(space) {
     if (!this.#app) return;
     this.#syncBodies(space);
-    for (const [body, sprite] of this.#bodySprites) {
-      sprite.x = body.position.x;
-      sprite.y = body.position.y;
-      sprite.rotation = body.rotation;
+    for (const [body, gfx] of this.#bodySprites) {
+      gfx.x = body.position.x;
+      gfx.y = body.position.y;
+      gfx.rotation = body.rotation;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Internal: body sprite management (Sprite + generateTexture pattern)
+  // Internal: body graphics management
   // ---------------------------------------------------------------------------
 
   #addBodySprite(body) {
@@ -282,21 +272,12 @@ export class PixiJSAdapter {
     const gfx = new _PIXI.Graphics();
     this.#drawBodyShapes(body, gfx, this.#showOutlines);
 
-    // Bake Graphics → Texture → Sprite
-    const bounds = gfx.getLocalBounds();
-    const frame = new _PIXI.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
-    const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2, frame });
-    const sprite = new _PIXI.Sprite(texture);
-    // Anchor maps the body origin (0,0) within the baked texture
-    sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
+    gfx.x = body.position.x;
+    gfx.y = body.position.y;
+    gfx.rotation = body.rotation;
 
-    sprite.x = body.position.x;
-    sprite.y = body.position.y;
-    sprite.rotation = body.rotation;
-
-    gfx.destroy();
-    this.#app.stage.addChild(sprite);
-    this.#bodySprites.set(body, sprite);
+    this.#app.stage.addChild(gfx);
+    this.#bodySprites.set(body, gfx);
   }
 
   #syncBodies(space) {
@@ -304,11 +285,10 @@ export class PixiJSAdapter {
     const spaceBodies = new Set();
     for (const body of space.bodies) spaceBodies.add(body);
 
-    for (const [body, sprite] of this.#bodySprites) {
+    for (const [body, gfx] of this.#bodySprites) {
       if (!spaceBodies.has(body)) {
-        this.#app.stage.removeChild(sprite);
-        sprite.texture.destroy(true);
-        sprite.destroy();
+        this.#app.stage.removeChild(gfx);
+        gfx.destroy();
         this.#bodySprites.delete(body);
       }
     }
@@ -378,14 +358,13 @@ export class PixiJSAdapter {
 
   #lastWorkerDescs = null;
 
-  #ensureWorkerSprites(shapeDescs) {
-    // Rebuild all sprites when shapeDescs changes (body order may shift)
+  #ensureWorkerGfx(shapeDescs) {
+    // Rebuild all graphics when shapeDescs changes (body order may shift)
     if (this.#lastWorkerDescs !== shapeDescs) {
       this.#lastWorkerDescs = shapeDescs;
-      for (const [, sprite] of this.#bodySprites) {
-        this.#app.stage.removeChild(sprite);
-        sprite.texture.destroy(true);
-        sprite.destroy();
+      for (const [, gfx] of this.#bodySprites) {
+        this.#app.stage.removeChild(gfx);
+        gfx.destroy();
       }
       this.#bodySprites.clear();
     }
@@ -414,16 +393,8 @@ export class PixiJSAdapter {
         }
       }
 
-      // Bake to texture + sprite
-      const bounds = gfx.getLocalBounds();
-      const texture = this.#app.renderer.generateTexture({ target: gfx, resolution: 2 });
-      const sprite = new _PIXI.Sprite(texture);
-      sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
-      gfx.destroy();
-
-      this.#app.stage.addChild(sprite);
-      // Use index as key since we don't have body references in worker mode
-      this.#bodySprites.set(i, sprite);
+      this.#app.stage.addChild(gfx);
+      this.#bodySprites.set(i, gfx);
     }
   }
 }
