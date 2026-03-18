@@ -1,7 +1,7 @@
 import {
   Body, BodyType, Vec2, AABB, Polygon, MarchingSquares, PivotJoint,
 } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 // ---------------------------------------------------------------------------
 // IsoBody — generate a physics body from an image using MarchingSquares
@@ -254,6 +254,7 @@ export default {
   featured: false,
   tags: ["MarchingSquares", "Procedural", "Interactive"],
   desc: "Drag any image file onto the canvas — <b>MarchingSquares</b> extracts the physics contour instantly and spawns a dynamic body. <b>Drag</b> bodies with the mouse.",
+  walls: true,
 
   setup(space, W, H) {
     _space = space;
@@ -261,7 +262,6 @@ export default {
     _colorCounter = 0;
 
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     _mouseBody      = null;
     _grabJoint      = null;
@@ -381,4 +381,79 @@ export default {
   release() {
     _pendingRelease = true;
   },
+
+  code2d: `// Drop Image → Body — drag images onto the canvas
+const space = new Space(new Vec2(0, 600));
+const W = canvas.width, H = canvas.height;
+
+addWalls();
+
+// Extract physics body from any image using MarchingSquares
+function imageToBody(imgCanvas) {
+  const tw = 120, th = Math.round(120 * (imgCanvas.height / imgCanvas.width));
+  const scaled = document.createElement("canvas");
+  scaled.width = tw; scaled.height = th;
+  scaled.getContext("2d").drawImage(imgCanvas, 0, 0, tw, th);
+
+  const data = scaled.getContext("2d").getImageData(0, 0, tw, th).data;
+  // Check alpha channel
+  let hasAlpha = false;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] < 200) { hasAlpha = true; break; }
+  }
+
+  function iso(x, y) {
+    const ix = Math.max(0, Math.min(tw - 1, Math.floor(x)));
+    const iy = Math.max(0, Math.min(th - 1, Math.floor(y)));
+    const i = (iy * tw + ix) * 4;
+    if (hasAlpha) return data[i + 3] - 64;                        // alpha-based
+    return (0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2]) - 128; // luminance
+  }
+
+  const cellSize = Math.max(2, Math.round(Math.min(tw, th) / 30));
+  const polys = MarchingSquares.run(iso, new AABB(0, 0, tw, th), Vec2.weak(cellSize, cellSize), 2);
+
+  const body = new Body();
+  for (let i = 0; i < polys.length; i++) {
+    const p = polys.at(i);
+    const parts = p.simplify(1.5).convexDecomposition(true);
+    for (let j = 0; j < parts.length; j++) body.shapes.add(new Polygon(parts.at(j)));
+  }
+
+  if (body.shapes.length === 0) body.shapes.add(new Polygon(Polygon.box(tw * 0.8, th * 0.8)));
+  const com = body.localCOM;
+  body.translateShapes(Vec2.get(-com.x, -com.y));
+  return body;
+}
+
+// Handle file drops
+canvasWrap.addEventListener("dragover", (e) => e.preventDefault());
+canvasWrap.addEventListener("drop", (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer?.files?.[0];
+  if (!file || !file.type.startsWith("image/")) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      c.getContext("2d").drawImage(img, 0, 0);
+      const body = imageToBody(c);
+      body.position.setxy(W / 2, H / 2);
+      body.space = space;
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  ctx.clearRect(0, 0, W, H);
+  drawGrid();
+  for (const body of space.bodies) drawBody(body);
+  requestAnimationFrame(loop);
+}
+loop();`,
 };

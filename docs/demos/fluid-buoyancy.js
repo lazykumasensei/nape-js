@@ -2,7 +2,7 @@ import {
   Body, BodyType, Vec2, Circle, Polygon, FluidProperties,
 } from "../nape-js.esm.js";
 import { drawBody, drawGrid, drawConstraints } from "../renderer.js";
-import { loadThree } from "../demo-runner.js";
+import { loadThree } from "../renderers/threejs-adapter.js";
 
 // ---------------------------------------------------------------------------
 // State
@@ -248,29 +248,6 @@ function renderFluid(ctx, space, W, H, showOutlines) {
     ctx.restore();
   }
 
-  // Legend
-  ctx.save();
-  ctx.font = "11px monospace";
-  const labels = [
-    { color: "#58a6ff", text: "Light (0.3)" },
-    { color: "#d29922", text: "Wood (0.7)" },
-    { color: "#dbabff", text: "Rubber (0.5)" },
-    { color: "#f85149", text: "Steel (3.0)" },
-    { color: "#a371f7", text: "Anchor (7.0)" },
-    { color: "#c8a060", text: "Boat (0.25)" },
-  ];
-  const lx = 30;
-  let ly = 24;
-  for (const l of labels) {
-    ctx.fillStyle = l.color;
-    ctx.fillRect(lx, ly - 8, 10, 10);
-    ctx.fillStyle = "rgba(200,220,255,0.7)";
-    ctx.fillText(l.text, lx + 14, ly);
-    ly += 14;
-  }
-  ctx.fillStyle = "rgba(200,220,255,0.5)";
-  ctx.fillText("Click to drop objects", lx, ly + 6);
-  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +356,7 @@ export default {
   featuredOrder: 6,
   tags: ["Fluid", "Buoyancy", "Density", "Boat", "Click"],
   desc: 'Objects with different densities interact with a fluid pool — light ones float, heavy ones sink. A small boat bobs on the waves. <b>Click</b> to drop objects.',
+  walls: false,
 
   setup(space, W, H) {
     _W = W;
@@ -575,7 +553,6 @@ export default {
   },
 
   render3dOverlay(ctx, space, W, H) {
-    // Draw legend on the 2D overlay in 3D mode
     ctx.save();
     ctx.font = "11px monospace";
     const labels = [
@@ -586,8 +563,8 @@ export default {
       { color: "#a371f7", text: "Anchor (7.0)" },
       { color: "#c8a060", text: "Boat (0.25)" },
     ];
-    const lx = 10;
-    let ly = 20;
+    const lx = 30;
+    let ly = 24;
     for (const l of labels) {
       ctx.fillStyle = l.color;
       ctx.fillRect(lx, ly - 8, 10, 10);
@@ -595,7 +572,67 @@ export default {
       ctx.fillText(l.text, lx + 14, ly);
       ly += 14;
     }
+    ctx.fillStyle = "rgba(200,220,255,0.5)";
+    ctx.fillText("Click to drop objects", lx, ly + 6);
     ctx.restore();
+  },
+
+  renderPixi(adapter, space, W, H) {
+    _time += 1 / 60;
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    // Sync body sprites (add/remove/update positions)
+    adapter.syncBodies(space);
+
+    // Lazy-create a Graphics overlay for the water
+    if (!app.stage._waterGfx) {
+      app.stage._waterGfx = new PIXI.Graphics();
+      app.stage.addChild(app.stage._waterGfx);
+    }
+    const gfx = app.stage._waterGfx;
+
+    // Keep water overlay on top of body sprites
+    app.stage.setChildIndex(gfx, app.stage.children.length - 1);
+
+    // Animated wave water surface
+    gfx.clear();
+    const pts = [20, H - 10];
+    for (let x = 20; x <= W - 20; x += 3) {
+      pts.push(x, _waterY + waveY(x, _time));
+    }
+    pts.push(W - 20, H - 10);
+    gfx.poly(pts, true);
+    gfx.fill({ color: 0x1e90ff, alpha: 0.3 });
+
+    // Wave surface line
+    gfx.moveTo(20, _waterY + waveY(20, _time));
+    for (let x = 22; x <= W - 20; x += 2) {
+      gfx.lineTo(x, _waterY + waveY(x, _time));
+    }
+    gfx.stroke({ color: 0x64c8ff, width: 2.5, alpha: 0.9 });
+
+    // Boat mast + flag
+    if (!app.stage._boatGfx) {
+      app.stage._boatGfx = new PIXI.Graphics();
+      app.stage.addChild(app.stage._boatGfx);
+    }
+    const boatGfx = app.stage._boatGfx;
+    boatGfx.clear();
+    for (const body of space.bodies) {
+      if (!body.userData?._isBoat) continue;
+      boatGfx.position.set(body.position.x, body.position.y);
+      boatGfx.rotation = body.rotation;
+      // Mast
+      boatGfx.moveTo(-5, -18);
+      boatGfx.lineTo(-5, -55);
+      boatGfx.stroke({ color: 0xc8a060, width: 2.5, alpha: 1 });
+      // Flag (triangle)
+      boatGfx.poly([-5, -55, 15, -47, -5, -40], true);
+      boatGfx.fill({ color: 0xf85149, alpha: 0.8 });
+    }
+
+    app.render();
   },
 
   click(x, y, space) {
@@ -605,8 +642,8 @@ export default {
   },
 
   code2d: `// Fluid & Buoyancy — objects + boat in a fluid pool
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
-const W = 900, H = 500;
 
 // Walls
 const t = 20;
@@ -742,6 +779,123 @@ canvas.addEventListener("click", (e) => {
   const rect = canvas.getBoundingClientRect();
   const sx = canvas.width / rect.width;
   const sy = canvas.height / rect.height;
+  const cx = (e.clientX - rect.left) * sx;
+  const cy = (e.clientY - rect.top) * sy;
+  const spawnY = Math.min(cy, waterY - 30);
+  const b = new Body(BodyType.DYNAMIC, new Vec2(cx, spawnY));
+  if (Math.random() < 0.5) {
+    b.shapes.add(new Circle(8 + Math.random() * 12));
+  } else {
+    const sz = 12 + Math.random() * 18;
+    b.shapes.add(new Polygon(Polygon.box(sz, sz)));
+  }
+  b.shapes.at(0).material.density = 0.3 + Math.random() * 6;
+  b.space = space;
+});`,
+
+  codePixi: `// Fluid & Buoyancy — objects + boat in a fluid pool
+const space = new Space(new Vec2(0, 600));
+
+// Walls
+const t = 20;
+const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - t / 2));
+floor.shapes.add(new Polygon(Polygon.box(W, t)));
+floor.space = space;
+const left = new Body(BodyType.STATIC, new Vec2(t / 2, H / 2));
+left.shapes.add(new Polygon(Polygon.box(t, H)));
+left.space = space;
+const right = new Body(BodyType.STATIC, new Vec2(W - t / 2, H / 2));
+right.shapes.add(new Polygon(Polygon.box(t, H)));
+right.space = space;
+
+// Water pool (bottom 60%)
+const waterY = H * 0.4;
+const waterH = H - waterY;
+const water = new Body(BodyType.STATIC, new Vec2(W / 2, waterY + waterH / 2));
+const ws = new Polygon(Polygon.box(W - 40, waterH));
+ws.fluidEnabled = true;
+ws.fluidProperties = new FluidProperties(1.5, 3.0);
+water.shapes.add(ws);
+water.space = space;
+
+// Boat — V-hull with flat deck and cabin
+const boat = new Body(BodyType.DYNAMIC, new Vec2(W / 2, waterY - 10));
+const keel = new Polygon([
+  new Vec2(-38, 0), new Vec2(50, 0),
+  new Vec2(58, 6), new Vec2(0, 14), new Vec2(-42, 10),
+]);
+keel.material.density = 0.25;
+keel.material.elasticity = 0.1;
+keel.material.dynamicFriction = 0.4;
+keel.material.staticFriction = 0.4;
+boat.shapes.add(keel);
+const deck = new Polygon([
+  new Vec2(-38, -4), new Vec2(50, -4),
+  new Vec2(50, 0), new Vec2(-38, 0),
+]);
+deck.material.density = 0.2;
+deck.material.elasticity = 0.1;
+boat.shapes.add(deck);
+const cabin = new Polygon([
+  new Vec2(-12, -16), new Vec2(8, -16),
+  new Vec2(8, -4), new Vec2(-12, -4),
+]);
+cabin.material.density = 0.15;
+boat.shapes.add(cabin);
+boat.space = space;
+
+// Drop some objects
+for (let i = 0; i < 10; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(
+    80 + Math.random() * (W - 160), 30 + Math.random() * 80,
+  ));
+  if (Math.random() < 0.5) {
+    b.shapes.add(new Circle(8 + Math.random() * 12));
+    b.shapes.at(0).material.density = 0.3 + Math.random() * 6;
+  } else {
+    const sz = 12 + Math.random() * 18;
+    b.shapes.add(new Polygon(Polygon.box(sz, sz)));
+    b.shapes.at(0).material.density = 0.3 + Math.random() * 6;
+  }
+  b.space = space;
+}
+
+// Water overlay
+const waterGfx = new PIXI.Graphics();
+app.stage.addChild(waterGfx);
+
+let time = 0;
+function waveY(x) {
+  return Math.sin(x * 0.02 + time * 2) * 3
+       + Math.sin(x * 0.035 - time * 1.5) * 2;
+}
+
+function loop() {
+  time += 1 / 60;
+  space.step(1 / 60, 8, 3);
+
+  drawGrid();
+  syncBodies(space);
+
+  // Draw water overlay
+  waterGfx.clear();
+  const pts = [20, H - 10];
+  for (let x = 20; x <= W - 20; x += 3) {
+    pts.push(x, waterY + waveY(x));
+  }
+  pts.push(W - 20, H - 10);
+  waterGfx.poly(pts, true);
+  waterGfx.fill({ color: 0x1e90ff, alpha: 0.3 });
+
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();
+
+// Click to drop random objects
+app.canvas.addEventListener("click", (e) => {
+  const rect = app.canvas.getBoundingClientRect();
+  const sx = W / rect.width, sy = H / rect.height;
   const cx = (e.clientX - rect.left) * sx;
   const cy = (e.clientY - rect.top) * sy;
   const spawnY = Math.min(cy, waterY - 30);

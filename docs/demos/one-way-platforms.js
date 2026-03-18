@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Polygon, CbType, InteractionType, PreListener, PreFlag } from "../nape-js.esm.js";
-import { addWalls, spawnRandomShape } from "../demo-runner.js";
+import { spawnRandomShape } from "../demo-runner.js";
 
 export default {
   id: "one-way-platforms",
@@ -7,10 +7,10 @@ export default {
   featured: false,
   tags: ["PreListener", "CbType", "Kinematic"],
   desc: "Bodies pass through platforms from below but rest on them from above using PreListener. Conveyors push shapes sideways.",
+  walls: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     const platformType = new CbType();
     const objectType = new CbType();
@@ -73,4 +73,135 @@ export default {
       }
     }
   },
+
+  code2d: `// One-Way Platforms — PreListener pass-through logic + conveyors
+const space = new Space(new Vec2(0, 600));
+const W = canvas.width, H = canvas.height;
+
+addWalls();
+
+const platformType = new CbType();
+const objectType = new CbType();
+
+// Accept collision only when normal points upward (object lands on top)
+const preListener = new PreListener(
+  InteractionType.COLLISION,
+  platformType, objectType,
+  (cb) => {
+    try {
+      const colArb = cb.get_arbiter().get_collisionArbiter();
+      if (!colArb) return PreFlag.ACCEPT;
+      return colArb.get_normal().get_y() < 0 ? PreFlag.ACCEPT : PreFlag.IGNORE;
+    } catch (_) { return PreFlag.ACCEPT; }
+  },
+);
+preListener.space = space;
+
+// Platforms at different heights
+const platPositions = [
+  { x: W * 0.35, y: H * 0.7, w: W * 0.35 },
+  { x: W * 0.65, y: H * 0.5, w: W * 0.3 },
+  { x: W * 0.3, y: H * 0.35, w: W * 0.35 },
+];
+for (const p of platPositions) {
+  const plat = new Body(BodyType.STATIC, new Vec2(p.x, p.y));
+  plat.shapes.add(new Polygon(Polygon.box(p.w, 10)));
+  plat.shapes.at(0).cbTypes.add(platformType);
+  plat.space = space;
+}
+
+// Conveyor belt
+const conveyor = new Body(BodyType.KINEMATIC, new Vec2(W / 2, H * 0.85));
+conveyor.shapes.add(new Polygon(Polygon.box(W * 0.5, 10)));
+conveyor.surfaceVel = new Vec2(80, 0);
+conveyor.space = space;
+
+// Spawn shapes
+for (let i = 0; i < 20; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(
+    40 + Math.random() * (W - 80), -Math.random() * 200,
+  ));
+  if (Math.random() < 0.5) {
+    b.shapes.add(new Circle(6 + Math.random() * 8));
+  } else {
+    const sz = 8 + Math.random() * 12;
+    b.shapes.add(new Polygon(Polygon.box(sz, sz)));
+  }
+  for (const s of b.shapes) s.cbTypes.add(objectType);
+  b.space = space;
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  ctx.clearRect(0, 0, W, H);
+  drawGrid();
+  for (const body of space.bodies) drawBody(body);
+  requestAnimationFrame(loop);
+}
+loop();`,
+
+  codePixi: `// One-Way Platforms — PreListener pass-through logic + conveyors
+const space = new Space(new Vec2(0, 600));
+
+addWalls();
+
+const platformType = new CbType();
+const objectType = new CbType();
+
+// Accept collision only when normal points upward (object lands on top)
+const preListener = new PreListener(
+  InteractionType.COLLISION,
+  platformType, objectType,
+  (cb) => {
+    try {
+      const colArb = cb.get_arbiter().get_collisionArbiter();
+      if (!colArb) return PreFlag.ACCEPT;
+      return colArb.get_normal().get_y() < 0 ? PreFlag.ACCEPT : PreFlag.IGNORE;
+    } catch (_) { return PreFlag.ACCEPT; }
+  },
+);
+preListener.space = space;
+
+// Platforms at different heights
+const platPositions = [
+  { x: W * 0.35, y: H * 0.7, w: W * 0.35 },
+  { x: W * 0.65, y: H * 0.5, w: W * 0.3 },
+  { x: W * 0.3, y: H * 0.35, w: W * 0.35 },
+];
+for (const p of platPositions) {
+  const plat = new Body(BodyType.STATIC, new Vec2(p.x, p.y));
+  plat.shapes.add(new Polygon(Polygon.box(p.w, 10)));
+  plat.shapes.at(0).cbTypes.add(platformType);
+  plat.space = space;
+}
+
+// Conveyor belt
+const conveyor = new Body(BodyType.KINEMATIC, new Vec2(W / 2, H * 0.85));
+conveyor.shapes.add(new Polygon(Polygon.box(W * 0.5, 10)));
+conveyor.surfaceVel = new Vec2(80, 0);
+conveyor.space = space;
+
+// Spawn shapes
+for (let i = 0; i < 20; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(
+    40 + Math.random() * (W - 80), -Math.random() * 200,
+  ));
+  if (Math.random() < 0.5) {
+    b.shapes.add(new Circle(6 + Math.random() * 8));
+  } else {
+    const sz = 8 + Math.random() * 12;
+    b.shapes.add(new Polygon(Polygon.box(sz, sz)));
+  }
+  for (const s of b.shapes) s.cbTypes.add(objectType);
+  b.space = space;
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
 };

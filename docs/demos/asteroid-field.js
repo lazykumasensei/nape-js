@@ -1,5 +1,4 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Material } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
 
 export default {
   id: "asteroid-field",
@@ -9,10 +8,11 @@ export default {
   featuredOrder: 20,
   desc:
     "2000 asteroids drifting through space using the <b>SPATIAL_HASH</b> broadphase. Objects are spread out so most broadphase lookups skip narrowphase entirely — showcasing O(1) spatial hashing at scale. Click to spawn more.",
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 0); // zero-g — space!
-    addWalls(space, W, H);
 
     // Elastic, low-friction material so asteroids bounce and keep moving
     const mat = new Material(0.8, 0.6, 2, 0.01, 0.01);
@@ -51,6 +51,7 @@ export default {
   },
 
   code2d: `// Asteroid field with SPATIAL_HASH broadphase
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 0), Broadphase.SPATIAL_HASH);
 addWalls();
 
@@ -72,6 +73,32 @@ function loop() {
   space.step(1 / 60, 8, 3);
   ctx.clearRect(0, 0, W, H);
   for (const body of space.bodies) drawBody(body);
+  requestAnimationFrame(loop);
+}
+loop();`,
+
+  codePixi: `// Asteroid field with SPATIAL_HASH broadphase
+const space = new Space(new Vec2(0, 0));
+addWalls();
+
+const mat = new Material(0.8, 0.6, 2, 0.01, 0.01);
+for (let i = 0; i < 2000; i++) {
+  const body = new Body(BodyType.DYNAMIC, new Vec2(
+    25 + Math.random() * (W - 50),
+    25 + Math.random() * (H - 50),
+  ));
+  body.shapes.add(new Circle(2 + Math.random() * 4));
+  body.shapes.at(0).material = mat;
+  const a = Math.random() * Math.PI * 2;
+  const s = 20 + Math.random() * 60;
+  body.velocity = Vec2.weak(Math.cos(a)*s, Math.sin(a)*s);
+  body.space = space;
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  syncBodies(space);
+  app.render();
   requestAnimationFrame(loop);
 }
 loop();`,

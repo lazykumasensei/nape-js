@@ -1,6 +1,6 @@
 import { Body, BodyType, Vec2, Circle, DistanceJoint, PivotJoint, InteractionFilter } from "../nape-js.esm.js";
 import { drawBody, drawGrid, drawConstraints } from "../renderer.js";
-import { loadThree } from "../demo-runner.js";
+import { loadThree } from "../renderers/threejs-adapter.js";
 
 // ── Module-level state for drag + texture ──────────────────────────────────
 let _mouseBody = null;
@@ -35,9 +35,10 @@ export default {
   featured: false,
   tags: ["DistanceJoint", "Springs", "Grid"],
   desc: "A grid of particles connected by springs, simulating cloth with a logo texture. <b>Drag</b> the cloth with the mouse. A circle obstacle drifts across.",
+  walls: false,
 
   code2d: `// Cloth Simulation — spring-connected particle grid
-const W = 900, H = 500;
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 300));
 
 const cols = 20, rows = 14, gap = 20;
@@ -161,6 +162,77 @@ function frame() {
 frame();
 `,
 
+  codePixi: `// Cloth Simulation — spring-connected particle grid
+const space = new Space(new Vec2(0, 300));
+
+const cols = 20, rows = 14, gap = 20;
+const startX = W / 2 - (cols * gap) / 2;
+const startY = 30;
+const clothBodies = [];
+
+for (let r = 0; r < rows; r++) {
+  clothBodies[r] = [];
+  for (let c = 0; c < cols; c++) {
+    const isTop = r === 0 && (c % 4 === 0 || c === cols - 1);
+    const b = new Body(isTop ? BodyType.STATIC : BodyType.DYNAMIC, new Vec2(startX + c * gap, startY + r * gap));
+    const circle = new Circle(2);
+    circle.filter = new InteractionFilter(2, ~2);
+    b.shapes.add(circle);
+    b.space = space;
+    clothBodies[r][c] = b;
+  }
+}
+
+function connect(b1, b2, rest) {
+  const dj = new DistanceJoint(b1, b2, new Vec2(0, 0), new Vec2(0, 0), rest * 0.9, rest * 1.1);
+  dj.stiff = false; dj.frequency = 20; dj.damping = 0.3; dj.space = space;
+}
+for (let r = 0; r < rows; r++) {
+  for (let c = 0; c < cols; c++) {
+    if (c < cols - 1) connect(clothBodies[r][c], clothBodies[r][c + 1], gap);
+    if (r < rows - 1) connect(clothBodies[r][c], clothBodies[r + 1][c], gap);
+  }
+}
+
+// Moving circle obstacle
+const obstacleR = 29;
+const obstacle = new Body(BodyType.KINEMATIC, new Vec2(obstacleR + 20, H * 0.55 - 50));
+obstacle.shapes.add(new Circle(obstacleR));
+obstacle.space = space;
+
+// Cloth quad mesh
+const clothGfx = new PIXI.Graphics();
+app.stage.addChild(clothGfx);
+
+function frame() {
+  // Animate obstacle
+  const range = W / 2 - obstacleR - 20;
+  const t = performance.now() / 1000;
+  const targetX = W / 2 + Math.sin(t * 0.35 - Math.PI / 2) * range;
+  obstacle.velocity = new Vec2((targetX - obstacle.position.x) * 5, 0);
+
+  space.step(1 / 60, 8, 3);
+
+  // Draw cloth quads
+  clothGfx.clear();
+  for (let r = 0; r < rows - 1; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      const tl = clothBodies[r][c].position, tr = clothBodies[r][c + 1].position;
+      const bl = clothBodies[r + 1][c].position, br = clothBodies[r + 1][c + 1].position;
+      clothGfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
+      clothGfx.fill({ color: 0x58a6ff, alpha: 0.15 });
+      clothGfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
+      clothGfx.stroke({ color: 0x58a6ff, width: 0.5, alpha: 0.5 });
+    }
+  }
+
+  drawGrid();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(frame);
+}
+frame();`,
+
   async preload() {
     await loadLogo();
   },
@@ -186,7 +258,10 @@ frame();
         const circle = new Circle(2);
         circle.filter = new InteractionFilter(2, ~2);
         b.shapes.add(circle);
-        try { b.userData._colorIdx = isTop ? 3 : (r + c) % 6; } catch(_) {}
+        try {
+          b.userData._colorIdx = isTop ? 3 : (r + c) % 6;
+          b.userData._hidden3d = true;
+        } catch(_) {}
         b.space = space;
         bodies[r][c] = b;
       }
@@ -405,6 +480,97 @@ frame();
       if (isCloth) continue;
       drawBody(ctx, body, showOutlines);
     }
+  },
+
+  renderPixi(adapter, space, W, H) {
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    // Sync non-cloth body graphics (obstacle, walls)
+    // Cloth particles are skipped via _hidden3d flag
+    adapter.syncBodies(space);
+
+    if (_clothBodies) {
+      const cols = _clothCols;
+      const rows = _clothRows;
+
+      // Lazy-create textured Mesh or Graphics fallback
+      if (!app.stage._clothMesh && _logoImg) {
+        // Build UV coords and triangle indices (static — only positions change)
+        const uvs = new Float32Array(cols * rows * 2);
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const idx = (r * cols + c) * 2;
+            uvs[idx]     = c / (cols - 1);
+            uvs[idx + 1] = r / (rows - 1);
+          }
+        }
+        const indices = [];
+        for (let r = 0; r < rows - 1; r++) {
+          for (let c = 0; c < cols - 1; c++) {
+            const tl = r * cols + c;
+            const tr = tl + 1;
+            const bl = tl + cols;
+            const br = bl + 1;
+            indices.push(tl, tr, bl, tr, br, bl);
+          }
+        }
+
+        const positions = new Float32Array(cols * rows * 2);
+        const texture = PIXI.Texture.from(_logoImg);
+        const geom = new PIXI.MeshGeometry({
+          positions,
+          uvs,
+          indices: new Uint32Array(indices),
+        });
+        // White background mesh (same geometry, white texture)
+        const bgMesh = new PIXI.Mesh({ geometry: geom, texture: PIXI.Texture.WHITE });
+        app.stage.addChildAt(bgMesh, 0);
+        app.stage._clothBg = bgMesh;
+
+        // Textured mesh on top
+        const mesh = new PIXI.Mesh({ geometry: geom, texture });
+        app.stage.addChildAt(mesh, 1);
+        app.stage._clothMesh = mesh;
+        app.stage._clothPositions = positions;
+      }
+
+      if (app.stage._clothMesh) {
+        // Update vertex positions from physics bodies
+        const positions = app.stage._clothPositions;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const idx = (r * cols + c) * 2;
+            const pos = _clothBodies[r][c].position;
+            positions[idx]     = pos.x;
+            positions[idx + 1] = pos.y;
+          }
+        }
+        app.stage._clothMesh.geometry.getAttribute("aPosition").buffer.update();
+      } else {
+        // Fallback: draw cloth quads as colored polygons (no texture)
+        if (!app.stage._clothGfx) {
+          app.stage._clothGfx = new PIXI.Graphics();
+          app.stage.addChildAt(app.stage._clothGfx, 0);
+        }
+        const gfx = app.stage._clothGfx;
+        gfx.clear();
+        for (let r = 0; r < rows - 1; r++) {
+          for (let c = 0; c < cols - 1; c++) {
+            const tl = _clothBodies[r][c].position;
+            const tr = _clothBodies[r][c + 1].position;
+            const bl = _clothBodies[r + 1][c].position;
+            const br = _clothBodies[r + 1][c + 1].position;
+            gfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
+            gfx.fill({ color: 0x58a6ff, alpha: 0.15 });
+            gfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
+            gfx.stroke({ color: 0x58a6ff, width: 0.5, alpha: 0.5 });
+          }
+        }
+      }
+    }
+
+    app.render();
   },
 
   render3d(renderer, scene, camera, space, W, H) {

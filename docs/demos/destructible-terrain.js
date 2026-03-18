@@ -250,6 +250,7 @@ export default {
   featured: false,
   tags: ["MarchingSquares", "Terrain", "Procedural", "Click"],
   desc: "Procedural terrain built with <b>MarchingSquares</b>. <b>Click</b> to blast holes. Dynamic shapes spawn and interact with the evolving terrain.",
+  walls: false,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
@@ -324,6 +325,28 @@ export default {
     drawBlastCursor(ctx);
   },
 
+  renderPixi(adapter, space, W, H) {
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    // Sync body graphics (dynamic bodies + walls)
+    adapter.syncBodies(space);
+
+    // Terrain bitmap → PixiJS Sprite
+    const wasDirty = _terrainDirty;
+    updateTerrainImage(W, H);
+    if (!app.stage._terrainSprite) {
+      const texture = PIXI.Texture.from(_terrainCanvas);
+      const sprite = new PIXI.Sprite(texture);
+      app.stage.addChildAt(sprite, 0);
+      app.stage._terrainSprite = sprite;
+    } else if (wasDirty) {
+      app.stage._terrainSprite.texture.source.update();
+    }
+
+    app.render();
+  },
+
   hover(x, y) {
     _lastMouseX = x;
     _lastMouseY = y;
@@ -335,8 +358,8 @@ export default {
   },
 
   code2d: `// Destructible Terrain — MarchingSquares + bitmap erosion
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
-const W = 900, H = 500;
 
 // Value noise for terrain generation
 function hash(x, y) {

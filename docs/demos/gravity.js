@@ -12,6 +12,7 @@ export default {
   featured: true,
   featuredOrder: 5,
   desc: 'Mario Galaxy-style gravity: bodies are pulled toward a central planet. <b>Click</b> to spawn orbiting bodies.',
+  walls: false,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 0); // no global gravity
@@ -69,6 +70,7 @@ export default {
   },
 
   code2d: `// Orbital gravity — Mario Galaxy style
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 0)); // no global gravity!
 
 // Static "planet" at center
@@ -111,6 +113,53 @@ function loop() {
   ctx.clearRect(0, 0, W, H);
   drawGrid();
   for (const body of space.bodies) drawBody(body);
+  requestAnimationFrame(loop);
+}
+loop();`,
+
+  codePixi: `// Orbital gravity — Mario Galaxy style
+const space = new Space(new Vec2(0, 0)); // no global gravity!
+
+// Static "planet" at center
+const planet = new Body(BodyType.STATIC, new Vec2(W / 2, H / 2));
+planet.shapes.add(new Circle(40));
+planet.space = space;
+
+// Spawn orbiting bodies with tangential velocity
+for (let i = 0; i < 50; i++) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 100 + Math.random() * 180;
+  const body = new Body(BodyType.DYNAMIC, new Vec2(
+    W / 2 + Math.cos(angle) * dist,
+    H / 2 + Math.sin(angle) * dist,
+  ));
+  body.shapes.add(new Circle(6 + Math.random() * 10));
+  body.space = space;
+  const speed = 80 + Math.random() * 60;
+  body.velocity = new Vec2(-Math.sin(angle) * speed, Math.cos(angle) * speed);
+}
+
+// Gravitational pull
+function applyGravity() {
+  const G = 800000;
+  for (const body of space.bodies) {
+    if (body.isStatic()) continue;
+    const dx = W / 2 - body.position.x;
+    const dy = H / 2 - body.position.y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < 100) continue;
+    const dist = Math.sqrt(distSq);
+    const force = G / distSq;
+    body.force = new Vec2(dx / dist * force, dy / dist * force);
+  }
+}
+
+function loop() {
+  applyGravity();
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
   requestAnimationFrame(loop);
 }
 loop();`,

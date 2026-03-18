@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, PivotJoint, AngleJoint } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 export default {
   id: "ragdoll",
@@ -8,10 +8,11 @@ export default {
   featured: true,
   featuredOrder: 7,
   desc: 'Ragdoll figures built from <code>PivotJoint</code> and <code>AngleJoint</code> constraints. <b>Click</b> to spawn a new ragdoll at the cursor.',
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
     spawnRagdoll(space, W / 2, 120, 0);
     spawnRagdoll(space, W / 2 - 150, 80, 2);
     spawnRagdoll(space, W / 2 + 150, 60, 4);
@@ -22,6 +23,7 @@ export default {
   },
 
   code2d: `// Ragdoll using PivotJoint + AngleJoint constraints
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 addWalls();
@@ -61,6 +63,50 @@ function loop() {
   drawGrid();
   drawConstraintLines();
   for (const body of space.bodies) drawBody(body);
+  requestAnimationFrame(loop);
+}
+loop();`,
+
+  codePixi: `// Ragdoll using PivotJoint + AngleJoint constraints
+const space = new Space(new Vec2(0, 600));
+
+addWalls();
+
+function spawnRagdoll(x, y) {
+  const torso = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+  torso.shapes.add(new Polygon(Polygon.box(24, 48)));
+  torso.space = space;
+
+  const head = new Body(BodyType.DYNAMIC, new Vec2(x, y - 38));
+  head.shapes.add(new Circle(12));
+  head.space = space;
+
+  new PivotJoint(torso, head, new Vec2(0, -24), new Vec2(0, 12)).space = space;
+  const neckAngle = new AngleJoint(torso, head, -0.4, 0.4);
+  neckAngle.stiff = false; neckAngle.frequency = 8; neckAngle.damping = 0.6;
+  neckAngle.space = space;
+
+  const arm = new Body(BodyType.DYNAMIC, new Vec2(x - 26, y - 14));
+  arm.shapes.add(new Polygon(Polygon.box(28, 8)));
+  arm.space = space;
+  new PivotJoint(torso, arm, new Vec2(-12, -20), new Vec2(14, 0)).space = space;
+  new AngleJoint(torso, arm, -Math.PI * 0.75, Math.PI * 0.75).space = space;
+
+  const leg = new Body(BodyType.DYNAMIC, new Vec2(x - 8, y + 40));
+  leg.shapes.add(new Polygon(Polygon.box(10, 32)));
+  leg.space = space;
+  new PivotJoint(torso, leg, new Vec2(-8, 24), new Vec2(0, -16)).space = space;
+  new AngleJoint(torso, leg, -0.6, 0.6).space = space;
+}
+
+spawnRagdoll(W / 2, 120);
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  drawConstraintLines();
+  syncBodies(space);
+  app.render();
   requestAnimationFrame(loop);
 }
 loop();`,

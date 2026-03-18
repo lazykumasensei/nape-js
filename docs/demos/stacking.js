@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Material } from "../nape-js.esm.js";
-import { addWalls } from "../demo-runner.js";
+
 
 export default {
   id: "stacking",
@@ -7,10 +7,11 @@ export default {
   tags: ["Stacking", "Stability", "Click"],
   featured: false,
   desc: 'Towers of various shapes testing stacking stability. <b>Click</b> to drop a heavy box.',
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     // Tower 1: boxes
     for (let i = 0; i < 12; i++) {
@@ -59,6 +60,7 @@ export default {
   },
 
   code2d: `// Stacking stability test — towers of various shapes
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 addWalls();
@@ -89,6 +91,41 @@ function loop() {
   ctx.clearRect(0, 0, W, H);
   drawGrid();
   for (const body of space.bodies) drawBody(body);
+  requestAnimationFrame(loop);
+}
+loop();`,
+
+  codePixi: `// Stacking stability test — towers of various shapes
+const space = new Space(new Vec2(0, 600));
+
+addWalls();
+
+// Tower of boxes
+for (let i = 0; i < 12; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(200, H - 30 - 25 * i - 12.5));
+  b.shapes.add(new Polygon(Polygon.box(40, 25)));
+  b.space = space;
+}
+
+// Tower of circles
+for (let i = 0; i < 10; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(400, H - 30 - 24 * i - 12));
+  b.shapes.add(new Circle(12));
+  b.space = space;
+}
+
+// Tower of hexagons
+for (let i = 0; i < 10; i++) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(600, H - 30 - 28 * i - 14));
+  b.shapes.add(new Polygon(Polygon.regular(18, 18, 6)));
+  b.space = space;
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
   requestAnimationFrame(loop);
 }
 loop();`,

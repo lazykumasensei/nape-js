@@ -2,7 +2,7 @@ import {
   Body, BodyType, Vec2, Polygon,
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, PulleyJoint,
 } from '../nape-js.esm.js';
-import { addWalls } from '../demo-runner.js';
+
 import { drawBody, drawGrid } from '../renderer.js';
 
 // ── Layout ──────────────────────────────────────────────────────────────────
@@ -105,6 +105,7 @@ export default {
   featured: true,
   featuredOrder: 4,
   desc: 'All 7 built-in constraint types in a 3×3 grid (original nape layout). <b>Drag</b> any body to feel how each constraint reacts.',
+  walls: true,
 
   // Body refs for constraint rendering
   _bodies: {},
@@ -113,7 +114,6 @@ export default {
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
 
     this._bodies = {};
     this._pinnedBodies = new Set();
@@ -589,7 +589,163 @@ export default {
     ctx.restore();
   },
 
+  render3dOverlay(ctx, space, W, H) {
+    ctx.save();
+    const cw = (W - 2 * T) / COLS;
+    const ch = (H - 2 * T) / ROWS;
+
+    // Cell dividers
+    ctx.strokeStyle = '#ffffff09';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 7]);
+    for (let c = 1; c < COLS; c++) {
+      const lx = T + c * cw;
+      ctx.beginPath(); ctx.moveTo(lx, T); ctx.lineTo(lx, H - T); ctx.stroke();
+    }
+    for (let r = 1; r < ROWS; r++) {
+      const ly = T + r * ch;
+      ctx.beginPath(); ctx.moveTo(T, ly); ctx.lineTo(W - T, ly); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // PivotJoint
+    if (this._bodies.pivot) {
+      const { b1, b2, px, py } = this._bodies.pivot;
+      drawDashedLine(ctx, px, py, b1.position.x, b1.position.y, '#58a6ff33');
+      drawDashedLine(ctx, px, py, b2.position.x, b2.position.y, '#58a6ff33');
+      drawPin(ctx, px, py, '#58a6ff');
+    }
+    // WeldJoint
+    if (this._bodies.weld) {
+      const { b1, b2 } = this._bodies.weld;
+      drawDashedLine(ctx, b1.position.x, b1.position.y, b2.position.x, b2.position.y, '#a371f733');
+      const mx = (b1.position.x + b2.position.x) / 2;
+      const my = (b1.position.y + b2.position.y) / 2;
+      const s = 6;
+      ctx.beginPath();
+      ctx.moveTo(mx - s, my - s); ctx.lineTo(mx + s, my + s);
+      ctx.moveTo(mx + s, my - s); ctx.lineTo(mx - s, my + s);
+      ctx.strokeStyle = '#a371f7'; ctx.lineWidth = 2; ctx.stroke();
+    }
+    // DistanceJoint
+    if (this._bodies.distance) {
+      const { b1, b2 } = this._bodies.distance;
+      const cos1 = Math.cos(b1.rotation), sin1 = Math.sin(b1.rotation);
+      const cos2 = Math.cos(b2.rotation), sin2 = Math.sin(b2.rotation);
+      const ax1 = b1.position.x + SIZE * sin1, ay1 = b1.position.y - SIZE * cos1;
+      const ax2 = b2.position.x + SIZE * sin2, ay2 = b2.position.y - SIZE * cos2;
+      drawSpring(ctx, ax1, ay1, ax2, ay2, '#d29922');
+      drawPin(ctx, ax1, ay1, '#d29922'); drawPin(ctx, ax2, ay2, '#d29922');
+    }
+    // LineJoint
+    if (this._bodies.line) {
+      const { b1, b2, ax, ay } = this._bodies.line;
+      const railLen = SIZE * 4;
+      ctx.beginPath(); ctx.moveTo(ax, ay - railLen); ctx.lineTo(ax, ay + railLen);
+      ctx.strokeStyle = '#3fb95033'; ctx.lineWidth = 3; ctx.stroke();
+      for (const dy of [-SIZE, SIZE]) {
+        ctx.beginPath(); ctx.moveTo(ax - 8, ay + dy); ctx.lineTo(ax + 8, ay + dy);
+        ctx.strokeStyle = '#3fb95088'; ctx.lineWidth = 2; ctx.stroke();
+      }
+      drawDashedLine(ctx, ax, ay, b1.position.x, b1.position.y, '#3fb95033');
+      drawDashedLine(ctx, ax, ay, b2.position.x, b2.position.y, '#3fb95033');
+      drawPin(ctx, ax, ay, '#3fb950');
+    }
+    // PulleyJoint
+    if (this._bodies.pulley) {
+      const { bar, b2, b3, hangGap } = this._bodies.pulley;
+      const cos = Math.cos(bar.rotation), sin = Math.sin(bar.rotation);
+      const lx = bar.position.x + (-hangGap) * cos, ly = bar.position.y + (-hangGap) * sin;
+      const rx = bar.position.x + hangGap * cos, ry = bar.position.y + hangGap * sin;
+      drawDashedLine(ctx, lx, ly, b2.position.x, b2.position.y, '#f8514955');
+      drawDashedLine(ctx, rx, ry, b3.position.x, b3.position.y, '#f8514955');
+      drawPin(ctx, lx, ly, '#f85149'); drawPin(ctx, rx, ry, '#f85149');
+    }
+    // AngleJoint
+    if (this._bodies.angle) {
+      const { b1, b2 } = this._bodies.angle;
+      const r = SIZE + 8;
+      for (const [b, color] of [[b1, '#a371f7'], [b2, '#a371f7']]) {
+        ctx.beginPath(); ctx.moveTo(b.position.x, b.position.y);
+        ctx.lineTo(b.position.x + Math.cos(b.rotation) * r, b.position.y + Math.sin(b.rotation) * r);
+        ctx.strokeStyle = color + '88'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(b.position.x, b.position.y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = color + '22'; ctx.lineWidth = 1; ctx.stroke();
+      }
+      const mx = (b1.position.x + b2.position.x) / 2, my = (b1.position.y + b2.position.y) / 2;
+      ctx.beginPath(); ctx.moveTo(b1.position.x + r, b1.position.y);
+      ctx.quadraticCurveTo(mx, my - 20, b2.position.x - r, b2.position.y);
+      ctx.strokeStyle = '#a371f744'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // MotorJoint
+    if (this._bodies.motor) {
+      const { b1, b2 } = this._bodies.motor;
+      const r = SIZE + 8;
+      for (const b of [b1, b2]) {
+        const arcStart = b.rotation - 1.5, arcEnd = b.rotation + 1.5;
+        ctx.beginPath(); ctx.arc(b.position.x, b.position.y, r, arcStart, arcEnd);
+        ctx.strokeStyle = '#f8514966'; ctx.lineWidth = 2; ctx.stroke();
+        const ex = b.position.x + Math.cos(arcEnd) * r, ey = b.position.y + Math.sin(arcEnd) * r;
+        const ta = arcEnd + Math.PI / 2;
+        ctx.beginPath(); ctx.moveTo(ex, ey);
+        ctx.lineTo(ex + Math.cos(ta - 0.4) * 6, ey + Math.sin(ta - 0.4) * 6);
+        ctx.lineTo(ex + Math.cos(ta + 0.4) * 6, ey + Math.sin(ta + 0.4) * 6);
+        ctx.closePath(); ctx.fillStyle = '#f8514977'; ctx.fill();
+      }
+      const mx = (b1.position.x + b2.position.x) / 2, my = (b1.position.y + b2.position.y) / 2;
+      ctx.beginPath(); ctx.moveTo(b1.position.x + r, b1.position.y);
+      ctx.quadraticCurveTo(mx, my - 20, b2.position.x - r, b2.position.y);
+      ctx.strokeStyle = '#f8514933'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // Pinned markers
+    if (this._pinnedBodies) {
+      for (const b of this._pinnedBodies) drawPinnedMarker(ctx, b.position.x, b.position.y);
+    }
+
+    // Drag indicator
+    if (_grabJoint) {
+      const grabbed = _grabJoint.body2;
+      if (grabbed) {
+        const lp = _grabJoint.anchor2;
+        const cos = Math.cos(grabbed.rotation), sin = Math.sin(grabbed.rotation);
+        const ax = grabbed.position.x + lp.x * cos - lp.y * sin;
+        const ay = grabbed.position.y + lp.x * sin + lp.y * cos;
+        ctx.beginPath(); ctx.moveTo(_dragX, _dragY); ctx.lineTo(ax, ay);
+        ctx.strokeStyle = '#ffffff44'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(_dragX, _dragY, 5, 0, Math.PI * 2); ctx.fillStyle = '#ffffff55'; ctx.fill();
+      }
+    }
+
+    // Cell labels
+    const LABELS = [
+      { col: 0, row: 0, name: '', desc: `Constraints softened with\nfrequency=20  damping=1` },
+      { col: 1, row: 0, name: 'PivotJoint', desc: 'shared pivot point' },
+      { col: 2, row: 0, name: 'WeldJoint', desc: 'rigid weld + 45\u00B0 phase' },
+      { col: 0, row: 1, name: 'DistanceJoint', desc: 'spring distance range' },
+      { col: 1, row: 1, name: 'LineJoint', desc: 'vertical rail slider' },
+      { col: 2, row: 1, name: 'PulleyJoint', desc: 'pulley with ratio 2.5' },
+      { col: 0, row: 2, name: 'AngleJoint', desc: 'linked rotation (ratio 2)' },
+      { col: 1, row: 2, name: 'MotorJoint', desc: 'driven spin (ratio 3)' },
+    ];
+    for (const { col, row, name, desc } of LABELS) {
+      const c = cellOrigin(col, row, W, H);
+      const lx = c.left + 8, ly = c.top + 17;
+      if (name) {
+        ctx.fillStyle = '#58a6ffdd'; ctx.font = 'bold 11px monospace'; ctx.fillText(name, lx, ly);
+        ctx.fillStyle = '#8b949eaa'; ctx.font = '10px monospace'; ctx.fillText(desc, lx, ly + 14);
+      } else {
+        ctx.fillStyle = '#8b949ecc'; ctx.font = '11px monospace';
+        const lines = desc.split('\n');
+        for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], c.left + 12, c.top + ch / 2 - 6 + i * 16);
+      }
+    }
+
+    ctx.restore();
+  },
+
   code2d: `// Constraints Showcase — original nape layout (3\u00D73 grid)
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 // Common constraint settings
@@ -639,6 +795,67 @@ format(new AngleJoint(a1, a2, -Math.PI*1.5, Math.PI*1.5, 2));
 // MotorJoint — drives angular velocity
 const m1 = box(350, 500, true), m2 = box(450, 500, true);
 format(new MotorJoint(m1, m2, 10, 3));`,
+
+  codePixi: `// Constraints Showcase — original nape layout (3×3 grid)
+const space = new Space(new Vec2(0, 600));
+
+// Common constraint settings
+const frequency = 20, damping = 1;
+function format(c) {
+  c.stiff = false;
+  c.frequency = frequency;
+  c.damping = damping;
+  c.space = space;
+}
+function box(x, y, pinned) {
+  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+  b.shapes.add(new Polygon(Polygon.box(28, 28)));
+  b.space = space;
+  if (pinned) new PivotJoint(space.world, b, new Vec2(x,y), new Vec2(0,0)).space = space;
+  return b;
+}
+
+// PivotJoint — two bodies share a pivot point
+const p1 = box(250, 100), p2 = box(350, 100);
+format(new PivotJoint(p1, p2,
+  p1.worldPointToLocal(new Vec2(300, 100)),
+  p2.worldPointToLocal(new Vec2(300, 100))));
+
+// WeldJoint — rigid connection with 45° phase offset
+const w1 = box(550, 100), w2 = box(650, 100);
+format(new WeldJoint(w1, w2,
+  w1.worldPointToLocal(new Vec2(600, 100)),
+  w2.worldPointToLocal(new Vec2(600, 100)), Math.PI/4));
+
+// DistanceJoint — spring between two bodies
+const d1 = box(100, 300), d2 = box(180, 300);
+format(new DistanceJoint(d1, d2,
+  new Vec2(0, -14), new Vec2(0, -14), 60, 100));
+
+// LineJoint — constrained to slide along an axis
+const l1 = box(350, 300), l2 = box(450, 300);
+format(new LineJoint(l1, l2,
+  l1.worldPointToLocal(new Vec2(400, 300)),
+  l2.worldPointToLocal(new Vec2(400, 300)),
+  new Vec2(0, 1), -14, 14));
+
+// AngleJoint — limits relative rotation
+const a1 = box(100, 500, true), a2 = box(200, 500, true);
+format(new AngleJoint(a1, a2, -Math.PI*1.5, Math.PI*1.5, 2));
+
+// MotorJoint — drives angular velocity
+const m1 = box(350, 500, true), m2 = box(450, 500, true);
+format(new MotorJoint(m1, m2, 10, 3));
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  drawConstraintLines();
+  syncBodies(space);
+  app.render();
+  requestAnimationFrame(loop);
+}
+loop();`,
 
   code3d: `// 3D view of constraints demo
 const container = document.getElementById("container");

@@ -27,7 +27,12 @@
     gtag('config', 'G-TF84DLZ4X8');
   </script>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
-  <link rel="stylesheet" href="style.css?v=3.13.5" />
+  <link rel="stylesheet" href="style.css?v=3.15.5" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" data-manual></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
 </head>
 <body>
   <!-- ===== HERO ===== -->
@@ -74,10 +79,16 @@
           <div class="card-render-toggle" id="renderModeToggle">
             <button class="card-render-btn active" data-mode="2d">2D</button>
             <button class="card-render-btn" data-mode="3d">3D</button>
+            <button class="card-render-btn" data-mode="pixi">PixiJS</button>
           </div>
           <button class="canvas-outline-btn active" id="outlineBtn" title="Toggle outlines">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="8" cy="8" r="3"/>
+            </svg>
+          </button>
+          <button class="canvas-fs-btn canvas-worker-btn" id="workerBtn" title="Toggle Web Worker physics" style="display:none">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/>
             </svg>
           </button>
           <button class="canvas-fs-btn canvas-reset-btn" id="resetBtn" title="Reset demo">
@@ -190,6 +201,6 @@
     </div>
   </footer>
 
-  <script type="module" src="app.js?v=3.13.5"></script>
+  <script type="module" src="app.js?v=3.15.5"></script>
 </body>
 </html>

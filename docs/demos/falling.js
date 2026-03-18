@@ -1,5 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, Material } from "../nape-js.esm.js";
-import { addWalls, spawnRandomShape } from "../demo-runner.js";
+import { spawnRandomShape } from "../demo-runner.js";
 
 export default {
   id: "falling",
@@ -8,10 +8,11 @@ export default {
   featured: true,
   featuredOrder: 0,
   desc: 'Random boxes and circles fall into a container. <b>Click</b> to spawn more shapes at the cursor.',
+  walls: true,
+  workerCompatible: true,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
-    addWalls(space, W, H);
     for (let i = 0; i < 80; i++) {
       spawnRandomShape(space, 100 + Math.random() * 700, 50 + Math.random() * 200);
     }
@@ -24,6 +25,7 @@ export default {
   },
 
   code2d: `// Create a Space with downward gravity
+const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 
 addWalls();
@@ -51,6 +53,38 @@ function loop() {
   ctx.clearRect(0, 0, W, H);
   drawGrid();
   for (const body of space.bodies) drawBody(body);
+  requestAnimationFrame(loop);
+}
+loop();`,
+
+  codePixi: `// Create a Space with downward gravity
+const space = new Space(new Vec2(0, 600));
+
+addWalls();
+
+// Spawn random shapes
+for (let i = 0; i < 80; i++) {
+  const body = new Body(BodyType.DYNAMIC, new Vec2(
+    100 + Math.random() * 700,
+    50 + Math.random() * 200,
+  ));
+
+  if (Math.random() < 0.5) {
+    body.shapes.add(new Circle(6 + Math.random() * 14));
+  } else {
+    const w = 10 + Math.random() * 24;
+    const h = 10 + Math.random() * 24;
+    body.shapes.add(new Polygon(Polygon.box(w, h)));
+  }
+
+  body.space = space;
+}
+
+function loop() {
+  space.step(1 / 60, 8, 3);
+  drawGrid();
+  syncBodies(space);
+  app.render();
   requestAnimationFrame(loop);
 }
 loop();`,
