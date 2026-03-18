@@ -280,6 +280,12 @@ const POS_THRESHOLD = 0.1;   // px
 const ROT_THRESHOLD = 0.001; // rad
 const lastState = new Map(); // id → { x, y, rot }
 
+// ─── Periodic full resync ────────────────────────────────────────────────────
+// Every FULL_SYNC_INTERVAL_MS, send a full snapshot to all clients so they
+// don't drift due to missed settle frames or accumulated delta errors.
+const FULL_SYNC_INTERVAL_MS = 2000; // 2 seconds
+let lastFullSyncTime = Date.now();
+
 function buildStateFrame() {
   const changed = [];
   for (const [id, body] of dynamicBodies) {
@@ -287,14 +293,22 @@ function buildStateFrame() {
     const y   = body.position.y;
     const rot = body.rotation;
     const prev = lastState.get(id);
-    if (
-      !prev ||
+    if (!prev) {
+      // New body — always include
+      changed.push({ id, x, y, rot });
+      lastState.set(id, { x, y, rot, settled: false });
+    } else if (
       Math.abs(x - prev.x)     > POS_THRESHOLD ||
       Math.abs(y - prev.y)     > POS_THRESHOLD ||
       Math.abs(rot - prev.rot) > ROT_THRESHOLD
     ) {
+      // Body is still moving — include and mark as unsettled
       changed.push({ id, x, y, rot });
-      lastState.set(id, { x, y, rot });
+      lastState.set(id, { x, y, rot, settled: false });
+    } else if (!prev.settled) {
+      // Body just stopped — send one final "settle" frame with exact position
+      changed.push({ id, x, y, rot });
+      lastState.set(id, { x, y, rot, settled: true });
     }
   }
   if (changed.length === 0) return null;
@@ -401,15 +415,53 @@ function updateMovingPlatform() {
   movingPlatBody.velocity = new Vec2(MOVING_PLAT_SPEED * movingPlatDir, 0);
 }
 
-// ─── Main loop ────────────────────────────────────────────────────────────────
+// ─── Main loop (pauses when no clients connected) ───────────────────────────
 
-setInterval(() => {
-  updateMovingPlatform();
-  applyPlayerInputs();
-  space.step(TICK_MS / 1000);
-  const frame = buildStateFrame();
-  if (frame) broadcastBinary(frame);
-}, TICK_MS);
+let physicsInterval = null;
+
+function getClientCount() {
+  return players.size + spectators.size;
+}
+
+function startPhysicsLoop() {
+  if (physicsInterval) return; // already running
+  console.log("Physics loop started (clients connected)");
+  lastFullSyncTime = Date.now();
+  lastState.clear();
+  physicsInterval = setInterval(() => {
+    updateMovingPlatform();
+    applyPlayerInputs();
+    space.step(TICK_MS / 1000);
+
+    // Periodic full resync — every 2s send ALL body positions to correct any drift
+    const now = Date.now();
+    if (now - lastFullSyncTime >= FULL_SYNC_INTERVAL_MS) {
+      lastFullSyncTime = now;
+      const fullSnap = buildFullSnapshot();
+      if (fullSnap) broadcastBinary(fullSnap);
+      // Reset lastState so delta tracking starts fresh after full sync
+      lastState.clear();
+    } else {
+      const frame = buildStateFrame();
+      if (frame) broadcastBinary(frame);
+    }
+  }, TICK_MS);
+}
+
+function stopPhysicsLoop() {
+  if (!physicsInterval) return; // already stopped
+  clearInterval(physicsInterval);
+  physicsInterval = null;
+  console.log("Physics loop paused (no clients)");
+}
+
+function onClientCountChanged() {
+  if (getClientCount() > 0) {
+    startPhysicsLoop();
+  } else {
+    stopPhysicsLoop();
+  }
+}
 
 // ─── HTTP + WebSocket server ──────────────────────────────────────────────────
 
@@ -441,6 +493,7 @@ wss.on("connection", (ws) => {
   // ── Spectator mode ────────────────────────────────────────────────────────
   if (!result) {
     spectators.add(ws);
+    onClientCountChanged();
     console.log(`Spectator connected, total spectators: ${spectators.size}`);
     ws.send(JSON.stringify({
       type: "init",
@@ -464,15 +517,17 @@ wss.on("connection", (ws) => {
 
     ws.on("close", () => {
       spectators.delete(ws);
+      onClientCountChanged();
       console.log(`Spectator disconnected, total spectators: ${spectators.size}`);
     });
 
-    ws.on("error", () => { spectators.delete(ws); });
+    ws.on("error", () => { spectators.delete(ws); onClientCountChanged(); });
     return;
   }
 
   // ── Player mode ───────────────────────────────────────────────────────────
   const { playerId, bodyId, colorIdx } = result;
+  onClientCountChanged();
   console.log(`Player ${playerId} connected (body ${bodyId}), total: ${players.size}`);
 
   ws.send(JSON.stringify(buildInitPacket(playerId, bodyId, colorIdx)));
@@ -496,12 +551,14 @@ wss.on("connection", (ws) => {
 
   ws.on("close", () => {
     removePlayer(playerId);
+    onClientCountChanged();
     console.log(`Player ${playerId} disconnected, total: ${players.size}`);
     broadcastPlayerList();
   });
 
   ws.on("error", () => {
     removePlayer(playerId);
+    onClientCountChanged();
     broadcastPlayerList();
   });
 });
