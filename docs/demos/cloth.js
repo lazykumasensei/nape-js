@@ -523,8 +523,14 @@ frame();`,
           uvs,
           indices: new Uint32Array(indices),
         });
+        // White background mesh (same geometry, white texture)
+        const bgMesh = new PIXI.Mesh({ geometry: geom, texture: PIXI.Texture.WHITE });
+        app.stage.addChildAt(bgMesh, 0);
+        app.stage._clothBg = bgMesh;
+
+        // Textured mesh on top
         const mesh = new PIXI.Mesh({ geometry: geom, texture });
-        app.stage.addChildAt(mesh, 0);
+        app.stage.addChildAt(mesh, 1);
         app.stage._clothMesh = mesh;
         app.stage._clothPositions = positions;
       }
