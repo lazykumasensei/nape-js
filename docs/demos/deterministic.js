@@ -4,8 +4,6 @@
  * Two identical physics spaces run side by side. With `space.deterministic = true`,
  * every body position matches bit-for-bit on every frame. A live status overlay
  * shows the match state and frame count.
- *
- * Click to drop a stack of shapes into both simulations simultaneously.
  */
 import {
   Space, Body, BodyType, Vec2, Circle, Polygon, PivotJoint, DistanceJoint,
@@ -179,15 +177,17 @@ export default {
   },
 
   step(space, W, H) {
-    // Step Space B in sync (Space A is stepped by the runner)
-    _spaceB.step(1 / 60, 8, 3);
-
+    // Compare BEFORE stepping — both spaces are at the same frame here
+    // (Space A was stepped by the runner last frame, Space B was stepped below)
     _frame++;
     if (spacesMatch(space, _spaceB)) {
       _matched++;
     } else {
       _mismatched++;
     }
+
+    // Step Space B in sync (Space A will be stepped by the runner after this callback)
+    _spaceB.step(1 / 60, 8, 3);
   },
 
   click(x, y, space, W, H) {
