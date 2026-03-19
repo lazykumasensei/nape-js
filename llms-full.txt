@@ -1321,6 +1321,7 @@ new Space(gravity?: Vec2, broadphase?: Broadphase)
 | `gravity` | `Vec2` | R/W | World gravity (live Vec2). Default: (0, 0). |
 | `broadphase` | `Broadphase` | R | SWEEP_AND_PRUNE or DYNAMIC_AABB_TREE |
 | `sortContacts` | `boolean` | R/W | Sort contacts for determinism. Default: true. |
+| `deterministic` | `boolean` | R/W | Same-platform deterministic mode. Sorts all iteration lists by stable IDs. Implies `sortContacts = true`. ~1-5% overhead. Default: false. |
 | `worldLinearDrag` | `number` | R/W | Global linear drag coefficient |
 | `worldAngularDrag` | `number` | R/W | Global angular drag coefficient |
 | `bodies` | `NapeList<Body>` | R | All bodies |

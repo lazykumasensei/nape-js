@@ -63,7 +63,7 @@ function update() {
 
 | Class | Description |
 |-------|-------------|
-| `Space` | Physics world — add bodies, step simulation |
+| `Space` | Physics world — add bodies, step simulation, `deterministic` mode for rollback/prediction |
 | `Body` | Rigid body with position, velocity, mass |
 | `Vec2` | 2D vector — pooling, `clone()`, `equals()`, `lerp()`, `fromAngle()` |
 | `Vec3` | 3D vector for constraint impulses — `clone()`, `equals()` |

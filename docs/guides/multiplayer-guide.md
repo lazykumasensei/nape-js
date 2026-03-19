@@ -315,6 +315,11 @@ runs on the same browser/OS given the same inputs.
   Zero overhead when disabled (default).
 - **Same-platform requirement:** For prediction/rollback, ensure client and
   server run on the same JS engine (e.g., both on V8/Node.js).
+- **Single space per process:** The engine uses global object pools shared across
+  all `Space` instances. Running two deterministic spaces side-by-side and
+  adding/removing bodies at runtime can cause divergence due to shared pool
+  state. For multiplayer, use a single `Space` with binary snapshots for
+  rollback rather than maintaining parallel spaces.
 
 ---
 

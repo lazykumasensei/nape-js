@@ -32,7 +32,7 @@ function update() {
 
 ## Core Classes
 
-- [Space](https://newkrok.github.io/nape-js/api/classes/Space.html): Physics world — create with gravity, add bodies, call `step(dt)` to simulate
+- [Space](https://newkrok.github.io/nape-js/api/classes/Space.html): Physics world — create with gravity, add bodies, call `step(dt)` to simulate. `space.deterministic = true` for same-platform reproducibility (multiplayer rollback/prediction)
 - [Body](https://newkrok.github.io/nape-js/api/classes/Body.html): Rigid body with position, velocity, rotation, mass, shapes list
 - [Vec2](https://newkrok.github.io/nape-js/api/classes/Vec2.html): 2D vector with pooling (`Vec2.get()`, `Vec2.weak()`) and arithmetic methods
 - [AABB](https://newkrok.github.io/nape-js/api/classes/AABB.html): Axis-aligned bounding box for spatial queries
