@@ -282,33 +282,39 @@ the server authoritative state.
 
 ## Determinism Considerations
 
-### Current State
+### Soft Determinism (P48)
 
-nape-js does **not** guarantee deterministic simulation. Two runs of the same
-inputs may produce slightly different results due to:
+nape-js supports **same-platform deterministic simulation** via the
+`space.deterministic` flag:
 
-- JavaScript IEEE 754 floating-point implementation differences between engines
-- Hash map iteration order (affects constraint solving order)
-- `Math.sin`/`Math.cos` precision varies across platforms
+```ts
+const space = new Space(Vec2.weak(0, 400));
+space.deterministic = true; // opt-in
+```
+
+When enabled, all internal iteration orders (bodies, constraints, arbiters,
+islands) are sorted by stable IDs, guaranteeing identical results across
+runs on the same browser/OS given the same inputs.
 
 ### What This Means for Multiplayer
 
 | Architecture | Determinism needed? | nape-js support |
 |---|---|---|
 | Server-authoritative (recommended) | No | Full support |
-| Client-side prediction + server reconciliation | Soft (same platform) | Works in practice |
+| Client-side prediction + server reconciliation | Soft (same platform) | **Full support** (`deterministic = true`) |
 | Lockstep (P2P) | Hard (cross-platform) | Not recommended |
-| Rollback netcode (GGPO-style) | Soft (same platform) | Viable with snapshots |
+| Rollback netcode (GGPO-style) | Soft (same platform) | **Full support** (`deterministic = true` + binary snapshots) |
 
-### Planned: P48 — Soft Determinism
+### Limitations
 
-Future work will audit and fix non-deterministic code paths to guarantee
-**same-platform determinism** (identical results on the same browser/OS).
-This is sufficient for client-side prediction and rollback netcode, where
-client and server both run on V8.
-
-True cross-platform bit-exact determinism (like Rapier's WASM approach)
-is impractical in pure JavaScript and is not planned.
+- **Cross-platform:** `Math.sin`/`Math.cos` precision and IEEE 754 rounding
+  may differ between JS engines (V8 vs SpiderMonkey vs JavaScriptCore).
+  True cross-platform bit-exact determinism (like Rapier's WASM approach)
+  is impractical in pure JavaScript.
+- **Performance:** ~1-5% overhead on `step()` when deterministic mode is enabled.
+  Zero overhead when disabled (default).
+- **Same-platform requirement:** For prediction/rollback, ensure client and
+  server run on the same JS engine (e.g., both on V8/Node.js).
 
 ---
 

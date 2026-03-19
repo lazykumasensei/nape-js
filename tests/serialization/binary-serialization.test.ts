@@ -44,8 +44,8 @@ function roundTrip(space: Space): Space {
 // ---------------------------------------------------------------------------
 
 describe("BINARY_SNAPSHOT_VERSION", () => {
-  it("is 1", () => {
-    expect(BINARY_SNAPSHOT_VERSION).toBe(1);
+  it("is 2", () => {
+    expect(BINARY_SNAPSHOT_VERSION).toBe(2);
   });
 });
 

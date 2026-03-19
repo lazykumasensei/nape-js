@@ -229,6 +229,7 @@ export interface SpaceSnapshot {
   worldLinearDrag: number;
   worldAngularDrag: number;
   sortContacts: boolean;
+  deterministic: boolean;
   broadphase: "SWEEP_AND_PRUNE" | "DYNAMIC_AABB_TREE";
   bodies: BodyData[];
   constraints: ConstraintData[];

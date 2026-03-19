@@ -318,6 +318,7 @@ export function spaceFromJSON(snapshot: SpaceSnapshot): Space {
   space.worldLinearDrag = snapshot.worldLinearDrag;
   space.worldAngularDrag = snapshot.worldAngularDrag;
   space.sortContacts = snapshot.sortContacts;
+  space.deterministic = snapshot.deterministic ?? false;
 
   // ------------------------------------------------------------------
   // 2. Build all bodies (not added to space yet — compound bodies are

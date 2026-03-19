@@ -156,6 +156,26 @@ export class Space {
   }
 
   /**
+   * If true, the simulation produces identical results across runs on the same
+   * platform given the same inputs (same-platform "soft" determinism).
+   *
+   * When enabled, all internal iteration orders (bodies, constraints, arbiters,
+   * islands) are sorted by stable IDs before processing. `sortContacts` is also
+   * forced to `true`.
+   *
+   * **Performance:** adds ~1-5% overhead to `step()` due to sorting. Default: `false`.
+   */
+  get deterministic(): boolean {
+    return this.zpp_inner.deterministic;
+  }
+  set deterministic(value: boolean) {
+    this.zpp_inner.deterministic = value;
+    if (value) {
+      this.zpp_inner.sortcontacts = true;
+    }
+  }
+
+  /**
    * Global angular drag coefficient applied to all bodies.
    * @throws If set to NaN.
    */

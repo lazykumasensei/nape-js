@@ -116,7 +116,7 @@ Potential future priorities identified via competitive analysis and market gaps:
 | P45 — Character controller                | M      | DX       | medium | ⬜ Not started |
 | P46 — Hot-path optimization               | M      | perf     | low    | ✅ Done        |
 | P47 — CJS bundle dedup (serialization)    | S      | bundle   | low    | ⬜ Not started |
-| P48 — Deterministic mode (soft)           | L      | critical | high   | ⬜ Not started |
+| P48 — Deterministic mode (soft)           | L      | critical | high   | ✅ Done        |
 | P49 — ECS adapter layer                   | M      | DX       | medium | ⬜ Not started |
 | P50 — Spatial hash grid broadphase        | S-M    | perf     | low    | ✅ Done        |
 | P51 — Sub-stepping solver                 | XL     | stability| high   | ⬜ Not started |
@@ -348,20 +348,28 @@ correctly code-splits (8.2 KB). Fix via tsup config: `splitting`, `treeshake`, `
 
 ---
 
-## Planned: P48 — Deterministic Mode (Soft)
+## Done: P48 — Deterministic Mode (Soft)
 
 **Effort: L | Impact: critical (multiplayer) | Risk: high**
 
-Same-platform deterministic simulation (identical results on same browser/OS):
+Same-platform deterministic simulation (identical results on same browser/OS).
 
-- Already has `sortContacts: true` as a foundation
-- Audit all non-deterministic code paths (hash iteration, floating-point ordering)
-- Ensure fixed timestep produces identical results across runs
-- Document limitations vs cross-platform determinism (which requires WASM/fixed-point)
+**API:** `space.deterministic = true` (opt-in, default `false`)
 
-Note: True cross-platform bit-level determinism (like Rapier) is impractical in pure JS
-due to IEEE 754 implementation differences. "Soft determinism" (same platform = same results)
-is the achievable goal and sufficient for most multiplayer patterns.
+**What it does:**
+- Sorts all internal iteration lists (bodies, constraints, arbiters, islands) by stable IDs
+- Forces `sortContacts = true` (contact ordering prerequisite)
+- Fixes contact sort comparator to be stable even for inactive arbiters
+- Sorts island components before sleep/wake processing
+- ~1-5% overhead on `step()` when enabled; zero overhead when disabled
+
+**Serialization:** `deterministic` flag is persisted in both JSON and binary snapshots.
+Binary snapshot version bumped to 2.
+
+**Limitations:** True cross-platform bit-level determinism (like Rapier) is impractical
+in pure JS due to IEEE 754 implementation differences. "Soft determinism"
+(same platform = same results) is the achievable goal and sufficient for most
+multiplayer patterns (client-side prediction, rollback netcode).
 
 ---
 

@@ -448,6 +448,7 @@ export function spaceFromBinary(data: Uint8Array): Space {
   const worldLinearDrag = r.readFloat64();
   const worldAngularDrag = r.readFloat64();
   const sortContacts = r.readBool();
+  const deterministic = r.readBool();
   const broadphaseType = r.readUint8();
 
   const broadphase =
@@ -456,6 +457,7 @@ export function spaceFromBinary(data: Uint8Array): Space {
   space.worldLinearDrag = worldLinearDrag;
   space.worldAngularDrag = worldAngularDrag;
   space.sortContacts = sortContacts;
+  space.deterministic = deterministic;
 
   // ------------------------------------------------------------------
   // 3. Bodies
