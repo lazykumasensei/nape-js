@@ -43,6 +43,7 @@ import destructibleTerrain from "./demos/destructible-terrain.js?v=3.15.5";
 import webWorker           from "./demos/web-worker.js?v=3.15.5";
 import asteroidField       from "./demos/asteroid-field.js?v=3.15.5";
 import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.15.5";
+import deterministic       from "./demos/deterministic.js?v=3.15.5";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -53,6 +54,7 @@ const ALL_DEMOS = [
   webWorker,
   asteroidField,
   fluidBuoyancy,
+  deterministic,
 ];
 
 const CW = 900;
