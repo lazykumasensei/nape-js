@@ -63,7 +63,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | What                     | Status |
 | ------------------------ | ------ |
 | Haxe modernization       | ✅ Complete — pure TypeScript, fully typed |
-| Test coverage            | 🔶 ~60% statements (4591 tests), target ≥80% |
+| Test coverage            | 🔶 ~60% statements (4616 tests), target ≥80% |
 | Serialization API        | ✅ Done — `@newkrok/nape-js/serialization` |
 | Binary snapshots         | ✅ Done — `spaceToBinary` / `spaceFromBinary` (P39) |
 | Debug draw API           | ✅ Done — abstract `DebugDraw` + `Space.debugDraw()` |
@@ -75,7 +75,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | PixiJS integration       | 🔶 Partial — P44 (CodePen demos + Sprite adapter done; public npm package pending) |
 | Character controller     | ⬜ Planned — P45 |
 | Hot-path optimization    | ✅ Done — P46 (step/prestep dedup, pool bypass fix, O(1) pair removal, `any` narrowing) |
-| Deterministic mode       | ⬜ Planned — P48 (multiplayer) |
+| Deterministic mode       | ✅ Done — P48 (`space.deterministic = true`, soft same-platform determinism) |
 | ECS adapter              | ⬜ Planned — P49 |
 | Spatial hash grid        | ✅ Done — P50 (`Broadphase.SPATIAL_HASH`, asteroid field demo) |
 | Sub-stepping solver      | ⬜ Planned — P51 (long-term) |

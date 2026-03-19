@@ -445,6 +445,7 @@ export function spaceToJSON(space: Space): SpaceSnapshot {
     worldLinearDrag: space.worldLinearDrag,
     worldAngularDrag: space.worldAngularDrag,
     sortContacts: space.sortContacts,
+    deterministic: space.deterministic,
     broadphase,
     bodies,
     constraints,

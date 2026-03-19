@@ -58,6 +58,7 @@ export class ZPP_Space {
   midstep: boolean = false;
   time: number = 0;
   sortcontacts: boolean = false;
+  deterministic: boolean = false;
   c_arbiters_true: any = null;
   c_arbiters_false: any = null;
   f_arbiters: any = null;
@@ -107,6 +108,7 @@ export class ZPP_Space {
     this.c_arbiters_false = null;
     this.c_arbiters_true = null;
     this.sortcontacts = false;
+    this.deterministic = false;
     this.time = 0.0;
     this.midstep = false;
     this.stamp = 0;
@@ -3210,6 +3212,102 @@ export class ZPP_Space {
     }
   }
 
+  /**
+   * In-place merge sort of a singly-linked list by a numeric key.
+   * Used in deterministic mode to ensure stable iteration order.
+   * Returns the new head node (the list object's head is also updated).
+   */
+  private _sortLinkedList<N extends { elt: any; next: N | null }>(
+    list: { head: N | null; modified: boolean; pushmod: boolean },
+    keyFn: (elt: any) => number,
+  ): void {
+    if (list.head == null || list.head.next == null) return;
+    let head = list.head;
+    let listSize = 1;
+    while (true) {
+      let numMerges = 0;
+      let left: N | null = head;
+      head = null!;
+      let tail: N | null = null;
+      while (left != null) {
+        numMerges++;
+        let right: N | null = left;
+        let leftSize = 0;
+        let rightSize = listSize;
+        while (right != null && leftSize < listSize) {
+          leftSize++;
+          right = right.next;
+        }
+        while (leftSize > 0 || (rightSize > 0 && right != null)) {
+          let nxt: N;
+          if (leftSize == 0) {
+            nxt = right!;
+            right = right!.next;
+            rightSize--;
+          } else if (rightSize == 0 || right == null) {
+            nxt = left!;
+            left = left!.next;
+            leftSize--;
+          } else if (keyFn(left!.elt) <= keyFn(right.elt)) {
+            nxt = left!;
+            left = left!.next;
+            leftSize--;
+          } else {
+            nxt = right;
+            right = right.next;
+            rightSize--;
+          }
+          if (tail != null) {
+            tail.next = nxt;
+          } else {
+            head = nxt;
+          }
+          tail = nxt;
+        }
+        left = right;
+      }
+      tail!.next = null;
+      listSize <<= 1;
+      if (numMerges <= 1) break;
+    }
+    list.head = head;
+    list.modified = true;
+    list.pushmod = true;
+  }
+
+  /**
+   * Sort key for arbiter ordering: canonical pair of shape interactor IDs.
+   * Uses the smaller ID as the high bits to ensure (s1,s2) == (s2,s1).
+   */
+  private _arbiterSortKey(arb: any): number {
+    const id1 = arb.s1 != null ? arb.s1.id : 0;
+    const id2 = arb.s2 != null ? arb.s2.id : 0;
+    const lo = id1 < id2 ? id1 : id2;
+    const hi = id1 < id2 ? id2 : id1;
+    return lo * 1000000 + hi;
+  }
+
+  /**
+   * When deterministic mode is enabled, sort all live iteration lists
+   * by stable IDs to guarantee consistent processing order.
+   */
+  private _ensureDeterministicOrder(): void {
+    if (!this.deterministic) return;
+
+    // Sort live bodies by body ID
+    this._sortLinkedList(this.live, (b: any) => b.id);
+
+    // Sort live constraints by constraint ID
+    this._sortLinkedList(this.live_constraints, (c: any) => c.id);
+
+    // Sort collision arbiter lists by canonical shape ID pair
+    this._sortLinkedList(this.c_arbiters_false, (a: any) => this._arbiterSortKey(a));
+    this._sortLinkedList(this.c_arbiters_true, (a: any) => this._arbiterSortKey(a));
+
+    // Sort fluid arbiter lists by canonical shape ID pair
+    this._sortLinkedList(this.f_arbiters, (a: any) => this._arbiterSortKey(a));
+  }
+
   step(deltaTime: number, velocityIterations: number, positionIterations: number) {
     if (this.midstep) {
       throw new Error(
@@ -3223,6 +3321,7 @@ export class ZPP_Space {
     try {
       this.validation();
       this.bphase.broadphase(this, true);
+      this._ensureDeterministicOrder();
       this.prestep(deltaTime);
       if (this.sortcontacts) {
         const xxlist = this.c_arbiters_false;
@@ -3262,7 +3361,9 @@ export class ZPP_Space {
                 } else if (
                   left.elt.active && right.elt.active
                     ? left.elt.oc1.dist < right.elt.oc1.dist
-                    : true
+                    : this.deterministic
+                      ? this._arbiterSortKey(left.elt) <= this._arbiterSortKey(right.elt)
+                      : true
                 ) {
                   nxt = left;
                   left = left.next;
@@ -5873,6 +5974,11 @@ export class ZPP_Space {
       const ret4 = _this5.next;
       _this5.pop();
       const i = ret4;
+      if (this.deterministic) {
+        this._sortLinkedList(i.comps, (c: any) =>
+          c.isBody ? c.body.id : c.constraint.id + 1000000000,
+        );
+      }
       if (i.sleep) {
         let cx_ite3 = i.comps.head;
         while (cx_ite3 != null) {

@@ -9,7 +9,7 @@
  *
  * Binary layout (little-endian):
  *   Header: magic "NAPE" (4B), version u16, bodyCount u32, constraintCount u32, compoundCount u32
- *   Space:  gravity (2×f64), worldLinearDrag f64, worldAngularDrag f64, sortContacts u8, broadphase u8
+ *   Space:  gravity (2×f64), worldLinearDrag f64, worldAngularDrag f64, sortContacts u8, deterministic u8, broadphase u8
  *   Bodies: [per body — see writeBinaryBody]
  *   Constraints: [per constraint — see writeBinaryConstraint]
  *   Compounds: [per compound — bodyCount u16, bodyIds u32[], constraintCount u16, constraintIdxs u32[], childCount u16, childIdxs u32[]]
@@ -39,7 +39,7 @@ import { BinaryWriter } from "./binary-writer";
 const MAGIC = 0x4e415045; // "NAPE" in ASCII (big-endian u32)
 
 /** Binary format version — bumped on breaking layout changes. */
-export const BINARY_SNAPSHOT_VERSION = 1;
+export const BINARY_SNAPSHOT_VERSION = 2;
 
 // Constraint type tags
 const CONSTRAINT_PIVOT = 0;
@@ -427,6 +427,7 @@ export function spaceToBinary(space: Space): Uint8Array {
   w.writeFloat64(space.worldLinearDrag);
   w.writeFloat64(space.worldAngularDrag);
   w.writeBool(space.sortContacts);
+  w.writeBool(space.deterministic);
   w.writeUint8(space.zpp_inner.bphase.is_sweep ? 0 : 1);
 
   // ------------------------------------------------------------------
