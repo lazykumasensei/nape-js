@@ -13,7 +13,7 @@ A fully typed TypeScript 2D physics engine — modernized rewrite of the origina
 - **Fluid simulation** — buoyancy and drag via fluid-enabled shapes (unique among JS engines)
 - **Serialization** — JSON (`spaceToJSON` / `spaceFromJSON`) + binary (`spaceToBinary` / `spaceFromBinary`) for save/load/multiplayer rollback
 - **Debug draw** — abstract `DebugDraw` interface (Box2D pattern), reference impls for Canvas/Three.js/PixiJS/p5.js
-- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 4461 tests
+- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 4591 tests
 
 ## Build & Test
 
@@ -63,7 +63,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | What                     | Status |
 | ------------------------ | ------ |
 | Haxe modernization       | ✅ Complete — pure TypeScript, fully typed |
-| Test coverage            | 🔶 ~60% statements (4461 tests), target ≥80% |
+| Test coverage            | 🔶 ~60% statements (4591 tests), target ≥80% |
 | Serialization API        | ✅ Done — `@newkrok/nape-js/serialization` |
 | Binary snapshots         | ✅ Done — `spaceToBinary` / `spaceFromBinary` (P39) |
 | Debug draw API           | ✅ Done — abstract `DebugDraw` + `Space.debugDraw()` |
