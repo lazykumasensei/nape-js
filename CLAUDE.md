@@ -76,7 +76,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 | Character controller     | ⬜ Planned — P45 |
 | Hot-path optimization    | ✅ Done — P46 (step/prestep dedup, pool bypass fix, O(1) pair removal, `any` narrowing) |
 | Deterministic mode       | ✅ Done — P48 (`space.deterministic = true`, soft same-platform determinism) |
-| ECS adapter              | ⬜ Planned — P49 |
+| ECS adapter              | ❌ Cancelled — P49 (trivial sync pattern, not worth a dedicated adapter/docs) |
 | Spatial hash grid        | ✅ Done — P50 (`Broadphase.SPATIAL_HASH`, asteroid field demo) |
 | Sub-stepping solver      | ⬜ Planned — P51 (long-term) |
 | Multiplayer demo         | ✅ Done — P52 (Railway WebSocket, `docs/multiplayer.html` + `server/`) |

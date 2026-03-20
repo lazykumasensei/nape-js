@@ -117,7 +117,7 @@ Potential future priorities identified via competitive analysis and market gaps:
 | P46 — Hot-path optimization               | M      | perf     | low    | ✅ Done        |
 | P47 — CJS bundle dedup (serialization)    | S      | bundle   | low    | ⬜ Not started |
 | P48 — Deterministic mode (soft)           | L      | critical | high   | ✅ Done        |
-| P49 — ECS adapter layer                   | M      | DX       | medium | ⬜ Not started |
+| P49 — ECS adapter layer                   | M      | DX       | medium | ❌ Cancelled   |
 | P50 — Spatial hash grid broadphase        | S-M    | perf     | low    | ✅ Done        |
 | P51 — Sub-stepping solver                 | XL     | stability| high   | ⬜ Not started |
 | P53 — Polygon-Polygon narrowphase bug fix | M      | critical | high   | ⬜ Not started |
@@ -373,16 +373,12 @@ multiplayer patterns (client-side prediction, rollback netcode).
 
 ---
 
-## Planned: P49 — ECS Adapter Layer
+## Cancelled: P49 — ECS Adapter Layer
 
-**Effort: M | Impact: DX | Risk: medium**
-
-Optional adapter for Entity Component System frameworks (bitECS, miniplex, Becsy):
-
-- Physics components (position, velocity, mass) as flat typed arrays
-- System that syncs ECS components ↔ nape-js Body objects each frame
-- Enables better cache locality and easier serialization
-- Growing trend in JS game development — no physics engine currently offers this
+**Decision: Cancelled.** ECS integration is a trivial sync pattern (~6 lines to copy
+`body.position`/`rotation`/`velocity` into ECS typed arrays). A dedicated adapter library
+or guide page would add maintenance burden and LLM context noise without real user value.
+Users who work with bitECS/miniplex/Becsy already know how to wire a sync system.
 
 ---
 
