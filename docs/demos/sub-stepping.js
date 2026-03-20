@@ -10,6 +10,9 @@ import {
   Space, Body, BodyType, Vec2, Circle, Polygon,
 } from "../nape-js.esm.js";
 import { drawGrid } from "../renderer.js";
+import { loadThree } from "../renderers/threejs-adapter.js";
+
+let _THREE = null;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -168,14 +171,13 @@ function countAwake(space) {
 // Demo definition
 // ---------------------------------------------------------------------------
 
-export default {
+const demoDef = {
   id: "sub-stepping",
   label: "Sub-Stepping Solver",
   tags: ["SubSteps", "Stacking", "Stability", "Performance"],
   desc: 'A 14-row pyramid under low solver iterations. Left: <code>subSteps=1</code> — jitters endlessly (<b style="color:#ff5020">orange</b>). Right: <code>subSteps=4</code> — settles to sleep (<b style="color:#32b450">green</b>). <b>Click</b> to drop more boxes.',
   walls: false,
   noCodePen: true,
-  canvas2dOnly: true,
   velocityIterations: 1,
   positionIterations: 1,
 
@@ -307,6 +309,219 @@ export default {
     ctx.restore();
   },
 
+  // -------------------------------------------------------------------------
+  // ThreeJS — render both spaces into one 3D scene
+  // (Uses renderOverrides.threejs which receives the adapter directly)
+  // -------------------------------------------------------------------------
+
+  _render3d(adapter, space, W, H) {
+    if (!_THREE) {
+      loadThree().then(mod => { _THREE = mod; });
+      adapter.getRenderer().render(adapter.getScene(), adapter.getCamera());
+      return;
+    }
+    const THREE = _THREE;
+    const halfW = W / 2;
+    const scene = adapter.getScene();
+    const renderer = adapter.getRenderer();
+    const camera = adapter.getCamera();
+
+    // Helper: ensure meshes exist for all bodies in a space, track in a Set
+    function ensureMeshes(sp, meshList, trackedSet) {
+      for (const body of sp.bodies) {
+        if (trackedSet.has(body)) continue;
+        trackedSet.add(body);
+        for (const shape of body.shapes) {
+          let geom;
+          if (shape.isCircle()) {
+            geom = new THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
+          } else if (shape.isPolygon()) {
+            const verts = shape.castPolygon.localVerts;
+            const len = verts.length;
+            if (len < 3) continue;
+            const pts = [];
+            for (let i = 0; i < len; i++) pts.push(new THREE.Vector2(verts.at(i).x, verts.at(i).y));
+            geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
+              depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2,
+            });
+            geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
+            geom.computeVertexNormals();
+            geom.translate(0, 0, -15);
+          }
+          if (!geom) continue;
+          const color = body.isStatic() ? 0x455a64 : (body.isSleeping ? 0x32b450 : 0xff5020);
+          const mesh = new THREE.Mesh(geom, new THREE.MeshPhongMaterial({
+            color, shininess: 80, specular: 0x444444, side: THREE.DoubleSide,
+          }));
+          scene.add(mesh);
+          meshList.push({ mesh, body, mat: mesh.material });
+        }
+      }
+    }
+
+    // Helper: sync mesh positions + sleep color
+    function syncMeshes(meshList, offsetX) {
+      for (const entry of meshList) {
+        const b = entry.body;
+        entry.mesh.position.set(b.position.x + offsetX, -b.position.y, 0);
+        entry.mesh.rotation.z = -b.rotation;
+        const wantColor = b.isStatic() ? 0x455a64 : (b.isSleeping ? 0x32b450 : 0xff5020);
+        if (entry.mat.color.getHex() !== wantColor) entry.mat.color.setHex(wantColor);
+      }
+    }
+
+    // Init tracking data
+    if (!scene.userData._subA) {
+      scene.userData._subA = [];
+      scene.userData._subASet = new Set();
+      scene.userData._subB = [];
+      scene.userData._subBSet = new Set();
+    }
+
+    // Build & sync Space A (left, offset=0)
+    ensureMeshes(space, scene.userData._subA, scene.userData._subASet);
+    syncMeshes(scene.userData._subA, 0);
+
+    // Build & sync Space B (right, offset=halfW)
+    ensureMeshes(_spaceB, scene.userData._subB, scene.userData._subBSet);
+    syncMeshes(scene.userData._subB, halfW);
+
+    // Divider plane
+    if (!scene.userData._divider) {
+      const dg = new THREE.PlaneGeometry(2, H);
+      const dm = new THREE.MeshBasicMaterial({ color: 0xff8c32, transparent: true, opacity: 0.4 });
+      const divider = new THREE.Mesh(dg, dm);
+      divider.position.set(halfW, -H / 2, 10);
+      scene.add(divider);
+      scene.userData._divider = divider;
+    }
+
+    renderer.render(scene, camera);
+  },
+
+  // -------------------------------------------------------------------------
+  // PixiJS — render both spaces with sprites
+  // -------------------------------------------------------------------------
+
+  renderPixi(adapter, space, W, H, showOutlines) {
+    const { PIXI, app } = adapter.getEngine();
+    const halfW = W / 2;
+
+    // Sync Space A sprites (auto-managed)
+    adapter.syncBodies(space);
+
+    // Lazy-init Space B container
+    if (!app.stage._subBContainer) {
+      app.stage._subBContainer = new PIXI.Container();
+      app.stage.addChild(app.stage._subBContainer);
+      app.stage._subBSprites = new Map();
+    }
+    const container = app.stage._subBContainer;
+    const sprites = app.stage._subBSprites;
+
+    // Add sprites for new Space B bodies
+    for (const body of _spaceB.bodies) {
+      if (sprites.has(body)) continue;
+      const gfx = new PIXI.Graphics();
+      for (const shape of body.shapes) {
+        const sleeping = body.isSleeping;
+        const fillColor = body.isStatic() ? 0x607888
+          : sleeping ? 0x32b450 : 0xff5020;
+
+        if (shape.isCircle()) {
+          gfx.circle(0, 0, shape.castCircle.radius);
+          gfx.fill({ color: fillColor, alpha: 0.5 });
+          gfx.stroke({ color: fillColor, alpha: 0.8, width: 1.2 });
+        } else if (shape.isPolygon()) {
+          const verts = shape.castPolygon.localVerts;
+          const len = verts.length;
+          if (len < 3) continue;
+          const v0 = verts.at(0);
+          gfx.moveTo(v0.x, v0.y);
+          for (let i = 1; i < len; i++) {
+            const v = verts.at(i);
+            gfx.lineTo(v.x, v.y);
+          }
+          gfx.closePath();
+          gfx.fill({ color: fillColor, alpha: 0.5 });
+          gfx.stroke({ color: fillColor, alpha: 0.8, width: 1.2 });
+        }
+      }
+      container.addChild(gfx);
+      sprites.set(body, gfx);
+    }
+
+    // Sync positions (offset by halfW)
+    for (const [body, gfx] of sprites) {
+      gfx.x = body.position.x + halfW;
+      gfx.y = body.position.y;
+      gfx.rotation = body.rotation;
+      // Update color for sleep state changes
+      const sleeping = body.isSleeping;
+      const isStatic = body.isStatic();
+      if (!isStatic && gfx._wasSleeping !== sleeping) {
+        gfx._wasSleeping = sleeping;
+        gfx.clear();
+        const fillColor = sleeping ? 0x32b450 : 0xff5020;
+        for (const shape of body.shapes) {
+          if (shape.isPolygon()) {
+            const verts = shape.castPolygon.localVerts;
+            const len = verts.length;
+            if (len < 3) continue;
+            const v0 = verts.at(0);
+            gfx.moveTo(v0.x, v0.y);
+            for (let i = 1; i < len; i++) gfx.lineTo(verts.at(i).x, verts.at(i).y);
+            gfx.closePath();
+            gfx.fill({ color: fillColor, alpha: 0.5 });
+            gfx.stroke({ color: fillColor, alpha: 0.8, width: 1.2 });
+          }
+        }
+      }
+    }
+
+    // Divider line
+    if (!app.stage._subDivider) {
+      const div = new PIXI.Graphics();
+      div.moveTo(halfW, 0);
+      div.lineTo(halfW, H);
+      div.stroke({ color: 0xff8c32, alpha: 0.5, width: 2 });
+      app.stage.addChild(div);
+      app.stage._subDivider = div;
+    }
+
+    app.render();
+  },
+
+  // -------------------------------------------------------------------------
+  // 2D overlay for 3D/PixiJS modes — legend + stats
+  // -------------------------------------------------------------------------
+
+  render3dOverlay(ctx, space, W, H) {
+    const halfW = W / 2;
+
+    ctx.save();
+    ctx.font = "bold 13px monospace";
+    ctx.textBaseline = "top";
+
+    ctx.fillStyle = "rgba(255,80,30,0.9)";
+    ctx.fillText("subSteps = 1", 12, 10);
+    ctx.fillStyle = "rgba(50,200,80,0.9)";
+    ctx.fillText("subSteps = 4", halfW + 12, 10);
+
+    ctx.font = "11px monospace";
+    const awakeColorA = _awakeA > 0 ? "rgba(255,120,40,0.9)" : "rgba(50,200,80,0.8)";
+    ctx.fillStyle = awakeColorA;
+    ctx.fillText(`Awake: ${_awakeA} / ${_totalA}`, 12, 32);
+    const awakeColorB = _awakeB > 0 ? "rgba(255,120,40,0.9)" : "rgba(50,200,80,0.8)";
+    ctx.fillStyle = awakeColorB;
+    ctx.fillText(`Awake: ${_awakeB} / ${_totalB}`, halfW + 12, 32);
+
+    ctx.fillStyle = "rgba(200,220,255,0.35)";
+    ctx.fillText("Solver: 1 vel / 1 pos iteration", 12, 50);
+    ctx.fillText("Click to drop more boxes", 12, H - 18);
+    ctx.restore();
+  },
+
   code2d: `// Sub-Stepping: pyramid stability comparison
 const W = canvas.width, H = canvas.height;
 const halfW = W / 2;
@@ -395,3 +610,20 @@ function loop() {
 }
 loop();`,
 };
+
+// ---------------------------------------------------------------------------
+// Wire up renderOverrides so the bridge doesn't strip the adapter reference
+// ---------------------------------------------------------------------------
+
+function overlayFn(ctx, space, W, H) {
+  demoDef.render3dOverlay(ctx, space, W, H);
+}
+
+demoDef.renderOverrides = {
+  canvas2d: (ctx, sp, w, h, outlines) => demoDef.render(ctx, sp, w, h, outlines),
+  threejs:  (adapter, sp, w, h) => demoDef._render3d(adapter, sp, w, h),
+  pixijs:   (adapter, sp, w, h, outlines) => demoDef.renderPixi(adapter, sp, w, h, outlines),
+  overlay:  overlayFn,
+};
+
+export default demoDef;
