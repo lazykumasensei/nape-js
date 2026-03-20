@@ -175,6 +175,7 @@ export default {
   desc: 'A 14-row pyramid under low solver iterations. Left: <code>subSteps=1</code> — jitters endlessly (<b style="color:#ff5020">orange</b>). Right: <code>subSteps=4</code> — settles to sleep (<b style="color:#32b450">green</b>). <b>Click</b> to drop more boxes.',
   walls: false,
   noCodePen: true,
+  canvas2dOnly: true,
   velocityIterations: 1,
   positionIterations: 1,
 

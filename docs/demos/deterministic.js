@@ -160,6 +160,7 @@ export default {
   desc: 'Two identical simulations run side by side with <code>space.deterministic = true</code>. Every position matches bit-for-bit. <b>Click</b> to drop shapes into both.',
   walls: false,
   noCodePen: true,
+  canvas2dOnly: true,
 
   setup(space, W, H) {
     _W = W;

@@ -141,6 +141,10 @@ function createCard(demo, { onTagClick } = {}) {
   btnPixi.dataset.mode = "pixi";
   btnPixi.textContent = "PixiJS";
   renderToggle.append(btn2d, btn3d, btnPixi);
+  if (demo.canvas2dOnly) {
+    btn3d.style.display = "none";
+    btnPixi.style.display = "none";
+  }
 
   let cardMode = "2d";
   const modeMap = { "2d": "canvas2d", "3d": "threejs", "pixi": "pixijs" };
