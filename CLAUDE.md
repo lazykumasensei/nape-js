@@ -60,26 +60,17 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 
 ## Current Status
 
+Completed: P21–P43, P46, P48, P50, P52, P53. Cancelled: P34, P36, P49.
+
 | What                     | Status |
 | ------------------------ | ------ |
-| Haxe modernization       | ✅ Complete — pure TypeScript, fully typed |
-| Test coverage            | 🔶 ~60% statements (4616 tests), target ≥80% |
-| Serialization API        | ✅ Done — `@newkrok/nape-js/serialization` |
-| Binary snapshots         | ✅ Done — `spaceToBinary` / `spaceFromBinary` (P39) |
-| Debug draw API           | ✅ Done — abstract `DebugDraw` + `Space.debugDraw()` |
-| Server/demo examples     | ❌ Cancelled — P36 (no standalone value without hosting) |
-| Haxe remnant cleanup     | ✅ Done — P40 (`__name__`/`__class__`/`__super__`/`_gthis`/`_init()`) |
-| Capsule shape            | ✅ Done — P41 (`Capsule.create` / `Capsule.createVertical`) |
-| Web Worker helper        | ✅ Done — P42 (`@newkrok/nape-js/worker`, `PhysicsWorkerManager`) |
-| Concave polygon helper   | ✅ Done — P43 (`createConcaveBody`) |
-| PixiJS integration       | 🔶 Partial — P44 (CodePen demos + Sprite adapter done; public npm package pending) |
+| Test coverage            | 🔶 ~60% statements (4616 tests), target ≥80% — P29 |
+| PixiJS integration       | 🔶 Phase 1 done (CodePen demos + Sprite adapter); npm package pending — P44 |
 | Character controller     | ⬜ Planned — P45 |
-| Hot-path optimization    | ✅ Done — P46 (step/prestep dedup, pool bypass fix, O(1) pair removal, `any` narrowing) |
-| Deterministic mode       | ✅ Done — P48 (`space.deterministic = true`, soft same-platform determinism) |
-| ECS adapter              | ❌ Cancelled — P49 (trivial sync pattern, not worth a dedicated adapter/docs) |
-| Spatial hash grid        | ✅ Done — P50 (`Broadphase.SPATIAL_HASH`, asteroid field demo) |
+| CJS bundle dedup         | ⬜ Planned — P47 |
 | Sub-stepping solver      | ⬜ Planned — P51 (long-term) |
-| Multiplayer demo         | ✅ Done — P52 (Railway WebSocket, `docs/multiplayer.html` + `server/`) |
-| Polygon-Polygon bug      | ✅ P53 — validated: polygon-polygon collision works correctly; reported tunneling not reproducible (22 tests confirm) |
+| Performance benchmark    | ⬜ Planned — P54 (public comparison page vs Matter.js/Planck.js) |
+| npm/SEO optimization     | ⬜ Planned — P55 (keywords, badges, ranking) |
+| Interactive playground   | ⬜ Planned — P56 (StackBlitz/CodeSandbox template) |
 
 Full roadmap with details, competitor analysis, and history: `docs/guides/roadmap.md`
