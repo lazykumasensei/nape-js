@@ -60,7 +60,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 
 ## Current Status
 
-Completed: P21–P43, P46, P48, P50, P52, P53. Cancelled: P34, P36, P49.
+Completed: P21–P43, P46, P48, P50, P52, P53, P55. Cancelled: P34, P36, P49.
 
 | What                     | Status |
 | ------------------------ | ------ |
@@ -70,7 +70,7 @@ Completed: P21–P43, P46, P48, P50, P52, P53. Cancelled: P34, P36, P49.
 | CJS bundle dedup         | ⬜ Planned — P47 |
 | Sub-stepping solver      | ⬜ Planned — P51 (long-term) |
 | Performance benchmark    | ⬜ Planned — P54 (public comparison page vs Matter.js/Planck.js) |
-| npm/SEO optimization     | ⬜ Planned — P55 (keywords, badges, ranking) |
+| npm/SEO optimization     | ✅ Done — P55 (keywords, meta tags, JSON-LD, social card) |
 | Interactive playground   | ⬜ Planned — P56 (StackBlitz/CodeSandbox template) |
 
 Full roadmap with details, competitor analysis, and history: `docs/guides/roadmap.md`
