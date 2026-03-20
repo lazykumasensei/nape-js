@@ -88,7 +88,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | P44 — PixiJS integration package          | M      | adoption  | low    | 🔶 Phase 1 done |
 | P45 — Character controller                | M      | DX        | medium | ⬜ Not started |
 | P47 — CJS bundle dedup (serialization)    | S      | bundle    | low    | ⬜ Not started |
-| P51 — Sub-stepping solver                 | XL     | stability | high   | ⬜ Not started |
+| P51 — Sub-stepping solver                 | M      | stability | low    | ✅ Done |
 | P54 — Performance benchmark page          | S      | adoption  | low    | ⬜ Not started |
 | P55 — npm/SEO optimization                | XS     | adoption  | low    | ✅ Done |
 | P56 — Interactive playground              | S-M    | adoption  | low    | ⬜ Not started |
@@ -134,12 +134,26 @@ correctly code-splits (8.2 KB). Fix via tsup config: `splitting`, `treeshake`, `
 
 ---
 
-## Planned: P51 — Sub-stepping Solver
+## Done: P51 — Sub-stepping Solver
 
-**Effort: XL | Impact: stability | Risk: high**
+**Effort: M | Impact: stability | Risk: low**
 
-Box2D v3's "Soft Step" solver approach: soft constraints + sub-stepping for better stability.
-Major architectural change — long-term goal, depends on P46 (hot-path optimization).
+Added `space.subSteps` property (default: 1). When set to N > 1, each `step(dt)` call
+internally runs N sub-steps with `dt/N`, improving simulation stability for fast objects,
+stacking, and stiff constraints at the cost of proportionally more CPU time.
+
+**API:** `space.subSteps = 4` — good balance for most games. `1` = zero overhead (default).
+
+**Implementation:** The core physics pipeline (broadphase → narrowphase → prestep →
+velocity solve → position update → CCD → position solve → sleep management) runs N times
+per `step()` call, while outer bookkeeping (midstep flag, stamp, callbacks) runs once.
+
+**Tests:** 17 tests covering property validation, backward compatibility, tunneling
+prevention, stacking stability, joint stiffness, energy conservation, deterministic mode
+combo, and runtime changes.
+
+**Demo:** `docs/demos/sub-stepping.js` — fires bullets at a thin wall, left side
+(`subSteps=1`) shows tunneling, right side (`subSteps=4`) catches all bullets.
 
 ---
 

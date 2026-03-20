@@ -44,6 +44,7 @@ import webWorker           from "./demos/web-worker.js?v=3.15.10";
 import asteroidField       from "./demos/asteroid-field.js?v=3.15.10";
 import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.15.10";
 import deterministic       from "./demos/deterministic.js?v=3.15.10";
+import subStepping         from "./demos/sub-stepping.js?v=3.15.10";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -55,6 +56,7 @@ const ALL_DEMOS = [
   asteroidField,
   fluidBuoyancy,
   deterministic,
+  subStepping,
 ];
 
 const CW = 900;

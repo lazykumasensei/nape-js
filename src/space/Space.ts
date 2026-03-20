@@ -176,6 +176,36 @@ export class Space {
   }
 
   /**
+   * Number of sub-steps performed per `step()` call. Each sub-step uses
+   * `deltaTime / subSteps` and the same velocity/position iteration counts.
+   *
+   * Higher values improve simulation stability (stacking, fast objects, joint
+   * stiffness) at the cost of proportionally more CPU time.
+   *
+   * - `1` (default) — standard single-step behaviour, zero overhead.
+   * - `4` — good balance between quality and performance for most games.
+   * - `8+` — high-precision, useful for stiff constraints or very fast objects.
+   *
+   * **Performance:** cost scales linearly — `subSteps = 4` ≈ 4× solver work.
+   * Tip: you can lower `velocityIterations` to compensate (e.g. 10 iter × 1 step
+   * → 3 iter × 4 sub-steps ≈ similar quality at ~1.2× cost).
+   *
+   * @throws If set to a value less than 1 or NaN.
+   */
+  get subSteps(): number {
+    return this.zpp_inner.subSteps;
+  }
+  set subSteps(value: number) {
+    if (value !== value) {
+      throw new Error("Error: Space::subSteps cannot be NaN");
+    }
+    if (value < 1) {
+      throw new Error("Error: Space::subSteps must be at least 1");
+    }
+    this.zpp_inner.subSteps = Math.floor(value);
+  }
+
+  /**
    * Global angular drag coefficient applied to all bodies.
    * @throws If set to NaN.
    */

@@ -59,6 +59,7 @@ export class ZPP_Space {
   time: number = 0;
   sortcontacts: boolean = false;
   deterministic: boolean = false;
+  subSteps: number = 1;
   c_arbiters_true: any = null;
   c_arbiters_false: any = null;
   f_arbiters: any = null;
@@ -3315,154 +3316,158 @@ export class ZPP_Space {
       );
     }
     this.time += deltaTime;
-    this.pre_dt = deltaTime;
     this.midstep = true;
     this.stamp++;
+    const n = this.subSteps;
+    const subDt = deltaTime / n;
     try {
-      this.validation();
-      this.bphase.broadphase(this, true);
-      this._ensureDeterministicOrder();
-      this.prestep(deltaTime);
-      if (this.sortcontacts) {
-        const xxlist = this.c_arbiters_false;
-        if (xxlist.head != null && xxlist.head.next != null) {
-          let head = xxlist.head;
-          let tail = null;
-          let left = null;
-          let right = null;
-          let nxt = null;
-          let listSize = 1;
-          let numMerges;
-          let leftSize;
-          let rightSize;
-          while (true) {
-            numMerges = 0;
-            left = head;
-            head = null;
-            tail = head;
-            while (left != null) {
-              ++numMerges;
-              right = left;
-              leftSize = 0;
-              rightSize = listSize;
-              while (right != null && leftSize < listSize) {
-                ++leftSize;
-                right = right.next;
-              }
-              while (leftSize > 0 || (rightSize > 0 && right != null)) {
-                if (leftSize == 0) {
-                  nxt = right;
+      for (let _sub = 0; _sub < n; _sub++) {
+        this.pre_dt = subDt;
+        this.validation();
+        this.bphase.broadphase(this, true);
+        this._ensureDeterministicOrder();
+        this.prestep(subDt);
+        if (this.sortcontacts) {
+          const xxlist = this.c_arbiters_false;
+          if (xxlist.head != null && xxlist.head.next != null) {
+            let head = xxlist.head;
+            let tail = null;
+            let left = null;
+            let right = null;
+            let nxt = null;
+            let listSize = 1;
+            let numMerges;
+            let leftSize;
+            let rightSize;
+            while (true) {
+              numMerges = 0;
+              left = head;
+              head = null;
+              tail = head;
+              while (left != null) {
+                ++numMerges;
+                right = left;
+                leftSize = 0;
+                rightSize = listSize;
+                while (right != null && leftSize < listSize) {
+                  ++leftSize;
                   right = right.next;
-                  --rightSize;
-                } else if (rightSize == 0 || right == null) {
-                  nxt = left;
-                  left = left.next;
-                  --leftSize;
-                } else if (
-                  left.elt.active && right.elt.active
-                    ? left.elt.oc1.dist < right.elt.oc1.dist
-                    : this.deterministic
-                      ? this._arbiterSortKey(left.elt) <= this._arbiterSortKey(right.elt)
-                      : true
-                ) {
-                  nxt = left;
-                  left = left.next;
-                  --leftSize;
-                } else {
-                  nxt = right;
-                  right = right.next;
-                  --rightSize;
                 }
-                if (tail != null) {
-                  tail.next = nxt;
-                } else {
-                  head = nxt;
+                while (leftSize > 0 || (rightSize > 0 && right != null)) {
+                  if (leftSize == 0) {
+                    nxt = right;
+                    right = right.next;
+                    --rightSize;
+                  } else if (rightSize == 0 || right == null) {
+                    nxt = left;
+                    left = left.next;
+                    --leftSize;
+                  } else if (
+                    left.elt.active && right.elt.active
+                      ? left.elt.oc1.dist < right.elt.oc1.dist
+                      : this.deterministic
+                        ? this._arbiterSortKey(left.elt) <= this._arbiterSortKey(right.elt)
+                        : true
+                  ) {
+                    nxt = left;
+                    left = left.next;
+                    --leftSize;
+                  } else {
+                    nxt = right;
+                    right = right.next;
+                    --rightSize;
+                  }
+                  if (tail != null) {
+                    tail.next = nxt;
+                  } else {
+                    head = nxt;
+                  }
+                  tail = nxt;
                 }
-                tail = nxt;
+                left = right;
               }
-              left = right;
+              tail.next = null;
+              listSize <<= 1;
+              if (!(numMerges > 1)) {
+                break;
+              }
             }
-            tail.next = null;
-            listSize <<= 1;
-            if (!(numMerges > 1)) {
-              break;
-            }
+            xxlist.head = head;
+            xxlist.modified = true;
+            xxlist.pushmod = true;
           }
-          xxlist.head = head;
-          xxlist.modified = true;
-          xxlist.pushmod = true;
         }
-      }
-      this.updateVel(deltaTime);
-      this.warmStart();
-      this.iterateVel(velocityIterations);
-      let cx_ite = this.kinematics.head;
-      while (cx_ite != null) {
-        const cur = cx_ite.elt;
-        cur.pre_posx = cur.posx;
-        cur.pre_posy = cur.posy;
-        cur.pre_rot = cur.rot;
-        cx_ite = cx_ite.next;
-      }
-      let cx_ite1 = this.live.head;
-      while (cx_ite1 != null) {
-        const cur1 = cx_ite1.elt;
-        cur1.pre_posx = cur1.posx;
-        cur1.pre_posy = cur1.posy;
-        cur1.pre_rot = cur1.rot;
-        cx_ite1 = cx_ite1.next;
-      }
-      this.updatePos(deltaTime);
-      this.continuous = true;
-      this.continuousCollisions(deltaTime);
-      this.continuous = false;
-      this.iteratePos(positionIterations);
-      this._invalidateBodyList(this.kinematics);
-      this._invalidateBodyList(this.live);
-      let pre = null;
-      let cx_ite8 = this.staticsleep.head;
-      while (cx_ite8 != null) {
-        const b = cx_ite8.elt;
-        if (b.type != 3 || (b.velx == 0 && b.vely == 0 && b.angvel == 0)) {
-          if (b.kinematicDelaySleep) {
-            b.kinematicDelaySleep = false;
-            cx_ite8 = cx_ite8.next;
+        this.updateVel(subDt);
+        this.warmStart();
+        this.iterateVel(velocityIterations);
+        let cx_ite = this.kinematics.head;
+        while (cx_ite != null) {
+          const cur = cx_ite.elt;
+          cur.pre_posx = cur.posx;
+          cur.pre_posy = cur.posy;
+          cur.pre_rot = cur.rot;
+          cx_ite = cx_ite.next;
+        }
+        let cx_ite1 = this.live.head;
+        while (cx_ite1 != null) {
+          const cur1 = cx_ite1.elt;
+          cur1.pre_posx = cur1.posx;
+          cur1.pre_posy = cur1.posy;
+          cur1.pre_rot = cur1.rot;
+          cx_ite1 = cx_ite1.next;
+        }
+        this.updatePos(subDt);
+        this.continuous = true;
+        this.continuousCollisions(subDt);
+        this.continuous = false;
+        this.iteratePos(positionIterations);
+        this._invalidateBodyList(this.kinematics);
+        this._invalidateBodyList(this.live);
+        let pre = null;
+        let cx_ite8 = this.staticsleep.head;
+        while (cx_ite8 != null) {
+          const b = cx_ite8.elt;
+          if (b.type != 3 || (b.velx == 0 && b.vely == 0 && b.angvel == 0)) {
+            if (b.kinematicDelaySleep) {
+              b.kinematicDelaySleep = false;
+              cx_ite8 = cx_ite8.next;
+              continue;
+            }
+            b.component.sleeping = true;
+            const _this = this.staticsleep;
+            let old;
+            let ret;
+            if (pre == null) {
+              old = _this.head;
+              ret = old.next;
+              _this.head = ret;
+              if (_this.head == null) {
+                _this.pushmod = true;
+              }
+            } else {
+              old = pre.next;
+              ret = old.next;
+              pre.next = ret;
+              if (ret == null) {
+                _this.pushmod = true;
+              }
+            }
+            const o = old;
+            o.elt = null;
+            o.next = ZPP_Space._zpp.util.ZNPNode_ZPP_Body.zpp_pool;
+            ZPP_Space._zpp.util.ZNPNode_ZPP_Body.zpp_pool = o;
+            _this.modified = true;
+            _this.length--;
+            _this.pushmod = true;
+            cx_ite8 = ret;
             continue;
           }
-          b.component.sleeping = true;
-          const _this = this.staticsleep;
-          let old;
-          let ret;
-          if (pre == null) {
-            old = _this.head;
-            ret = old.next;
-            _this.head = ret;
-            if (_this.head == null) {
-              _this.pushmod = true;
-            }
-          } else {
-            old = pre.next;
-            ret = old.next;
-            pre.next = ret;
-            if (ret == null) {
-              _this.pushmod = true;
-            }
-          }
-          const o = old;
-          o.elt = null;
-          o.next = ZPP_Space._zpp.util.ZNPNode_ZPP_Body.zpp_pool;
-          ZPP_Space._zpp.util.ZNPNode_ZPP_Body.zpp_pool = o;
-          _this.modified = true;
-          _this.length--;
-          _this.pushmod = true;
-          cx_ite8 = ret;
-          continue;
+          pre = cx_ite8;
+          cx_ite8 = cx_ite8.next;
         }
-        pre = cx_ite8;
-        cx_ite8 = cx_ite8.next;
-      }
-      this.doForests(deltaTime);
-      this.sleepArbiters();
+        this.doForests(subDt);
+        this.sleepArbiters();
+      } // end sub-step loop
     } finally {
       this.midstep = false;
     }
