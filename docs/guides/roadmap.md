@@ -54,7 +54,6 @@ Potential future priorities identified via competitive analysis and market gaps:
 |------|-----|--------|--------|
 | **Phaser plugin/adapter** | Phaser is the #1 JS game framework; direct integration = massive reach | M | 🔥 Very high |
 | **React/R3F integration** | `@react-three/rapier`-style package for React gamedev community | M | 🔥 High |
-| **Soft body / cloth sim** | No competitor has this in pure JS — market gap | L | High |
 | **Particle system** | Simple physics-aware particle emitter — commonly requested by gamedevs | S-M | Medium |
 | **Tilemap collision helper** | Tiled/LDtk map → physics body conversion — common gamedev need | S | Medium |
 
