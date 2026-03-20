@@ -9,9 +9,12 @@
 [![CI](https://github.com/NewKrok/nape-js/actions/workflows/ci.yml/badge.svg)](https://github.com/NewKrok/nape-js/actions/workflows/ci.yml)
 [![bundle size](https://img.shields.io/badge/gzip-16%20KB-blue.svg)](https://github.com/NewKrok/nape-js)
 [![license](https://img.shields.io/npm/l/@newkrok/nape-js.svg)](https://github.com/NewKrok/nape-js/blob/master/LICENSE)
+[![docs](https://img.shields.io/badge/docs-online-blue.svg)](https://newkrok.github.io/nape-js/)
 
 Fully typed, tree-shakeable 2D physics engine — a modern TypeScript rewrite of the
 [Nape](https://github.com/deltaluca/nape) Haxe physics engine.
+
+**[Homepage & Interactive Demos](https://newkrok.github.io/nape-js/)** | **[API Reference](https://newkrok.github.io/nape-js/api/)** | **[Examples](https://newkrok.github.io/nape-js/examples.html)** | **[Multiplayer Demo](https://newkrok.github.io/nape-js/multiplayer.html)**
 
 - Originally created in Haxe by Luca Deltodesco
 - Ported to TypeScript by Istvan Krisztian Somoracz

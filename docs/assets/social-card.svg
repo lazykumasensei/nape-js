@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#3fb950"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1200" height="4" fill="url(#accent)"/>
+  <!-- Logo -->
+  <g transform="translate(100,120) scale(0.55)">
+    <g transform="translate(0,287) scale(0.1,-0.1)" fill="url(#accent)" stroke="none">
+      <path d="M1705 2430 c-145 -27 -292 -101 -399 -201 -40 -37 -72 -59 -87 -59 -39 0 -121 -45 -161 -86 -105 -111 -103 -282 5 -385 l34 -33 -26 -55 c-22 -47 -26 -70 -26 -146 0 -82 3 -97 33 -157 58 -118 179 -208 327 -245 45 -11 66 -21 70 -34 10 -29 61 -60 102 -61 25 -1 63 10 107 31 127 60 263 101 331 100 22 0 11 -6 -41 -23 -97 -31 -226 -101 -324 -176 -68 -52 -86 -61 -108 -55 -56 13 -204 71 -397 155 -206 90 -292 116 -348 105 -17 -3 -75 -27 -127 -53 -129 -64 -177 -65 -306 -5 -124 58 -166 55 -180 -13 -11 -58 67 -122 209 -171 86 -30 275 -42 372 -24 l59 11 51 -48 c337 -325 618 -462 951 -462 207 0 385 52 528 154 221 157 296 385 196 592 -32 66 -136 186 -181 209 l-28 15 32 54 c32 54 32 54 87 58 101 7 193 70 234 158 29 63 28 170 -1 226 -41 77 -114 131 -194 141 -37 5 -40 9 -54 56 -55 186 -239 357 -441 411 -73 20 -232 28 -299 16z m-268 -331 c15 -5 39 -21 53 -34 l26 -24 64 25 c145 59 316 4 379 -122 47 -94 27 -217 -47 -297 -33 -35 -103 -72 -155 -81 -37 -7 -37 -7 -23 -34 35 -69 27 -150 -21 -223 -56 -84 -182 -131 -305 -111 -251 38 -376 263 -243 436 l34 45 -19 45 c-32 71 -36 150 -11 221 23 64 76 129 126 151 36 16 104 18 142 3z"/>
+    </g>
+  </g>
+  <!-- Title -->
+  <text x="280" y="210" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#e6edf3">nape-js</text>
+  <!-- Subtitle -->
+  <text x="280" y="270" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#8b949e">High-performance 2D physics engine for TypeScript</text>
+  <!-- Feature pills -->
+  <g font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#58a6ff">
+    <rect x="100" y="340" width="170" height="38" rx="19" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="185" y="365" text-anchor="middle">Rigid Bodies</text>
+
+    <rect x="290" y="340" width="160" height="38" rx="19" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="370" y="365" text-anchor="middle">Constraints</text>
+
+    <rect x="470" y="340" width="200" height="38" rx="19" fill="none" stroke="#3fb950" stroke-width="1.5" />
+    <text x="570" y="365" text-anchor="middle" fill="#3fb950">Fluid Simulation</text>
+
+    <rect x="690" y="340" width="160" height="38" rx="19" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="770" y="365" text-anchor="middle">Raycasting</text>
+
+    <rect x="870" y="340" width="170" height="38" rx="19" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="955" y="365" text-anchor="middle">Multiplayer</text>
+
+    <rect x="100" y="395" width="195" height="38" rx="19" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="197" y="420" text-anchor="middle">Tree-shakeable</text>
+
+    <rect x="315" y="395" width="210" height="38" rx="19" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="420" y="420" text-anchor="middle">Zero Dependencies</text>
+
+    <rect x="545" y="395" width="175" height="38" rx="19" fill="none" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="632" y="420" text-anchor="middle" fill="#3fb950">Web Workers</text>
+
+    <rect x="740" y="395" width="180" height="38" rx="19" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="830" y="420" text-anchor="middle">Serialization</text>
+  </g>
+  <!-- Install command -->
+  <rect x="100" y="480" width="440" height="48" rx="8" fill="#1c2128"/>
+  <text x="120" y="511" font-family="ui-monospace, monospace" font-size="20" fill="#8b949e">$</text>
+  <text x="145" y="511" font-family="ui-monospace, monospace" font-size="20" fill="#e6edf3">npm install @newkrok/nape-js</text>
+  <!-- Stats -->
+  <text x="600" y="511" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#8b949e">~16 KB gzip  ·  4600+ tests  ·  MIT</text>
+  <!-- Bottom accent line -->
+  <rect x="0" y="626" width="1200" height="4" fill="url(#accent)"/>
+</svg>

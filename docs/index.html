@@ -5,19 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>nape-js — 2D Physics Engine for TypeScript</title>
   <meta name="description" content="nape-js — high-performance TypeScript 2D physics engine with rigid body dynamics, constraints, fluid simulation, and debug draw. Zero dependencies." />
-  <meta name="keywords" content="physics engine, TypeScript, 2D physics, rigid body, collision detection, constraints, nape, JavaScript" />
+  <meta name="keywords" content="physics engine, TypeScript, 2D physics, rigid body, collision detection, constraints, nape, JavaScript, game physics, fluid simulation, buoyancy, raycasting, deterministic physics, multiplayer, tree-shakeable, web worker" />
+  <meta name="theme-color" content="#0d1117" />
   <link rel="canonical" href="https://newkrok.github.io/nape-js/" />
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:title" content="nape-js — 2D Physics Engine for TypeScript" />
-  <meta property="og:description" content="Fully typed, tree-shakeable 2D physics engine — rigid bodies, constraints, fluid simulation, and debug draw." />
+  <meta property="og:description" content="High-performance 2D physics engine — rigid bodies, constraints, fluid simulation, raycasting, and deterministic multiplayer. Tree-shakeable, zero dependencies, ~16 KB gzip." />
   <meta property="og:url" content="https://newkrok.github.io/nape-js/" />
-  <meta property="og:image" content="https://newkrok.github.io/nape-js/logo.svg" />
+  <meta property="og:image" content="https://newkrok.github.io/nape-js/assets/social-card.svg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
   <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="nape-js — 2D Physics Engine for TypeScript" />
-  <meta name="twitter:description" content="Fully typed, tree-shakeable 2D physics engine — rigid bodies, constraints, fluid simulation, and debug draw." />
-  <meta name="twitter:image" content="https://newkrok.github.io/nape-js/logo.svg" />
+  <meta name="twitter:description" content="High-performance 2D physics engine — rigid bodies, constraints, fluid simulation, raycasting, and deterministic multiplayer. Tree-shakeable, zero dependencies, ~16 KB gzip." />
+  <meta name="twitter:image" content="https://newkrok.github.io/nape-js/assets/social-card.svg" />
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "nape-js",
+    "description": "High-performance 2D physics engine for TypeScript & JavaScript — rigid bodies, constraints, fluid simulation, raycasting, and deterministic multiplayer.",
+    "url": "https://newkrok.github.io/nape-js/",
+    "codeRepository": "https://github.com/NewKrok/nape-js",
+    "programmingLanguage": ["TypeScript", "JavaScript"],
+    "license": "https://opensource.org/licenses/MIT",
+    "author": {
+      "@type": "Person",
+      "name": "Istvan Krisztian Somoracz",
+      "url": "https://github.com/NewKrok"
+    },
+    "keywords": ["2D physics engine", "TypeScript", "rigid body dynamics", "collision detection", "fluid simulation", "game physics", "multiplayer physics"]
+  }
+  </script>
   <!-- Google Analytics (GA4) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-TF84DLZ4X8"></script>
   <script>
@@ -27,7 +49,7 @@
     gtag('config', 'G-TF84DLZ4X8');
   </script>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
-  <link rel="stylesheet" href="style.css?v=3.15.10" />
+  <link rel="stylesheet" href="style.css?v=3.16.1" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css?v=3.15.10" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.css?v=3.15.10" />
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" data-manual></script>
@@ -201,6 +223,6 @@
     </div>
   </footer>
 
-  <script type="module" src="app.js?v=3.15.10"></script>
+  <script type="module" src="app.js?v=3.16.1"></script>
 </body>
 </html>

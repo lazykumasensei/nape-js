@@ -90,7 +90,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | P47 — CJS bundle dedup (serialization)    | S      | bundle    | low    | ⬜ Not started |
 | P51 — Sub-stepping solver                 | XL     | stability | high   | ⬜ Not started |
 | P54 — Performance benchmark page          | S      | adoption  | low    | ⬜ Not started |
-| P55 — npm/SEO optimization                | XS     | adoption  | low    | ⬜ Not started |
+| P55 — npm/SEO optimization                | XS     | adoption  | low    | ✅ Done |
 | P56 — Interactive playground              | S-M    | adoption  | low    | ⬜ Not started |
 
 ---
@@ -155,15 +155,23 @@ Public comparison page (nape-js vs Matter.js vs Planck.js) with reproducible ben
 
 ---
 
-## Planned: P55 — npm/SEO Optimization
+## Completed: P55 — npm/SEO Optimization
 
-**Effort: XS | Impact: adoption | Risk: low**
+**Effort: XS | Impact: adoption | Risk: low | Status: ✅ Done**
 
-Improve discoverability on npm and search engines:
+Improved discoverability on npm and search engines:
 
-- Optimize package.json `keywords` for "2d physics engine typescript" ranking
-- README badges (npm version, bundle size, test count, license)
-- Consistent naming/description across npm, GitHub, docs
+- ✅ Expanded package.json `keywords` from 7 to 20 (game-physics, fluid-simulation, multiplayer, etc.)
+- ✅ Optimized package.json `description` with high-value search terms
+- ✅ Set `homepage` to docs site (newkrok.github.io/nape-js)
+- ✅ README badges (npm version, downloads, CI, bundle size, license, docs)
+- ✅ Prominent docs/demos/API links in README header
+- ✅ JSON-LD structured data (SoftwareSourceCode schema) on landing page
+- ✅ Open Graph / Twitter Card with `summary_large_image` and social card
+- ✅ `theme-color` meta tag on all pages
+- ✅ Consistent meta descriptions across npm, GitHub, and docs site
+- ✅ Sitemap `lastmod` dates added
+- ✅ Version cache-buster strings synced to 3.16.1 across all HTML pages
 
 ---
 
