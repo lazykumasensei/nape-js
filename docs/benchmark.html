@@ -443,9 +443,11 @@
         <strong>Rapier note:</strong> Rapier runs via WASM+SIMD and is not a pure JavaScript engine.
         Its performance reflects the advantage of compiled code — a fundamentally different approach
         from the other three engines.<br/><br/>
-        <strong>Fairness:</strong> All engines use default solver settings. Gravity, body counts,
-        and shapes are matched as closely as each engine's API allows. A deterministic pseudo-random
-        seed ensures reproducible layouts. Run benchmarks multiple times for stable results.
+        <strong>Fairness:</strong> All engines use their own <strong>default solver settings</strong>
+        (nape-js: 10 vel / 10 pos iterations; Planck.js: 8/3; Matter.js: 6/4; Rapier: 4/1).
+        Gravity is normalized to equivalent pixel-space acceleration (600 px/s&sup2;) across all engines.
+        Body counts, sizes, and positions are identical. A deterministic pseudo-random seed ensures
+        reproducible layouts. Run benchmarks multiple times for stable results.
       </div>
 
     </div>

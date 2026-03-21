@@ -29,8 +29,9 @@ export const NapeAdapter = {
   color: "#58a6ff",
   loaded: true,
 
-  createWorld(gravityY = 600) {
-    return new Space(new Vec2(0, gravityY));
+  // nape-js uses pixel units directly — gravity in px/s²
+  createWorld(gravityY_px = 600) {
+    return new Space(new Vec2(0, gravityY_px));
   },
 
   addStaticBox(space, x, y, w, h) {
@@ -80,7 +81,8 @@ export const NapeAdapter = {
   },
 
   step(space, dt) {
-    space.step(dt, 8, 3);
+    // Use engine defaults: 10 velocity, 10 position iterations
+    space.step(dt);
   },
 
   getBodyCount(space) {
@@ -125,26 +127,33 @@ export const MatterAdapter = {
     return this.loaded;
   },
 
-  createWorld(gravityY = 1) {
+  // Matter.js gravity is a scale factor (1 = default ≈ 980 px/s² at 60fps).
+  // To match nape-js 600 px/s²: scale = 600 / 980 ≈ 0.612
+  createWorld(gravityY_px = 600) {
     const engine = Matter.Engine.create();
-    engine.gravity.y = gravityY;
+    engine.gravity.y = gravityY_px / 980;
     return engine;
   },
 
   addStaticBox(engine, x, y, w, h) {
     const body = Matter.Bodies.rectangle(x, y, w, h, { isStatic: true });
+    body._benchW = w;
+    body._benchH = h;
     Matter.Composite.add(engine.world, body);
     return body;
   },
 
   addDynamicBox(engine, x, y, w, h) {
     const body = Matter.Bodies.rectangle(x, y, w, h);
+    body._benchW = w;
+    body._benchH = h;
     Matter.Composite.add(engine.world, body);
     return body;
   },
 
   addDynamicCircle(engine, x, y, r) {
     const body = Matter.Bodies.circle(x, y, r);
+    body._benchR = r;
     Matter.Composite.add(engine.world, body);
     return body;
   },
@@ -179,11 +188,11 @@ export const MatterAdapter = {
       x: b.position.x,
       y: b.position.y,
       rotation: b.angle,
-      w: b.bounds.max.x - b.bounds.min.x,
-      h: b.bounds.max.y - b.bounds.min.y,
-      r: b.circleRadius || 0,
+      w: b._benchW || 0,
+      h: b._benchH || 0,
+      r: b._benchR || 0,
       isStatic: b.isStatic,
-      isCircle: !!b.circleRadius,
+      isCircle: !!b._benchR,
     }));
   },
 
@@ -209,8 +218,9 @@ export const PlanckAdapter = {
     return this.loaded;
   },
 
-  createWorld(gravityY = 20) {
-    return planck.World(planck.Vec2(0, gravityY));
+  // Planck uses meters (Box2D). Convert px/s² → m/s² by dividing by SCALE.
+  createWorld(gravityY_px = 600) {
+    return planck.World(planck.Vec2(0, gravityY_px / this.SCALE));
   },
 
   addStaticBox(world, x, y, w, h) {
@@ -259,7 +269,8 @@ export const PlanckAdapter = {
   },
 
   step(world, dt) {
-    world.step(dt, 8, 3);
+    // Planck.js default: 8 velocity, 3 position iterations
+    world.step(dt);
   },
 
   getBodyCount(world) {
@@ -317,9 +328,11 @@ export const RapierAdapter = {
     return this.loaded;
   },
 
-  createWorld(gravityY = 9.81) {
+  // Rapier uses meters. Convert px/s² → m/s² by dividing by SCALE (30).
+  createWorld(gravityY_px = 600) {
     const R = this.RAPIER;
-    const world = new R.World(new R.Vector2(0.0, gravityY));
+    const S = 30;
+    const world = new R.World(new R.Vector2(0.0, gravityY_px / S));
     world._bodies = [];
     return world;
   },
