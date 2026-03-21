@@ -177,7 +177,6 @@ const demoDef = {
   tags: ["SubSteps", "Stacking", "Stability", "Performance"],
   desc: 'A 14-row pyramid under low solver iterations. Left: <code>subSteps=1</code> — jitters endlessly (<b style="color:#ff5020">orange</b>). Right: <code>subSteps=4</code> — settles to sleep (<b style="color:#32b450">green</b>). <b>Click</b> to drop more boxes.',
   walls: false,
-  noCodePen: true,
   velocityIterations: 1,
   positionIterations: 1,
 
@@ -606,6 +605,91 @@ function loop() {
   ctx.fillStyle = "rgba(50,200,80,0.9)";
   ctx.fillText("subSteps = 4", halfW + 12, 14);
 
+  requestAnimationFrame(loop);
+}
+loop();`,
+
+  codePixi: `// Sub-Stepping: pyramid stability comparison (PixiJS)
+const halfW = W / 2;
+const VEL_ITER = 1, POS_ITER = 1;
+
+const spaceA = new Space(new Vec2(0, 1500));
+const spaceB = new Space(new Vec2(0, 1500));
+spaceB.subSteps = 4;
+
+function buildPyramid(space, w, h) {
+  const floor = new Body(BodyType.STATIC, new Vec2(w / 2, h - 10));
+  floor.shapes.add(new Polygon(Polygon.box(w - 10, 10)));
+  floor.space = space;
+  const cx = w / 2, baseY = h - 10 - 6;
+  for (let row = 0; row < 14; row++) {
+    const count = 14 - row;
+    const startX = cx - (count - 1) * 12;
+    for (let col = 0; col < count; col++) {
+      const box = new Body(BodyType.DYNAMIC,
+        new Vec2(startX + col * 24, baseY - row * 12));
+      box.shapes.add(new Polygon(Polygon.box(24, 12)));
+      box.space = space;
+    }
+  }
+}
+
+buildPyramid(spaceA, halfW, H);
+buildPyramid(spaceB, halfW, H);
+
+// Space B sprites container (offset by halfW)
+const containerB = new PIXI.Container();
+containerB.x = halfW;
+app.stage.addChild(containerB);
+const spritesB = new Map();
+
+function ensureSpritesB() {
+  for (const body of spaceB.bodies) {
+    if (spritesB.has(body)) continue;
+    const gfx = new PIXI.Graphics();
+    const sleeping = body.isSleeping;
+    const isStatic = body.isStatic();
+    const color = isStatic ? 0x607888 : sleeping ? 0x32b450 : 0xff5020;
+    for (const shape of body.shapes) {
+      if (shape.isPolygon()) {
+        const verts = shape.castPolygon.localVerts;
+        const len = verts.length;
+        if (len < 3) continue;
+        const v0 = verts.at(0);
+        gfx.moveTo(v0.x, v0.y);
+        for (let i = 1; i < len; i++) gfx.lineTo(verts.at(i).x, verts.at(i).y);
+        gfx.closePath();
+        gfx.fill({ color, alpha: 0.5 });
+        gfx.stroke({ color, alpha: 0.8, width: 1.2 });
+      }
+    }
+    containerB.addChild(gfx);
+    spritesB.set(body, { gfx, wasSleeping: sleeping });
+  }
+}
+
+// Divider
+const divider = new PIXI.Graphics();
+divider.moveTo(halfW, 0);
+divider.lineTo(halfW, H);
+divider.stroke({ color: 0xff8c32, alpha: 0.5, width: 2 });
+app.stage.addChild(divider);
+
+function loop() {
+  spaceA.step(1 / 60, VEL_ITER, POS_ITER);
+  spaceB.step(1 / 60, VEL_ITER, POS_ITER);
+
+  drawGrid();
+  syncBodies(spaceA);
+  ensureSpritesB();
+
+  for (const [body, entry] of spritesB) {
+    entry.gfx.x = body.position.x;
+    entry.gfx.y = body.position.y;
+    entry.gfx.rotation = body.rotation;
+  }
+
+  app.render();
   requestAnimationFrame(loop);
 }
 loop();`,
