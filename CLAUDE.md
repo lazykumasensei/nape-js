@@ -60,7 +60,7 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 
 ## Current Status
 
-Completed: P21–P43, P46, P48, P50, P51, P52, P53, P55. Cancelled: P34, P36, P49.
+Completed: P21–P43, P46, P48, P50, P51, P52, P53, P54, P55. Cancelled: P34, P36, P49.
 
 | What                     | Status |
 | ------------------------ | ------ |
@@ -69,7 +69,7 @@ Completed: P21–P43, P46, P48, P50, P51, P52, P53, P55. Cancelled: P34, P36, P4
 | Character controller     | ⬜ Planned — P45 |
 | CJS bundle dedup         | ⬜ Planned — P47 |
 | Sub-stepping solver      | ✅ Done — P51 (`space.subSteps`, tunneling demo) |
-| Performance benchmark    | ⬜ Planned — P54 (public comparison page vs Matter.js/Planck.js) |
+| Performance benchmark    | ✅ Done — P54 (nape-js vs Matter.js vs Planck.js vs Rapier) |
 | npm/SEO optimization     | ✅ Done — P55 (keywords, meta tags, JSON-LD, social card) |
 | Interactive playground   | ⬜ Planned — P56 (StackBlitz/CodeSandbox template) |
 

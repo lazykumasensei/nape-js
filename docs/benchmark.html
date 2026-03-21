@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Performance Benchmarks — nape-js</title>
+  <meta name="description" content="Run real-time physics engine benchmarks in your browser — nape-js vs Matter.js vs Planck.js vs Rapier. Falling bodies, stacking, constraints, and more." />
+  <meta name="keywords" content="physics engine benchmark, nape-js performance, Matter.js comparison, Planck.js comparison, Rapier benchmark, 2D physics performance" />
+  <meta name="theme-color" content="#0d1117" />
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Performance Benchmarks — nape-js" />
+  <meta property="og:description" content="Run real-time physics engine benchmarks in your browser — nape-js vs Matter.js vs Planck.js vs Rapier." />
+  <meta property="og:url" content="https://newkrok.github.io/nape-js/benchmark.html" />
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-TF84DLZ4X8"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-TF84DLZ4X8');
+  </script>
+  <link rel="icon" type="image/svg+xml" href="logo.svg" />
+  <link rel="stylesheet" href="style.css?v=3.16.1" />
+
+  <!-- External engines (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/planck@1.4.3/dist/planck.min.js"></script>
+
+  <style>
+    /* ---- Benchmark-specific styles ---- */
+    .bench-hero {
+      padding: 40px 0 30px;
+      border-bottom: 1px solid var(--border);
+    }
+    .bench-hero h1 { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+    .bench-hero p { color: var(--text-dim); max-width: 640px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.9rem;
+      color: var(--accent);
+      text-decoration: none;
+      margin-bottom: 12px;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    /* Engine toggles */
+    .engine-toggles {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      margin: 20px 0;
+    }
+    .engine-toggle {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: border-color 0.15s, opacity 0.15s;
+      user-select: none;
+    }
+    .engine-toggle.active { border-color: var(--accent); }
+    .engine-toggle.disabled { opacity: 0.4; cursor: not-allowed; }
+    .engine-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .engine-toggle input { display: none; }
+
+    /* Scenario selector */
+    .scenario-tabs {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin: 16px 0 20px;
+    }
+    .scenario-tab {
+      padding: 6px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .scenario-tab:hover { border-color: var(--accent); }
+    .scenario-tab.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Canvas preview */
+    .preview-area {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+    @media (min-width: 800px) {
+      .preview-area { grid-template-columns: 1fr 1fr; }
+    }
+    .preview-card {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #0a0e14;
+    }
+    .preview-card canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .preview-label {
+      position: absolute;
+      top: 8px; left: 10px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      color: #fff;
+    }
+    .preview-status {
+      position: absolute;
+      bottom: 8px; right: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      background: rgba(0,0,0,0.6);
+      color: var(--text-dim);
+    }
+
+    /* Controls */
+    .bench-controls {
+      display: flex; align-items: center; gap: 14px;
+      flex-wrap: wrap;
+      margin: 20px 0;
+    }
+
+    /* Results table */
+    .results-section { margin: 30px 0; }
+    .results-section h3 {
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+    .bench-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .bench-table {
+      width: 100%;
+      min-width: 580px;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .bench-table th {
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .bench-table td {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .bench-table tr:last-child td { border-bottom: none; }
+    .bench-table .engine-name {
+      display: flex; align-items: center; gap: 8px;
+      font-weight: 600;
+    }
+    .bench-bar-cell { width: 40%; }
+    .bench-bar-wrap {
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px;
+      height: 10px;
+      overflow: hidden;
+    }
+    .bench-bar {
+      height: 100%;
+      border-radius: 4px;
+      min-width: 3px;
+      transition: width 0.5s ease;
+    }
+    .badge-fastest {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: var(--green);
+      color: #000;
+      margin-left: 6px;
+    }
+    .badge-na {
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* Summary chart */
+    .summary-chart {
+      display: grid;
+      gap: 12px;
+      margin: 24px 0;
+    }
+    .summary-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      align-items: center;
+      gap: 12px;
+    }
+    .summary-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-align: right;
+      color: var(--text-dim);
+    }
+    .summary-bars {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .summary-bar {
+      height: 22px;
+      border-radius: 4px;
+      min-width: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: #fff;
+      font-weight: 600;
+      transition: width 0.5s ease;
+    }
+
+    /* Features callout */
+    .features-callout {
+      margin: 30px 0;
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .features-callout h3 { font-size: 1rem; margin-bottom: 10px; }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 8px;
+    }
+    .feature-item {
+      font-size: 0.85rem;
+      padding: 6px 0;
+    }
+    .feature-item .check { color: var(--green); margin-right: 6px; }
+    .feature-item .cross { color: var(--red); margin-right: 6px; opacity: 0.5; }
+
+    /* Status spinner */
+    .status-msg {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--orange);
+    }
+    .status-msg.done { color: var(--green); }
+
+    /* Disclaimer */
+    .disclaimer {
+      margin: 24px 0 0;
+      padding: 16px;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HERO ===== -->
+  <header class="bench-hero">
+    <div class="container">
+      <a href="index.html" class="back-link">&larr; Back to Home</a>
+      <h1>Performance Benchmarks</h1>
+      <p>
+        Run real-time physics benchmarks in <strong>your browser</strong>.
+        Compare nape-js against Matter.js, Planck.js, and Rapier (WASM) on identical scenarios.
+        All tests run client-side — results reflect your hardware.
+      </p>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <section class="section">
+    <div class="container">
+
+      <!-- Engine toggles -->
+      <h3>Engines</h3>
+      <div class="engine-toggles" id="engineToggles"></div>
+
+      <!-- Scenario tabs -->
+      <h3>Scenario</h3>
+      <div class="scenario-tabs" id="scenarioTabs"></div>
+      <p id="scenarioDesc" style="color:var(--text-dim);font-size:0.85rem;margin-bottom:10px;"></p>
+
+      <!-- Controls -->
+      <div class="bench-controls">
+        <button class="btn btn-primary" id="runBtn">Run Benchmark</button>
+        <button class="btn btn-small" id="runAllBtn">Run All Scenarios</button>
+        <span class="status-msg" id="statusMsg"></span>
+      </div>
+
+      <!-- Visual preview canvases -->
+      <div class="preview-area" id="previewArea"></div>
+
+      <!-- Per-scenario results -->
+      <div class="results-section" id="resultsSection" style="display:none;">
+        <h3>Results</h3>
+        <div class="bench-table-wrap">
+          <table class="bench-table" id="resultsTable">
+            <thead>
+              <tr>
+                <th>Engine</th>
+                <th>Median (ms/step)</th>
+                <th>Avg</th>
+                <th>Min</th>
+                <th>Max</th>
+                <th class="bench-bar-cell">Relative</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Summary across all scenarios -->
+      <div class="results-section" id="summarySection" style="display:none;">
+        <h3>Summary — All Scenarios</h3>
+        <div class="summary-chart" id="summaryChart"></div>
+      </div>
+
+      <!-- Feature comparison callout -->
+      <div class="features-callout">
+        <h3>Beyond Raw Speed — Feature Comparison</h3>
+        <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:14px;">
+          Performance is only one dimension. Here is what each engine supports:
+        </p>
+        <div class="bench-table-wrap">
+          <table class="bench-table" style="min-width:500px;">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>nape-js</th>
+                <th>Matter.js</th>
+                <th>Planck.js</th>
+                <th>Rapier</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>CCD (tunneling prevention)</td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+              </tr>
+              <tr>
+                <td>Fluid simulation (buoyancy)</td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span> Unique</td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+              </tr>
+              <tr>
+                <td>Full TypeScript (strict)</td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span> DT</td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span> JS</td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span> WASM</td>
+              </tr>
+              <tr>
+                <td>Serialization (JSON+Binary)</td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span> Binary</td>
+              </tr>
+              <tr>
+                <td>Capsule shape (native)</td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+              </tr>
+              <tr>
+                <td>Sub-stepping solver</td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span></td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+              </tr>
+              <tr>
+                <td>Bundle size</td>
+                <td>~87 KB (16 KB gz)</td>
+                <td>~82 KB</td>
+                <td>~290 KB</td>
+                <td>~1.6 MB (WASM)</td>
+              </tr>
+              <tr>
+                <td>Zero dependencies</td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+                <td><span class="check" style="color:var(--green)">&#10003;</span></td>
+                <td><span class="cross" style="color:var(--red);opacity:0.5">&#10007;</span> WASM</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Disclaimer -->
+      <div class="disclaimer">
+        <strong>Methodology:</strong> Each scenario creates identical physics scenes across all engines.
+        After a warmup phase, <code>step(1/60)</code> is called repeatedly and timed with
+        <code>performance.now()</code>. Results show the <strong>median</strong> step time (ms) to
+        eliminate GC spikes. Lower is better.<br/><br/>
+        <strong>Rapier note:</strong> Rapier runs via WASM+SIMD and is not a pure JavaScript engine.
+        Its performance reflects the advantage of compiled code — a fundamentally different approach
+        from the other three engines.<br/><br/>
+        <strong>Fairness:</strong> All engines use default solver settings. Gravity, body counts,
+        and shapes are matched as closely as each engine's API allows. A deterministic pseudo-random
+        seed ensures reproducible layouts. Run benchmarks multiple times for stable results.
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="container">
+      <p>
+        Original Haxe engine by <a href="https://github.com/deltaluca/nape">Luca Deltodesco</a>
+        &bull; JS compiler by <a href="https://github.com/cspotcode/nape-to-js">Andrew Bradley</a>
+        &bull; TypeScript wrapper by <a href="https://github.com/NewKrok">Istvan Krisztian Somoracz</a>
+      </p>
+      <p>MIT License</p>
+      <p class="footer-support">
+        <a href="https://ko-fi.com/newkrok" target="_blank" rel="noopener" class="kofi-link">&#9749; Support me on Ko-fi</a>
+      </p>
+    </div>
+  </footer>
+
+  <!-- ===== MAIN SCRIPT ===== -->
+  <script type="module">
+    import {
+      NapeAdapter, MatterAdapter, PlanckAdapter, RapierAdapter, ALL_ENGINES
+    } from "./benchmark-engines.js";
+    import { SCENARIOS, runBenchmark, renderPreview } from "./benchmark-runner.js";
+
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    const enabledEngines = new Set(["nape-js", "Matter.js", "Planck.js", "Rapier"]);
+    let activeScenarioIdx = 0;
+    let isRunning = false;
+    const allResults = {}; // scenarioId → [ { engine, median, avg, min, max } ]
+
+    const CANVAS_W = 420;
+    const CANVAS_H = 300;
+
+    // -----------------------------------------------------------------------
+    // Init engines
+    // -----------------------------------------------------------------------
+    async function initEngines() {
+      MatterAdapter.init();
+      PlanckAdapter.init();
+
+      const statusMsg = document.getElementById("statusMsg");
+      statusMsg.textContent = "Loading Rapier (WASM)…";
+      await RapierAdapter.init();
+      statusMsg.textContent = "";
+
+      renderEngineToggles();
+    }
+
+    // -----------------------------------------------------------------------
+    // Engine toggles UI
+    // -----------------------------------------------------------------------
+    function renderEngineToggles() {
+      const container = document.getElementById("engineToggles");
+      container.innerHTML = "";
+      for (const adapter of ALL_ENGINES) {
+        const div = document.createElement("label");
+        div.className = "engine-toggle" +
+          (enabledEngines.has(adapter.name) ? " active" : "") +
+          (!adapter.loaded ? " disabled" : "");
+        div.innerHTML = `
+          <input type="checkbox" ${enabledEngines.has(adapter.name) ? "checked" : ""}
+                 ${!adapter.loaded ? "disabled" : ""} />
+          <span class="engine-dot" style="background:${adapter.color}"></span>
+          ${adapter.name}
+          ${!adapter.loaded ? '<span style="font-size:0.75rem;color:var(--red)">(failed to load)</span>' : ""}
+        `;
+        const checkbox = div.querySelector("input");
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) enabledEngines.add(adapter.name);
+          else enabledEngines.delete(adapter.name);
+          div.classList.toggle("active", checkbox.checked);
+          updatePreviews();
+        });
+        container.appendChild(div);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Scenario tabs UI
+    // -----------------------------------------------------------------------
+    function renderScenarioTabs() {
+      const container = document.getElementById("scenarioTabs");
+      container.innerHTML = "";
+      SCENARIOS.forEach((s, i) => {
+        const btn = document.createElement("button");
+        btn.className = "scenario-tab" + (i === activeScenarioIdx ? " active" : "");
+        btn.textContent = s.count ? `${s.name} (${s.count})` : s.name;
+        btn.onclick = () => {
+          activeScenarioIdx = i;
+          renderScenarioTabs();
+          updateScenarioDesc();
+          updatePreviews();
+          showResults();
+        };
+        container.appendChild(btn);
+      });
+      updateScenarioDesc();
+    }
+
+    function updateScenarioDesc() {
+      document.getElementById("scenarioDesc").textContent =
+        SCENARIOS[activeScenarioIdx].desc;
+    }
+
+    // -----------------------------------------------------------------------
+    // Preview canvases
+    // -----------------------------------------------------------------------
+    function updatePreviews() {
+      const area = document.getElementById("previewArea");
+      area.innerHTML = "";
+      const activeAdapters = ALL_ENGINES.filter(
+        (a) => a.loaded && enabledEngines.has(a.name)
+      );
+      for (const adapter of activeAdapters) {
+        const card = document.createElement("div");
+        card.className = "preview-card";
+        card.id = `preview-${adapter.name.replace(/[\s.]/g, "")}`;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = CANVAS_W;
+        canvas.height = CANVAS_H;
+        card.appendChild(canvas);
+
+        const label = document.createElement("div");
+        label.className = "preview-label";
+        label.style.background = adapter.color;
+        label.textContent = adapter.name;
+        card.appendChild(label);
+
+        const status = document.createElement("div");
+        status.className = "preview-status";
+        status.textContent = "Idle";
+        status.id = `status-${adapter.name.replace(/[\s.]/g, "")}`;
+        card.appendChild(status);
+
+        area.appendChild(card);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Run benchmark
+    // -----------------------------------------------------------------------
+    async function runSingle(scenarioIdx) {
+      const scenario = SCENARIOS[scenarioIdx];
+      const activeAdapters = ALL_ENGINES.filter(
+        (a) => a.loaded && enabledEngines.has(a.name)
+      );
+      if (activeAdapters.length === 0) return;
+
+      const results = [];
+
+      for (const adapter of activeAdapters) {
+        const statusEl = document.getElementById(
+          `status-${adapter.name.replace(/[\s.]/g, "")}`
+        );
+        const cardEl = document.getElementById(
+          `preview-${adapter.name.replace(/[\s.]/g, "")}`
+        );
+        const canvas = cardEl?.querySelector("canvas");
+        const ctx = canvas?.getContext("2d");
+
+        if (statusEl) statusEl.textContent = "Running…";
+        if (statusEl) statusEl.style.color = "var(--orange)";
+
+        // Visual preview callback
+        const onStep = ctx
+          ? (adp, world) => renderPreview(ctx, adp, world, CANVAS_W, CANVAS_H)
+          : null;
+
+        const result = await runBenchmark(scenario, adapter, CANVAS_W, CANVAS_H, onStep);
+
+        results.push({
+          engine: adapter.name,
+          color: adapter.color,
+          ...result,
+        });
+
+        if (statusEl) {
+          statusEl.textContent = `${result.median.toFixed(2)} ms/step`;
+          statusEl.style.color = "var(--green)";
+        }
+
+        gtag("event", "benchmark_run", {
+          event_category: "benchmark",
+          event_label: `${scenario.id}_${adapter.name}`,
+          value: Math.round(result.median * 100),
+        });
+      }
+
+      allResults[scenario.id] = results;
+      showResults();
+    }
+
+    async function runAll() {
+      for (let i = 0; i < SCENARIOS.length; i++) {
+        activeScenarioIdx = i;
+        renderScenarioTabs();
+        updatePreviews();
+
+        const statusMsg = document.getElementById("statusMsg");
+        statusMsg.textContent = `Running ${i + 1}/${SCENARIOS.length}: ${SCENARIOS[i].name}…`;
+        statusMsg.className = "status-msg";
+
+        await runSingle(i);
+
+        // Small delay between scenarios
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      const statusMsg = document.getElementById("statusMsg");
+      statusMsg.textContent = "All benchmarks complete!";
+      statusMsg.className = "status-msg done";
+
+      showSummary();
+    }
+
+    // -----------------------------------------------------------------------
+    // Results table
+    // -----------------------------------------------------------------------
+    function showResults() {
+      const scenario = SCENARIOS[activeScenarioIdx];
+      const results = allResults[scenario.id];
+      const section = document.getElementById("resultsSection");
+      const tbody = document.getElementById("resultsBody");
+
+      if (!results || results.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "";
+      tbody.innerHTML = "";
+
+      const bestMedian = Math.min(...results.map((r) => r.median));
+      const worstMedian = Math.max(...results.map((r) => r.median));
+
+      for (const r of results) {
+        const isFastest = r.median === bestMedian && results.length > 1;
+        const barPct = worstMedian > 0 ? (r.median / worstMedian) * 100 : 0;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>
+            <span class="engine-name">
+              <span class="engine-dot" style="background:${r.color}"></span>
+              ${r.engine}
+              ${isFastest ? '<span class="badge-fastest">FASTEST</span>' : ""}
+            </span>
+          </td>
+          <td><strong>${r.median.toFixed(3)}</strong></td>
+          <td>${r.avg.toFixed(3)}</td>
+          <td>${r.min.toFixed(3)}</td>
+          <td>${r.max.toFixed(3)}</td>
+          <td class="bench-bar-cell">
+            <div class="bench-bar-wrap">
+              <div class="bench-bar" style="width:${barPct}%;background:${r.color}"></div>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Summary chart
+    // -----------------------------------------------------------------------
+    function showSummary() {
+      const section = document.getElementById("summarySection");
+      const chart = document.getElementById("summaryChart");
+
+      const scenarioIds = Object.keys(allResults);
+      if (scenarioIds.length < 2) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "";
+      chart.innerHTML = "";
+
+      for (const sid of scenarioIds) {
+        const scenario = SCENARIOS.find((s) => s.id === sid);
+        const results = allResults[sid];
+        if (!results) continue;
+
+        const maxMedian = Math.max(...results.map((r) => r.median));
+
+        const row = document.createElement("div");
+        row.className = "summary-row";
+
+        const label = document.createElement("div");
+        label.className = "summary-label";
+        label.textContent = scenario.count
+          ? `${scenario.name} (${scenario.count})`
+          : scenario.name;
+        row.appendChild(label);
+
+        const bars = document.createElement("div");
+        bars.className = "summary-bars";
+        bars.style.width = "100%";
+
+        for (const r of results) {
+          const pct = maxMedian > 0 ? (r.median / maxMedian) * 100 : 0;
+          const bar = document.createElement("div");
+          bar.className = "summary-bar";
+          bar.style.width = pct + "%";
+          bar.style.background = r.color;
+          bar.textContent = r.median.toFixed(2);
+          bar.title = `${r.engine}: ${r.median.toFixed(3)} ms`;
+          bars.appendChild(bar);
+        }
+
+        row.appendChild(bars);
+        chart.appendChild(row);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Wire up
+    // -----------------------------------------------------------------------
+    document.getElementById("runBtn").onclick = async () => {
+      if (isRunning) return;
+      isRunning = true;
+      const btn = document.getElementById("runBtn");
+      btn.disabled = true;
+      btn.textContent = "Running…";
+
+      const statusMsg = document.getElementById("statusMsg");
+      statusMsg.textContent = "Benchmarking…";
+      statusMsg.className = "status-msg";
+
+      await runSingle(activeScenarioIdx);
+
+      statusMsg.textContent = "Done!";
+      statusMsg.className = "status-msg done";
+      btn.disabled = false;
+      btn.textContent = "Run Benchmark";
+      isRunning = false;
+    };
+
+    document.getElementById("runAllBtn").onclick = async () => {
+      if (isRunning) return;
+      isRunning = true;
+      const btn = document.getElementById("runAllBtn");
+      const runBtn = document.getElementById("runBtn");
+      btn.disabled = true;
+      runBtn.disabled = true;
+      btn.textContent = "Running All…";
+
+      await runAll();
+
+      btn.disabled = false;
+      runBtn.disabled = false;
+      btn.textContent = "Run All Scenarios";
+      isRunning = false;
+    };
+
+    // -----------------------------------------------------------------------
+    // Boot
+    // -----------------------------------------------------------------------
+    renderScenarioTabs();
+    await initEngines();
+    updatePreviews();
+  </script>
+
+</body>
+</html>

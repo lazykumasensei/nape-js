@@ -29,7 +29,7 @@
     gtag('config', 'G-TF84DLZ4X8');
   </script>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
-  <link rel="stylesheet" href="style.css?v=3.16.1" />
+  <link rel="stylesheet" href="style.css?v=3.17.0" />
   <style>
     .examples-hero {
       text-align: center;
@@ -272,8 +272,8 @@
       font-size: 0.95rem;
     }
   </style>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css?v=3.16.1" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.css?v=3.16.1" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css?v=3.17.0" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.css?v=3.17.0" />
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js" data-manual></script>
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
@@ -338,6 +338,15 @@
         </div>
         <a href="multiplayer.html" class="btn btn-primary" style="white-space:nowrap" onclick="gtag('event','navigation',{event_category:'examples',event_label:'multiplayer'})">Play &rarr;</a>
       </div>
+      <!-- Benchmark banner -->
+      <div class="multiplayer-banner" style="margin-top:12px">
+        <div style="flex:1;min-width:180px;text-align:left">
+          <div style="font-size:11px;color:var(--orange);margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em;font-weight:700">Performance</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px">Engine Benchmarks</div>
+          <div style="font-size:13px;color:var(--text-dim)">Compare nape-js vs Matter.js vs Planck.js vs Rapier — run benchmarks in your browser.</div>
+        </div>
+        <a href="benchmark.html" class="btn btn-primary" style="white-space:nowrap" onclick="gtag('event','navigation',{event_category:'examples',event_label:'benchmarks'})">Run &rarr;</a>
+      </div>
       <div class="examples-grid" id="examplesGrid"></div>
     </div>
   </section>
@@ -353,6 +362,6 @@
     </div>
   </footer>
 
-  <script type="module" src="examples.js?v=3.16.1"></script>
+  <script type="module" src="examples.js?v=3.17.0"></script>
 </body>
 </html>

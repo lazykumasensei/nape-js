@@ -89,7 +89,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | P45 — Character controller                | M      | DX        | medium | ⬜ Not started |
 | P47 — CJS bundle dedup (serialization)    | S      | bundle    | low    | ⬜ Not started |
 | P51 — Sub-stepping solver                 | M      | stability | low    | ✅ Done |
-| P54 — Performance benchmark page          | S      | adoption  | low    | ⬜ Not started |
+| P54 — Performance benchmark page          | S      | adoption  | low    | ✅ Done |
 | P55 — npm/SEO optimization                | XS     | adoption  | low    | ✅ Done |
 | P56 — Interactive playground              | S-M    | adoption  | low    | ⬜ Not started |
 
@@ -157,15 +157,19 @@ combo, and runtime changes.
 
 ---
 
-## Planned: P54 — Performance Benchmark Page
+## Done: P54 — Performance Benchmark Page
 
-**Effort: S | Impact: adoption | Risk: low**
+**Effort: S | Impact: adoption | Risk: low | Status: ✅ Done**
 
-Public comparison page (nape-js vs Matter.js vs Planck.js) with reproducible benchmarks:
+Public comparison page at `docs/benchmark.html` — nape-js vs Matter.js vs Planck.js vs Rapier (WASM):
 
-- Stacking stability, broadphase throughput, CCD accuracy, constraint solver convergence
-- Publishable to Hacker News / Reddit for visibility
-- Hosted on GitHub Pages alongside existing demos
+- **6 scenarios:** Falling Bodies (250/500/1000), Pyramid Stack, Constraint Chain, Mixed Shapes
+- **Visual preview:** live Canvas2D rendering during benchmark for each engine
+- **Fair methodology:** deterministic seeded layouts, warmup phase, median-based timing
+- **Feature matrix:** CCD, fluid sim, TypeScript, serialization, bundle size comparison
+- **Engine toggles:** enable/disable individual engines, run single or all scenarios
+- Links from index.html hero, demo tabs, and examples.html banner
+- Rapier (WASM) included with explicit note about JS vs WASM performance difference
 
 ---
 
