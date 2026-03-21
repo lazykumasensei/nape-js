@@ -257,16 +257,15 @@ export const PlanckAdapter = {
 
   addJoint(world, bodyA, bodyB, ax, ay, bx, by) {
     const S = this.SCALE;
-    // RevoluteJoint takes a single world-space anchor point.
-    // Use bodyA position + local offset A as the world anchor.
-    const posA = bodyA.getPosition();
+    // Use explicit local anchors (single-arg JointDef form)
     return world.createJoint(
-      planck.RevoluteJoint(
-        {},
+      planck.RevoluteJoint({
         bodyA,
         bodyB,
-        planck.Vec2(posA.x + ax / S, posA.y + ay / S)
-      )
+        localAnchorA: planck.Vec2(ax / S, ay / S),
+        localAnchorB: planck.Vec2(bx / S, by / S),
+        collideConnected: false,
+      })
     );
   },
 
