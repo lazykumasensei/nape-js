@@ -131,27 +131,32 @@ export const SCENARIOS = [
 
   // ---- 3. Constraint Chain ----
   {
-    id: "chain-100",
+    id: "chain-50",
     name: "Constraint Chain",
-    desc: "100-link chain connected by pivot joints — tests constraint solver convergence.",
+    desc: "Two 50-link chains hanging from fixed points — tests constraint solver convergence.",
     category: "constraints",
     warmup: 30,
     iterations: 200,
     setup(adapter, W, H) {
       const world = adapter.createWorld();
-      const anchor = adapter.addStaticBox(world, W / 2, 30, 10, 10);
-      let prev = anchor;
-      const linkSize = 8;
-      const spacing = 12;
-      for (let i = 0; i < 100; i++) {
-        const link = adapter.addDynamicCircle(
-          world,
-          W / 2 + (i + 1) * spacing,
-          30,
-          linkSize / 2
-        );
-        adapter.addJoint(world, prev, link, spacing / 2, 0, -spacing / 2, 0);
-        prev = link;
+      const linkSize = 6;
+      const spacing = 5;
+      const chainLen = 50;
+
+      // Two chains side by side for visual symmetry and more solver load
+      for (const anchorX of [W * 0.33, W * 0.67]) {
+        const anchor = adapter.addStaticBox(world, anchorX, 10, 10, 10);
+        let prev = anchor;
+        for (let i = 0; i < chainLen; i++) {
+          const link = adapter.addDynamicCircle(
+            world,
+            anchorX,
+            10 + (i + 1) * spacing,
+            linkSize / 2
+          );
+          adapter.addJoint(world, prev, link, 0, spacing / 2, 0, -spacing / 2);
+          prev = link;
+        }
       }
       return world;
     },
