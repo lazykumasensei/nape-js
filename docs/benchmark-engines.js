@@ -322,9 +322,18 @@ export const RapierAdapter = {
 
   async init() {
     try {
-      const RAPIER = await import(
-        "https://cdn.jsdelivr.net/npm/@dimforge/rapier2d-compat@0.14.0/rapier.es.js"
-      );
+      // Try SIMD build first (Chrome 91+, Firefox 89+, Safari 16.4+)
+      let RAPIER;
+      try {
+        RAPIER = await import(
+          "https://cdn.jsdelivr.net/npm/@dimforge/rapier2d-simd-compat@0.19.3/rapier.mjs"
+        );
+      } catch (_simdErr) {
+        // Fall back to non-SIMD compat build
+        RAPIER = await import(
+          "https://cdn.jsdelivr.net/npm/@dimforge/rapier2d-compat@0.19.3/rapier.mjs"
+        );
+      }
       await RAPIER.init();
       this.RAPIER = RAPIER;
       this.loaded = true;
