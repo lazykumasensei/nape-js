@@ -257,8 +257,16 @@ export const PlanckAdapter = {
 
   addJoint(world, bodyA, bodyB, ax, ay, bx, by) {
     const S = this.SCALE;
+    // RevoluteJoint takes a single world-space anchor point.
+    // Use bodyA position + local offset A as the world anchor.
+    const posA = bodyA.getPosition();
     return world.createJoint(
-      planck.RevoluteJoint({}, bodyA, bodyB, bodyB.getPosition())
+      planck.RevoluteJoint(
+        {},
+        bodyA,
+        bodyB,
+        planck.Vec2(posA.x + ax / S, posA.y + ay / S)
+      )
     );
   },
 
@@ -376,9 +384,10 @@ export const RapierAdapter = {
   addJoint(world, entryA, entryB, ax, ay, bx, by) {
     const R = this.RAPIER;
     const S = 30;
+    // Rapier revolute: local anchor on bodyA, local anchor on bodyB
     const params = R.JointData.revolute(
-      new R.Vector2(ax / S, ay / S),
-      new R.Vector2(bx / S, by / S)
+      { x: ax / S, y: ay / S },
+      { x: bx / S, y: by / S }
     );
     return world.createImpulseJoint(params, entryA.handle, entryB.handle, true);
   },
