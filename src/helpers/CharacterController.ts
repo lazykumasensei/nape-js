@@ -489,10 +489,21 @@ export class CharacterController {
       }
 
       if (safeDistance < 0) {
-        // Already overlapping — push out along the hit normal
-        const pushDist = -safeDistance;
-        px += hit.normal.x * pushDist;
-        py += hit.normal.y * pushDist;
+        // Already overlapping. Only push out if the surface faces us
+        // (normal opposes movement). If normal aligns with movement
+        // direction, we are exiting the shape — skip it entirely.
+        const normalDot = hit.normal.x * dirX + hit.normal.y * dirY;
+        if (normalDot < 0) {
+          // Surface faces us — push out along hit normal
+          const pushDist = -safeDistance;
+          px += hit.normal.x * pushDist;
+          py += hit.normal.y * pushDist;
+        } else {
+          // Moving away from surface — ignore hit, apply full movement
+          px += remX;
+          py += remY;
+          break;
+        }
       } else {
         // Advance to safe distance
         px += dirX * safeDistance;
