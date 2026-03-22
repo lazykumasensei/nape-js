@@ -73,6 +73,11 @@ export default {
     addOneWay(space, 130, 300, 120, platformTag);
     addOneWay(space, 380, 330, 80, platformTag);
 
+    // Ground-level coins (easy to reach)
+    addCoin(space, 200, floorY - 30, coinTag);
+    addCoin(space, 300, floorY - 30, coinTag);
+    addCoin(space, 400, floorY - 30, coinTag);
+    // Platform coins
     addCoin(space, 100, 418, coinTag);
     addCoin(space, 280, 348, coinTag);
     addCoin(space, 380, 308, coinTag);
