@@ -19,9 +19,14 @@ export const COLORS = [
 ];
 
 export function bodyColor(body) {
+  // Allow explicit color override via _colorIdx (e.g. one-way platforms, player)
+  const overrideIdx = body.userData?._colorIdx;
+  if (overrideIdx != null && overrideIdx > 0) {
+    return COLORS[overrideIdx % COLORS.length];
+  }
   if (body.isStatic()) return { fill: "rgba(120,160,200,0.15)", stroke: "#607888" };
   if (body.isSleeping) return { fill: "rgba(100,200,100,0.12)", stroke: "#3fb950" };
-  const idx = (body.userData?._colorIdx ?? 0) % COLORS.length;
+  const idx = (overrideIdx ?? 0) % COLORS.length;
   return COLORS[idx];
 }
 
