@@ -1,7 +1,7 @@
 import {
-  Body, BodyType, Vec2, Circle, Polygon, Material, CbType,
-  InteractionType, PreListener, PreFlag, CharacterController,
-  FluidProperties,
+  Body, BodyType, Vec2, Circle, Polygon, Material, CbType, CbEvent,
+  InteractionType, InteractionListener, PreListener, PreFlag,
+  CharacterController, FluidProperties,
 } from "../nape-js.esm.js";
 import { drawBody, drawConstraints, drawGrid, COLORS } from "../renderer.js";
 
@@ -31,6 +31,8 @@ let prevJumpKey = false;
 let jumpBufferTimer = 0;
 let velY = 0;
 let playerFacingRight = true;
+let coinCount = 0;
+let coinPopups = []; // { x, y, timer }
 
 // ---------------------------------------------------------------------------
 // Demo definition
@@ -53,6 +55,7 @@ export default {
 
     const platformTag = new CbType();
     const playerTag = new CbType();
+    const coinTag = new CbType();
 
     const floorY = WORLD_H - 10;
 
@@ -70,23 +73,23 @@ export default {
     addOneWay(space, 130, 300, 120, platformTag);
     addOneWay(space, 380, 330, 80, platformTag);
 
-    addCoin(space, 100, 418);
-    addCoin(space, 280, 348);
-    addCoin(space, 380, 308);
+    addCoin(space, 100, 418, coinTag);
+    addCoin(space, 280, 348, coinTag);
+    addCoin(space, 380, 308, coinTag);
 
     // ---- Section 2: Steps (x: 500–900) ----
     const stepBase = floorY - 10;
     for (let i = 0; i < 6; i++) {
       addStaticBox(space, 580 + i * 36, stepBase - i * 10, 34, 10 + i * 10);
     }
-    addCoin(space, 760, stepBase - 80);
+    addCoin(space, 760, stepBase - 80, coinTag);
 
     // ---- Section 3: Slopes (x: 900–1500) ----
     addSlopeRamp(space, 950, floorY - 10, 300, 80, false);
     addStaticBox(space, 1200, floorY - 80, 200, 16);
     addSlopeRamp(space, 1400, floorY - 10, 200, 80, true);
-    addCoin(space, 1200, floorY - 110);
-    addCoin(space, 1100, floorY - 50);
+    addCoin(space, 1200, floorY - 110, coinTag);
+    addCoin(space, 1100, floorY - 50, coinTag);
 
     // ---- Section 4: Moving platforms (x: 1500–2100) ----
     addStaticBox(space, 1550, floorY, 100, 20);
@@ -102,8 +105,8 @@ export default {
     vPlat._vMoving = { minY: floorY - 200, maxY: floorY - 50, speed: 60 };
 
     addStaticBox(space, 2100, floorY - 200, 100, 16);
-    addCoin(space, 2100, floorY - 230);
-    addCoin(space, 1750, floorY - 80);
+    addCoin(space, 2100, floorY - 230, coinTag);
+    addCoin(space, 1750, floorY - 80, coinTag);
 
     // ---- Section 5: Water (x: 2200–2600) ----
     addStaticBox(space, 2400, floorY + 100, 500, 20);
@@ -119,20 +122,20 @@ export default {
     water.space = space;
     water._isWater = true;
 
-    addCoin(space, 2300, floorY + 20);
-    addCoin(space, 2500, floorY + 20);
+    addCoin(space, 2300, floorY + 20, coinTag);
+    addCoin(space, 2500, floorY + 20, coinTag);
 
     // ---- Section 6: Wall zone (x: 2600–2900) ----
     addStaticBox(space, 2700, floorY - 80, 16, 160);
     addStaticBox(space, 2800, floorY - 80, 16, 160);
     addOneWay(space, 2750, floorY - 170, 80, platformTag);
-    addCoin(space, 2750, floorY - 200);
+    addCoin(space, 2750, floorY - 200, coinTag);
 
     // ---- Section 7: Final stretch (x: 2900–3100) ----
     addOneWay(space, 2950, 400, 100, platformTag);
     addOneWay(space, 3050, 330, 80, platformTag);
     addStaticBox(space, 3100, 280, 100, 16);
-    addCoin(space, 3100, 250);
+    addCoin(space, 3100, 250, coinTag);
 
     // ---- Player (dynamic body) ----
     player = new Body(BodyType.DYNAMIC, new Vec2(100, floorY - 30));
@@ -143,6 +146,28 @@ export default {
     player.isBullet = true;
     player.space = space;
     try { player.userData._colorIdx = 3; } catch (_) {}
+
+    // ---- Coin pickup listener ----
+    const coinListener = new InteractionListener(
+      CbEvent.BEGIN,
+      InteractionType.SENSOR,
+      playerTag,
+      coinTag,
+      (cb) => {
+        // Determine which interactor is the coin
+        const b1 = cb.int1.castBody;
+        const b2 = cb.int2.castBody;
+        const coin = (b1 && b1 !== player) ? b1 : b2;
+        if (coin && coin.space) {
+          const cx = coin.position.x;
+          const cy = coin.position.y;
+          coin.space = null; // remove from space
+          coinCount++;
+          coinPopups.push({ x: cx, y: cy - 10, timer: 1.0 });
+        }
+      },
+    );
+    coinListener.space = space;
 
     // ---- Character Controller ----
     cc = new CharacterController(space, player, {
@@ -166,6 +191,8 @@ export default {
     jumpBufferTimer = 0;
     velY = 0;
     playerFacingRight = true;
+    coinCount = 0;
+    coinPopups = [];
 
     // Keyboard handling
     this._onKeyDown = (e) => {
@@ -253,6 +280,13 @@ export default {
         py,
       );
     }
+
+    // Update coin popups
+    for (let i = coinPopups.length - 1; i >= 0; i--) {
+      coinPopups[i].timer -= DT;
+      coinPopups[i].y -= 30 * DT; // float upward
+      if (coinPopups[i].timer <= 0) coinPopups.splice(i, 1);
+    }
   },
 
   // ---- Custom render (camera-aware) ----
@@ -298,12 +332,26 @@ export default {
       ctx.fill();
     }
 
+    // Coin pickup popups (world space)
+    for (const p of coinPopups) {
+      const alpha = Math.min(1, p.timer * 2);
+      ctx.fillStyle = `rgba(210,153,34,${alpha})`;
+      ctx.font = "bold 14px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("+1", p.x, p.y);
+    }
+    ctx.textAlign = "left";
+
     ctx.restore();
 
     // ---- HUD (screen space) ----
     ctx.fillStyle = "rgba(255,255,255,0.7)";
     ctx.font = "12px monospace";
     ctx.fillText("WASD / Arrow keys to move, Space to jump", 10, 20);
+
+    // Coin counter
+    ctx.fillStyle = "#d29922";
+    ctx.fillText(`\u25CF ${coinCount}`, W - 60, 20);
 
     if (cc) {
       const state = cc.grounded ? "GROUNDED" : "AIRBORNE";
@@ -355,10 +403,11 @@ function addOneWay(space, cx, cy, w, platformTag) {
   return b;
 }
 
-function addCoin(space, cx, cy) {
+function addCoin(space, cx, cy, coinTag) {
   const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
   const shape = new Circle(5);
   shape.sensorEnabled = true;
+  if (coinTag) shape.cbTypes.add(coinTag);
   b.shapes.add(shape);
   b.space = space;
   try { b.userData._colorIdx = 1; } catch (_) {}
