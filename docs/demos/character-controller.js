@@ -121,8 +121,7 @@ export default {
     const water = new Body(BodyType.STATIC, new Vec2(2400, floorY + 30));
     const waterShape = new Polygon(Polygon.box(480, 80));
     waterShape.fluidEnabled = true;
-    waterShape.fluidProperties = new FluidProperties(2, 4);
-    waterShape.sensorEnabled = true;
+    waterShape.fluidProperties = new FluidProperties(1.5, 3);
     water.shapes.add(waterShape);
     water.space = space;
     water._isWater = true;
