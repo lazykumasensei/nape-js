@@ -276,19 +276,11 @@ export default {
     }
 
     // Jump / swim
-    const canJump = result.grounded || result.timeSinceGrounded * 1000 < COYOTE_MS;
+    const canJump = result.grounded || result.timeSinceGrounded * 1000 < COYOTE_MS || inWater;
     let jumped = false;
     if (jumpBufferTimer > 0 && canJump) {
-      velY = -JUMP_SPEED;
+      velY = inWater ? -JUMP_SPEED * 0.7 : -JUMP_SPEED;
       jumpBufferTimer = 0;
-      jumped = true;
-    } else if (inWater && jumpJustPressed) {
-      // Swim jump — strong enough to leave the water
-      velY = -JUMP_SPEED * 0.7;
-      jumped = true;
-    } else if (inWater && jumpKey) {
-      // Swim upward — hold to rise gradually
-      velY = Math.max(velY - 800 * DT, -250);
       jumped = true;
     }
 
