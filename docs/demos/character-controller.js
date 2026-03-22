@@ -1,7 +1,7 @@
 import {
   Body, BodyType, Vec2, Circle, Polygon, Material, CbType,
   InteractionType, PreListener, PreFlag, CharacterController,
-  FluidProperties, InteractionFilter,
+  FluidProperties,
 } from "../nape-js.esm.js";
 import { drawBody, drawConstraints, drawGrid, COLORS } from "../renderer.js";
 
@@ -12,10 +12,10 @@ import { drawBody, drawConstraints, drawGrid, COLORS } from "../renderer.js";
 const WORLD_W = 3200;
 const WORLD_H = 600;
 const PLAYER_R = 14;
-const ONEWAY_GROUP = 1 << 9; // must match CharacterController default
-const GRAVITY = 980;
+const ONEWAY_GROUP = 1 << 9;
+const GRAVITY = 600;
 const MOVE_SPEED = 180;
-const JUMP_SPEED = 420;
+const JUMP_SPEED = 380;
 const COYOTE_MS = 100;
 const JUMP_BUFFER_MS = 100;
 const DT = 1 / 60;
@@ -25,11 +25,11 @@ const DT = 1 / 60;
 // ---------------------------------------------------------------------------
 
 let player = null;
-let cc = null; // CharacterController
+let cc = null;
 let keys = {};
-let prevJumpKey = false; // for edge detection
+let prevJumpKey = false;
 let jumpBufferTimer = 0;
-let velY = 0; // vertical velocity (px/s), positive = downward
+let velY = 0;
 let playerFacingRight = true;
 
 // ---------------------------------------------------------------------------
@@ -42,12 +42,11 @@ export default {
   featured: true,
   featuredOrder: 11,
   tags: ["CharacterController", "Platformer", "Camera", "One-Way", "Slope"],
-  desc: "WASD/Arrow keys to move, <b>Space</b> to jump. Features: slopes, one-way platforms, step climbing, moving platforms, coyote time. Uses the built-in <code>CharacterController</code> class.",
+  desc: "WASD/Arrow keys to move, <b>Space</b> to jump. Features: slopes, one-way platforms, moving platforms, coyote time. Uses the built-in <code>CharacterController</code> class with dynamic body physics.",
   walls: false,
   canvas2dOnly: true,
 
-  // Camera config — follow the player, clamp to world bounds
-  camera: null, // set in setup() after player body is created
+  camera: null,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, GRAVITY);
@@ -55,28 +54,27 @@ export default {
     const platformTag = new CbType();
     const playerTag = new CbType();
 
-    // ---- Floor ----
     const floorY = WORLD_H - 10;
+
+    // ---- Floor ----
     addStaticBox(space, WORLD_W / 2, floorY, WORLD_W, 20);
 
     // ---- Left/right walls ----
     addStaticBox(space, -10, WORLD_H / 2, 20, WORLD_H);
     addStaticBox(space, WORLD_W + 10, WORLD_H / 2, 20, WORLD_H);
 
-    // ---- Section 1: Flat platforms + one-way platforms (x: 0–600) ----
+    // ---- Section 1: One-way platforms (x: 0–600) ----
     addStaticBox(space, 150, 500, 200, 16);
-    // One-way platforms — staggered for jumping
     addOneWay(space, 100, 440, 120, platformTag);
     addOneWay(space, 280, 370, 100, platformTag);
     addOneWay(space, 130, 300, 120, platformTag);
     addOneWay(space, 380, 330, 80, platformTag);
 
-    // Coins on one-way platforms
     addCoin(space, 100, 418);
     addCoin(space, 280, 348);
     addCoin(space, 380, 308);
 
-    // ---- Section 2: Steps / stair climbing (x: 500–900) ----
+    // ---- Section 2: Steps (x: 500–900) ----
     const stepBase = floorY - 10;
     for (let i = 0; i < 6; i++) {
       addStaticBox(space, 580 + i * 36, stepBase - i * 10, 34, 10 + i * 10);
@@ -85,21 +83,19 @@ export default {
 
     // ---- Section 3: Slopes (x: 900–1500) ----
     addSlopeRamp(space, 950, floorY - 10, 300, 80, false);
-    addStaticBox(space, 1200, floorY - 80, 200, 16); // Flat top
-    addSlopeRamp(space, 1400, floorY - 10, 200, 80, true); // Down slope
+    addStaticBox(space, 1200, floorY - 80, 200, 16);
+    addSlopeRamp(space, 1400, floorY - 10, 200, 80, true);
     addCoin(space, 1200, floorY - 110);
     addCoin(space, 1100, floorY - 50);
 
     // ---- Section 4: Moving platforms (x: 1500–2100) ----
     addStaticBox(space, 1550, floorY, 100, 20);
 
-    // Horizontal moving platform
     const hPlat = new Body(BodyType.KINEMATIC, new Vec2(1750, floorY - 50));
     hPlat.shapes.add(new Polygon(Polygon.box(100, 12)));
     hPlat.space = space;
     hPlat._hMoving = { minX: 1650, maxX: 1900, speed: 80 };
 
-    // Vertical moving platform
     const vPlat = new Body(BodyType.KINEMATIC, new Vec2(2000, floorY - 100));
     vPlat.shapes.add(new Polygon(Polygon.box(80, 12)));
     vPlat.space = space;
@@ -109,12 +105,11 @@ export default {
     addCoin(space, 2100, floorY - 230);
     addCoin(space, 1750, floorY - 80);
 
-    // ---- Section 5: Water / fluid zone (x: 2200–2600) ----
-    addStaticBox(space, 2400, floorY + 100, 500, 20); // Deep floor
-    addStaticBox(space, 2150, floorY + 40, 20, 100); // Left wall of pool
-    addStaticBox(space, 2650, floorY + 40, 20, 100); // Right wall of pool
+    // ---- Section 5: Water (x: 2200–2600) ----
+    addStaticBox(space, 2400, floorY + 100, 500, 20);
+    addStaticBox(space, 2150, floorY + 40, 20, 100);
+    addStaticBox(space, 2650, floorY + 40, 20, 100);
 
-    // Water zone (sensor with fluid properties)
     const water = new Body(BodyType.STATIC, new Vec2(2400, floorY + 30));
     const waterShape = new Polygon(Polygon.box(480, 80));
     waterShape.fluidEnabled = true;
@@ -127,39 +122,36 @@ export default {
     addCoin(space, 2300, floorY + 20);
     addCoin(space, 2500, floorY + 20);
 
-    // ---- Section 6: Wall jump zone (x: 2600–2900) ----
+    // ---- Section 6: Wall zone (x: 2600–2900) ----
     addStaticBox(space, 2700, floorY - 80, 16, 160);
     addStaticBox(space, 2800, floorY - 80, 16, 160);
     addOneWay(space, 2750, floorY - 170, 80, platformTag);
     addCoin(space, 2750, floorY - 200);
 
-    // ---- Section 7: Final stretch with mixed obstacles (x: 2900–3100) ----
+    // ---- Section 7: Final stretch (x: 2900–3100) ----
     addOneWay(space, 2950, 400, 100, platformTag);
     addOneWay(space, 3050, 330, 80, platformTag);
     addStaticBox(space, 3100, 280, 100, 16);
     addCoin(space, 3100, 250);
 
-    // ---- Player (circle) ----
-    player = new Body(BodyType.KINEMATIC, new Vec2(100, floorY - 30));
-    const playerShape = new Circle(PLAYER_R);
+    // ---- Player (dynamic body) ----
+    player = new Body(BodyType.DYNAMIC, new Vec2(100, floorY - 30));
+    const playerShape = new Circle(PLAYER_R, undefined, new Material(0, 0.3, 0.3, 1));
     playerShape.cbTypes.add(playerTag);
     player.shapes.add(playerShape);
     player.allowRotation = false;
+    player.isBullet = true;
     player.space = space;
     try { player.userData._colorIdx = 3; } catch (_) {}
 
     // ---- Character Controller ----
     cc = new CharacterController(space, player, {
-      maxSlopeAngle: Math.PI / 3, // 60 degrees
-      stepHeight: 12,
-      skinWidth: 0.5,
-      snapToGround: 6,
+      maxSlopeAngle: Math.PI / 3,
       oneWayPlatformTag: platformTag,
       characterTag: playerTag,
-      trackMovingPlatforms: true,
     });
 
-    // Set camera config — read by DemoRunner after setup()
+    // Camera
     this.camera = {
       follow: player,
       offsetX: 0,
@@ -187,6 +179,7 @@ export default {
     window.addEventListener("keyup", this._onKeyUp);
   },
 
+  // step() runs BEFORE space.step() in DemoRunner
   step(space, W, H) {
     if (!cc || !player) return;
 
@@ -198,7 +191,7 @@ export default {
         if (!m._dir) m._dir = 1;
         if (px >= m.maxX) m._dir = -1;
         if (px <= m.minX) m._dir = 1;
-        body.position = new Vec2(px + m._dir * m.speed * DT, body.position.y);
+        body.velocity = new Vec2(m._dir * m.speed, 0);
       }
       if (body._vMoving) {
         const m = body._vMoving;
@@ -206,7 +199,7 @@ export default {
         if (!m._dir) m._dir = 1;
         if (py >= m.maxY) m._dir = -1;
         if (py <= m.minY) m._dir = 1;
-        body.position = new Vec2(body.position.x, py + m._dir * m.speed * DT);
+        body.velocity = new Vec2(0, m._dir * m.speed);
       }
     }
 
@@ -215,19 +208,21 @@ export default {
     const right = keys["ArrowRight"] || keys["KeyD"];
     const jumpKey = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
 
-    // Jump edge detection — only trigger on key-down, not hold
     const jumpJustPressed = jumpKey && !prevJumpKey;
     prevJumpKey = jumpKey;
 
     let moveX = 0;
-    if (left) { moveX = -MOVE_SPEED * DT; playerFacingRight = false; }
-    if (right) { moveX = MOVE_SPEED * DT; playerFacingRight = true; }
+    if (left) { moveX = -MOVE_SPEED; playerFacingRight = false; }
+    if (right) { moveX = MOVE_SPEED; playerFacingRight = true; }
 
-    // ---- Vertical velocity with gravity ----
-    // Apply gravity
-    velY += GRAVITY * DT;
+    // ---- Query state from last frame ----
+    const result = cc.update();
 
-    // Jump buffering — set buffer when jump pressed
+    // ---- Vertical velocity ----
+    // Read current velY from body (physics may have changed it due to collisions)
+    velY = player.velocity.y;
+
+    // Jump buffering
     if (jumpJustPressed) {
       jumpBufferTimer = JUMP_BUFFER_MS;
     } else {
@@ -235,48 +230,28 @@ export default {
     }
 
     // Jump (with coyote time)
-    const canJump = cc.grounded || cc.timeSinceGrounded * 1000 < COYOTE_MS;
+    const canJump = result.grounded || result.timeSinceGrounded * 1000 < COYOTE_MS;
     if (jumpBufferTimer > 0 && canJump) {
-      velY = -JUMP_SPEED; // upward
+      velY = -JUMP_SPEED;
       jumpBufferTimer = 0;
     }
 
-    // Variable jump height — release early = cut velocity
+    // Variable jump height
     if (!jumpKey && velY < 0) {
-      velY *= 0.7;
+      velY *= 0.85;
     }
 
-    // Reset vertical velocity when grounded and not jumping
-    if (cc.grounded && velY > 0) {
-      velY = 0;
-    }
-
-    const moveY = velY * DT;
-
-    // ---- Move ----
-    const result = cc.move(new Vec2(moveX, moveY));
-
-    // If we hit a ceiling, stop upward velocity
-    if (velY < 0 && result.numCollisions > 0) {
-      for (let i = 0; i < result.numCollisions; i++) {
-        const col = result.getCollision(i);
-        if (col.normal.y > 0.5) { // ceiling hit
-          velY = 0;
-          break;
-        }
-      }
-    }
-
-    // If grounded, clamp velY to 0
-    if (result.grounded) {
-      velY = Math.max(0, velY);
-    }
+    // ---- Apply velocity (gravity is handled by space.gravity) ----
+    cc.setVelocity(moveX, velY);
 
     // Clamp player to world bounds
-    const px = Math.max(PLAYER_R, Math.min(WORLD_W - PLAYER_R, player.position.x));
-    const py = Math.max(PLAYER_R, Math.min(WORLD_H - PLAYER_R, player.position.y));
-    if (px !== player.position.x || py !== player.position.y) {
-      player.position = new Vec2(px, py);
+    const px = player.position.x;
+    const py = player.position.y;
+    if (px < PLAYER_R || px > WORLD_W - PLAYER_R) {
+      player.position = new Vec2(
+        Math.max(PLAYER_R, Math.min(WORLD_W - PLAYER_R, px)),
+        py,
+      );
     }
   },
 
@@ -285,17 +260,15 @@ export default {
     ctx.save();
     ctx.translate(-camX, -camY);
 
-    // Grid
     drawGrid(ctx, W, H, camX, camY);
 
-    // Water zones (draw before bodies)
+    // Water zones
     for (const body of space.bodies) {
       if (body._isWater) {
         const px = body.position.x;
         const py = body.position.y;
         ctx.fillStyle = "rgba(50,120,220,0.15)";
         ctx.fillRect(px - 240, py - 40, 480, 80);
-        // Wave effect
         ctx.strokeStyle = "rgba(80,160,255,0.3)";
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -315,7 +288,7 @@ export default {
       drawBody(ctx, body, showOutlines);
     }
 
-    // Player direction indicator (eye dot)
+    // Player eye
     if (player) {
       const px = player.position.x;
       const py = player.position.y;
@@ -342,7 +315,7 @@ export default {
       }
     }
 
-    // Legend (bottom-left)
+    // Legend
     const ly = H - 12;
     ctx.font = "10px monospace";
     ctx.fillStyle = "#a371f7";
@@ -375,12 +348,10 @@ function addOneWay(space, cx, cy, w, platformTag) {
   const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
   const shape = new Polygon(Polygon.box(w, 8));
   shape.cbTypes.add(platformTag);
-  // Set one-way group exclusively so CC can exclude from upward raycasts.
-  // Must not include default group (1) — otherwise the filter mask cannot exclude it.
   shape.filter.collisionGroup = ONEWAY_GROUP;
   b.shapes.add(shape);
   b.space = space;
-  try { b.userData._colorIdx = 4; } catch (_) {} // purple for one-way
+  try { b.userData._colorIdx = 4; } catch (_) {}
   return b;
 }
 
@@ -390,7 +361,7 @@ function addCoin(space, cx, cy) {
   shape.sensorEnabled = true;
   b.shapes.add(shape);
   b.space = space;
-  try { b.userData._colorIdx = 1; } catch (_) {} // orange for coins
+  try { b.userData._colorIdx = 1; } catch (_) {}
   return b;
 }
 

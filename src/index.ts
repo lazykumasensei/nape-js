@@ -102,7 +102,6 @@ export { createConcaveBody, type ConcaveBodyOptions } from "./helpers/createConc
 export {
   CharacterController,
   type CharacterControllerOptions,
-  type CharacterCollision,
   type MoveResult,
 } from "./helpers/CharacterController";
 
