@@ -256,6 +256,15 @@ export default {
     // ---- Query state from last frame ----
     const result = cc.update();
 
+    // Check if player is in water (has active fluid arbiters)
+    let inWater = false;
+    try {
+      const arbs = player.arbiters;
+      for (let i = 0; i < arbs.length; i++) {
+        if (arbs.at(i).isFluidArbiter()) { inWater = true; break; }
+      }
+    } catch (_) {}
+
     // ---- Vertical velocity ----
     velY = player.velocity.y;
 
@@ -266,23 +275,27 @@ export default {
       jumpBufferTimer = Math.max(0, jumpBufferTimer - 1000 * DT);
     }
 
-    // Jump (with coyote time)
+    // Jump / swim
     const canJump = result.grounded || result.timeSinceGrounded * 1000 < COYOTE_MS;
     let jumped = false;
     if (jumpBufferTimer > 0 && canJump) {
       velY = -JUMP_SPEED;
       jumpBufferTimer = 0;
       jumped = true;
+    } else if (inWater && jumpKey) {
+      // Swim upward — weaker than jump, can hold key
+      velY = Math.max(velY - 600 * DT, -200);
+      jumped = true;
     }
 
-    // Variable jump height — cut upward velocity on release
-    if (!jumpKey && velY < 0) {
+    // Variable jump height — cut upward velocity on release (not in water)
+    if (!inWater && !jumpKey && velY < 0) {
       velY *= 0.85;
     }
 
-    // Only override vertical velocity when jumping or cutting jump.
+    // Only override vertical velocity when jumping/swimming or cutting jump.
     // Otherwise let the engine handle gravity + buoyancy naturally.
-    if (jumped || (!jumpKey && player.velocity.y < 0)) {
+    if (jumped || (!jumpKey && player.velocity.y < 0 && !inWater)) {
       player.velocity = new Vec2(moveX, velY);
     } else {
       player.velocity = new Vec2(moveX, player.velocity.y);
