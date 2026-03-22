@@ -59,8 +59,9 @@ export default {
 
     const floorY = WORLD_H - 10;
 
-    // ---- Floor ----
-    addStaticBox(space, WORLD_W / 2, floorY, WORLD_W, 20);
+    // ---- Floor (with gap for water zone at x: 2160–2640) ----
+    addStaticBox(space, 1080, floorY, 2160, 20);       // left section: x 0–2160
+    addStaticBox(space, 2920, floorY, 560, 20);         // right section: x 2640–3200
 
     // ---- Left/right walls ----
     addStaticBox(space, -10, WORLD_H / 2, 20, WORLD_H);
