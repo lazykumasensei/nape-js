@@ -159,14 +159,17 @@ export default {
       playerTag,
       coinTag,
       (cb) => {
-        // Determine which interactor is the coin
-        const b1 = cb.int1.castBody;
-        const b2 = cb.int2.castBody;
-        const coin = (b1 && b1 !== player) ? b1 : b2;
-        if (coin && coin.space) {
-          const cx = coin.position.x;
-          const cy = coin.position.y;
-          coin.space = null; // remove from space
+        // int1/int2 may be Shape (cbType on shape) — get the body via .castShape.body
+        let coinBody = null;
+        const i1 = cb.int1;
+        const i2 = cb.int2;
+        const b1 = i1.castBody ?? i1.castShape?.body ?? null;
+        const b2 = i2.castBody ?? i2.castShape?.body ?? null;
+        coinBody = (b1 && b1 !== player) ? b1 : (b2 && b2 !== player) ? b2 : null;
+        if (coinBody && coinBody.space) {
+          const cx = coinBody.position.x;
+          const cy = coinBody.position.y;
+          coinBody.space = null;
           coinCount++;
           coinPopups.push({ x: cx, y: cy - 10, timer: 1.0 });
         }
