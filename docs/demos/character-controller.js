@@ -122,6 +122,9 @@ export default {
     const waterShape = new Polygon(Polygon.box(480, 80));
     waterShape.fluidEnabled = true;
     waterShape.fluidProperties = new FluidProperties(1.5, 3);
+    // Disable collision so the player sinks into the water, keep fluid interaction
+    waterShape.filter.collisionMask = 0;
+    waterShape.filter.collisionGroup = 0;
     water.shapes.add(waterShape);
     water.space = space;
     water._isWater = true;
