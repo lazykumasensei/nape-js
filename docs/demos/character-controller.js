@@ -257,7 +257,6 @@ export default {
     const result = cc.update();
 
     // ---- Vertical velocity ----
-    // Read current velY from body (physics may have changed it due to collisions)
     velY = player.velocity.y;
 
     // Jump buffering
@@ -269,18 +268,25 @@ export default {
 
     // Jump (with coyote time)
     const canJump = result.grounded || result.timeSinceGrounded * 1000 < COYOTE_MS;
+    let jumped = false;
     if (jumpBufferTimer > 0 && canJump) {
       velY = -JUMP_SPEED;
       jumpBufferTimer = 0;
+      jumped = true;
     }
 
-    // Variable jump height
+    // Variable jump height — cut upward velocity on release
     if (!jumpKey && velY < 0) {
       velY *= 0.85;
     }
 
-    // ---- Apply velocity (gravity is handled by space.gravity) ----
-    cc.setVelocity(moveX, velY);
+    // Only override vertical velocity when jumping or cutting jump.
+    // Otherwise let the engine handle gravity + buoyancy naturally.
+    if (jumped || (!jumpKey && player.velocity.y < 0)) {
+      player.velocity = new Vec2(moveX, velY);
+    } else {
+      player.velocity = new Vec2(moveX, player.velocity.y);
+    }
 
     // Clamp player to world bounds
     const px = player.position.x;
