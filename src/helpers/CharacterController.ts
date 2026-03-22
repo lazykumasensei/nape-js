@@ -179,7 +179,6 @@ export class CharacterController {
 
   // One-way platform support
   private _oneWayListener: PreListener | null = null;
-  private _filterNoOneWay: InteractionFilter | null = null; // excludes one-way platforms
   private _oneWayGroup = 0; // collision group bit for one-way platforms
 
   // State
@@ -227,12 +226,9 @@ export class CharacterController {
       this._filter = new InteractionFilter(1, ~CHAR_GROUP);
     }
 
-    // Auto-setup one-way platform PreListener + filter
+    // Auto-setup one-way platform PreListener
     if (options.oneWayPlatformTag && options.characterTag) {
-      const owGroup = options.oneWayGroupBit ?? ONEWAY_GROUP;
-      this._oneWayGroup = owGroup;
-      // Create a second filter that also excludes one-way platforms (for upward rays)
-      this._filterNoOneWay = new InteractionFilter(1, ~(CHAR_GROUP | owGroup));
+      this._oneWayGroup = options.oneWayGroupBit ?? ONEWAY_GROUP;
       this._setupOneWayPlatforms(options.oneWayPlatformTag, options.characterTag);
     }
   }
@@ -451,12 +447,6 @@ export class CharacterController {
       const dirX = remX / mag;
       const dirY = remY / mag;
 
-      // Cast ray from body center in movement direction.
-      // When moving upward, exclude one-way platforms so the character
-      // passes through them from below.
-      const movingUp = dirY < -0.1;
-      const filter = movingUp && this._filterNoOneWay ? this._filterNoOneWay : this._filter;
-
       // Determine the effective radius of the character shape in the ray direction.
       const charRadius = this._getCharacterRadius(dirX, dirY);
 
@@ -465,10 +455,23 @@ export class CharacterController {
       const ray = new Ray(new Vec2(px, py), new Vec2(dirX, dirY));
       ray.maxDistance = mag + charRadius + this._skinWidth;
 
-      const hit = this.space.rayCast(ray, false, filter);
+      const hit = this.space.rayCast(ray, false, this._filter);
 
       if (!hit) {
         // No collision — apply full remaining movement
+        px += remX;
+        py += remY;
+        break;
+      }
+
+      // One-way platform handling (mirrors original nape PreListener logic):
+      // If the hit shape is a one-way platform, check the contact normal.
+      // Only block if normal points upward (character is above the platform).
+      // If normal points downward or sideways, the character is below or
+      // beside it — ignore the hit and let the character pass through.
+      if (this._isOneWayShape(hit.shape) && hit.normal.y >= 0) {
+        // Normal y >= 0 means it points downward or sideways — character
+        // is approaching from below or the side. Ignore this hit.
         px += remX;
         py += remY;
         break;
@@ -698,6 +701,15 @@ export class CharacterController {
     });
     listener.space = this.space;
     this._oneWayListener = listener;
+  }
+
+  /**
+   * Check if a shape belongs to a one-way platform by testing its
+   * collisionGroup against the one-way group bit.
+   */
+  private _isOneWayShape(shape: Shape | null): boolean {
+    if (!shape || this._oneWayGroup === 0) return false;
+    return (shape.filter.collisionGroup & this._oneWayGroup) !== 0;
   }
 
   // -----------------------------------------------------------------------
