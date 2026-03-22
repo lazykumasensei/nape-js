@@ -87,14 +87,14 @@ export default {
     for (let i = 0; i < 6; i++) {
       addStaticBox(space, 580 + i * 36, stepBase - i * 10, 34, 10 + i * 10);
     }
-    addCoin(space, 760, stepBase - 80, coinTag);
+    addCoin(space, 760, stepBase - 90, coinTag);
 
     // ---- Section 3: Slopes (x: 900–1500) ----
     addSlopeRamp(space, 950, floorY - 10, 300, 80, false);
     addStaticBox(space, 1200, floorY - 80, 200, 16);
     addSlopeRamp(space, 1400, floorY - 10, 200, 80, true);
     addCoin(space, 1200, floorY - 110, coinTag);
-    addCoin(space, 1100, floorY - 50, coinTag);
+    addCoin(space, 1050, floorY - 50, coinTag);
 
     // ---- Section 4: Moving platforms (x: 1500–2100) ----
     addStaticBox(space, 1550, floorY, 100, 20);
