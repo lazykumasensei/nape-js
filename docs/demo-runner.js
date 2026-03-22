@@ -111,6 +111,11 @@ export class DemoRunner {
   #animId  = null;
   #debugDraw = true;
 
+  // Camera state (opt-in per demo via demo.camera config)
+  #camX = 0;
+  #camY = 0;
+  #cameraConfig = null;  // { follow, offsetX, offsetY, bounds, lerp, deadzone }
+
   // Worker bridge
   #workerBridge = null;
   #workerMode = false;
@@ -143,6 +148,9 @@ export class DemoRunner {
   get currentDemo()  { return this.#demo; }
   get space()        { return this.#space; }
   get debugDraw()    { return this.#debugDraw; }
+
+  /** Current camera offset (read-only). */
+  get camera() { return { x: this.#camX, y: this.#camY }; }
 
   /** Returns the active adapter ID (e.g. "canvas2d", "threejs", "pixijs"). */
   get mode() {
@@ -299,6 +307,10 @@ export class DemoRunner {
     const space = new Space();
     this.#space = space;
 
+    this.#camX = 0;
+    this.#camY = 0;
+    this.#cameraConfig = null;
+
     // Create walls from demo config (before setup).
     // Only auto-create walls if the demo explicitly defines a `walls` property.
     // Legacy demos that call addWalls() manually in setup() won't have this property.
@@ -309,6 +321,15 @@ export class DemoRunner {
     // Run demo setup
     demoDef.setup(space, this.#W, this.#H);
 
+    // Initialize camera from demo config (read AFTER setup so the demo can
+    // create bodies and reference them in camera.follow).
+    // demo.camera = { follow, offsetX, offsetY, bounds, lerp, deadzone }
+    if (demoDef.camera) {
+      this.#cameraConfig = demoDef.camera;
+      // Snap to target immediately so the first frame doesn't start at (0,0)
+      this.snapCamera();
+    }
+
     // Optional init hook (DOM-level listeners, overlays)
     if (!preview) demoDef.init?.(this.#container, this.#W, this.#H);
 
@@ -316,7 +337,7 @@ export class DemoRunner {
     if (!demoDef.renderOverrides) {
       const ro = {};
       if (demoDef.render) {
-        ro.canvas2d = (ctx, sp, w, h, outlines) => demoDef.render(ctx, sp, w, h, outlines);
+        ro.canvas2d = (ctx, sp, w, h, outlines, cx, cy) => demoDef.render(ctx, sp, w, h, outlines, cx, cy);
       }
       if (demoDef.render3d) {
         ro.threejs = (adapter, sp, w, h, outlines) => {
@@ -434,10 +455,11 @@ export class DemoRunner {
       const fitH    = fitW / aspect;
       const padX    = (rect.width  - fitW) / 2;
       const padY    = (rect.height - fitH) / 2;
-      return {
-        x: ((e.clientX - rect.left) - padX) * (this.#W / fitW),
-        y: ((e.clientY - rect.top)  - padY) * (this.#H / fitH),
-      };
+      // Screen-to-viewport coords
+      const vx = ((e.clientX - rect.left) - padX) * (this.#W / fitW);
+      const vy = ((e.clientY - rect.top)  - padY) * (this.#H / fitH);
+      // Apply camera offset to get world coords
+      return { x: vx + this.#camX, y: vy + this.#camY };
     };
 
     el.addEventListener("pointerdown", (e) => {
@@ -533,10 +555,15 @@ export class DemoRunner {
         );
         const stepMs = performance.now() - stepStart;
 
+        // Update camera (opt-in — only when demo.camera is configured)
+        this.#updateCamera();
+
         const renderStart = performance.now();
         this.#activeAdapter.renderFrame(this.#space, this.#W, this.#H, {
           showOutlines: this.#debugDraw,
           overrides: this.#demo?.renderOverrides ?? null,
+          camX: this.#camX,
+          camY: this.#camY,
         });
         const renderMs = performance.now() - renderStart;
 
@@ -546,5 +573,91 @@ export class DemoRunner {
     }
 
     this.#animId = requestAnimationFrame(() => this.#tick());
+  }
+
+  // -----------------------------------------------------------------------
+  // Camera
+  // -----------------------------------------------------------------------
+
+  /**
+   * Update camera position toward the follow target.
+   * Called once per frame after physics step.
+   */
+  #updateCamera() {
+    const cfg = this.#cameraConfig;
+    if (!cfg) return;
+
+    // Resolve follow target position
+    let tx, ty;
+    if (typeof cfg.follow === "function") {
+      const p = cfg.follow();
+      if (!p) return;
+      tx = p.x;
+      ty = p.y;
+    } else if (cfg.follow && cfg.follow.position) {
+      tx = cfg.follow.position.x;
+      ty = cfg.follow.position.y;
+    } else {
+      return;
+    }
+
+    // Target camera position = follow position + offset, centered in viewport
+    const offsetX = cfg.offsetX ?? 0;
+    const offsetY = cfg.offsetY ?? 0;
+    let goalX = tx + offsetX - this.#W / 2;
+    let goalY = ty + offsetY - this.#H / 2;
+
+    // Clamp to world bounds
+    const bounds = cfg.bounds;
+    if (bounds) {
+      goalX = Math.max(bounds.minX, Math.min(goalX, bounds.maxX - this.#W));
+      goalY = Math.max(bounds.minY, Math.min(goalY, bounds.maxY - this.#H));
+    }
+
+    // Deadzone — only move camera if target leaves deadzone area
+    const dz = cfg.deadzone;
+    if (dz) {
+      const dcx = this.#camX + this.#W / 2;
+      const dcy = this.#camY + this.#H / 2;
+      const dx = tx + offsetX - dcx;
+      const dy = ty + offsetY - dcy;
+      if (Math.abs(dx) <= dz.halfW && Math.abs(dy) <= dz.halfH) return;
+      // Push goal just enough to keep target at deadzone edge
+      if (Math.abs(dx) > dz.halfW) {
+        goalX = tx + offsetX - this.#W / 2 - Math.sign(dx) * (dz.halfW - Math.abs(dx));
+      }
+    }
+
+    // Lerp
+    const lerp = cfg.lerp ?? 0.1;
+    this.#camX += (goalX - this.#camX) * lerp;
+    this.#camY += (goalY - this.#camY) * lerp;
+
+    // Re-clamp after lerp (avoids overshoot)
+    if (bounds) {
+      this.#camX = Math.max(bounds.minX, Math.min(this.#camX, bounds.maxX - this.#W));
+      this.#camY = Math.max(bounds.minY, Math.min(this.#camY, bounds.maxY - this.#H));
+    }
+  }
+
+  /**
+   * Allow demos to update camera config at runtime (e.g. set follow target
+   * after body creation in setup()).
+   */
+  updateCamera(cfg) {
+    if (!cfg) return;
+    if (!this.#cameraConfig) this.#cameraConfig = {};
+    Object.assign(this.#cameraConfig, cfg);
+  }
+
+  /**
+   * Snap camera to follow target immediately (no lerp).
+   * Useful after teleporting the player or on initial setup.
+   */
+  snapCamera() {
+    const lerp = this.#cameraConfig?.lerp;
+    if (this.#cameraConfig) this.#cameraConfig.lerp = 1;
+    this.#updateCamera();
+    if (this.#cameraConfig) this.#cameraConfig.lerp = lerp;
   }
 }

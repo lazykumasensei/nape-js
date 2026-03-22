@@ -89,7 +89,7 @@ export class Canvas2DAdapter {
   // Per-frame rendering
   // ---------------------------------------------------------------------------
 
-  renderFrame(space, W, H, { showOutlines, overrides }) {
+  renderFrame(space, W, H, { showOutlines, overrides, camX = 0, camY = 0 }) {
     const ctx = this.#ctx;
     if (!ctx) return;
 
@@ -98,14 +98,18 @@ export class Canvas2DAdapter {
     ctx.clearRect(0, 0, W, H);
 
     if (overrides?.canvas2d) {
-      overrides.canvas2d(ctx, space, W, H, showOutlines);
+      overrides.canvas2d(ctx, space, W, H, showOutlines, camX, camY);
     } else {
-      drawGrid(ctx, W, H);
+      // Apply camera transform for default rendering
+      ctx.save();
+      ctx.translate(-camX, -camY);
+      drawGrid(ctx, W, H, camX, camY);
       drawConstraints(ctx, space);
       for (const body of space.bodies) drawBody(ctx, body, showOutlines);
+      ctx.restore();
     }
 
-    // HUD overlay (legend, cursor hints, etc.)
+    // HUD overlay (legend, cursor hints, etc.) — drawn in screen space, no camera
     if (overrides?.overlay) {
       overrides.overlay(ctx, space, W, H);
     }

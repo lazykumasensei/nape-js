@@ -86,7 +86,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | ----------------------------------------- | ------ | --------- | ------ | -------------- |
 | P29 — Test coverage ≥80%                  | L      | safety    | none   | 🔶 ~54% (3251 tests) |
 | P44 — PixiJS integration package          | M      | adoption  | low    | 🔶 Phase 1 done |
-| P45 — Character controller                | M      | DX        | medium | ⬜ Not started |
+| P45 — Character controller                | M      | DX        | medium | ✅ Done |
 | P47 — CJS bundle dedup (serialization)    | S      | bundle    | low    | ⬜ Not started |
 | P51 — Sub-stepping solver                 | M      | stability | low    | ✅ Done |
 | P54 — Performance benchmark page          | S      | adoption  | low    | ✅ Done |
@@ -113,15 +113,138 @@ Target: `@newkrok/nape-pixi` or `@newkrok/nape-js/pixi` subpath export
 
 ---
 
-## Planned: P45 — Character Controller
+## Done: P45 — Character Controller
 
 **Effort: M | Impact: DX | Risk: medium**
 
-Geometric character controller (Box2D v3.1 pattern):
+### Overview
 
-- Ground detection, slope handling, step climbing
-- One-way platform support (builds on existing PreListener pattern)
-- Moving platform support via kinematic body tracking
+Two-layer geometric character controller inspired by Rapier's `KinematicCharacterController`
+and Box2D v3.1's character mover toolkit. Unlike dynamic-body approaches (force/impulse driven),
+a geometric controller uses shape-casting ("collide-and-slide") for pixel-perfect, single-frame
+movement resolution — the same approach used by Celeste, Hollow Knight, and most acclaimed
+2D platformers.
+
+**What sets nape-js apart from competitors:**
+
+| Feature | Rapier 2D | Box2D v3.1 | Matter/Planck | nape-js P45 |
+|---------|-----------|------------|---------------|-------------|
+| Abstraction level | High-level only | Low-level only | None | Both layers |
+| Moving platforms | Broken (open issue) | Manual | N/A | Built-in via surfaceVel |
+| One-way platforms | Manual filter | Manual filter | N/A | Built-in PreListener |
+| Fluid/swim mode | No | No | No | Built-in (buoyancy) |
+| TypeScript native | WASM bindings | C bindings | JS | Pure strict TS |
+| Serializable | No | No | No | Yes (JSON + binary) |
+
+### Architecture: Two-Layer API
+
+**High-level — `CharacterController` class** (batteries-included):
+
+```typescript
+const cc = new CharacterController(space, body, {
+  maxSlopeAngle: Math.PI / 4,  // 45° climbable
+  stepHeight: 8,                // auto-step small ledges
+  skinWidth: 0.5,               // numerical stability margin
+  snapToGround: 4,              // stick to ground on slopes
+  oneWayPlatformTag: platformCbType, // auto-setup PreListener
+  trackMovingPlatforms: true,   // inherit kinematic velocity
+});
+
+// Game loop:
+const result = cc.move(desiredDelta); // Vec2
+result.grounded;          // boolean
+result.groundNormal;      // Vec2 | null
+result.groundBody;        // Body | null
+result.onMovingPlatform;  // boolean
+result.slopeAngle;        // radians
+result.wallLeft;          // boolean
+result.wallRight;         // boolean
+result.numCollisions;     // number
+result.getCollision(i);   // { normal, point, body, shape }
+```
+
+**Low-level — exported utilities** (advanced / custom controllers):
+
+```typescript
+import { castShape, solvePlanes, clipVelocity } from 'nape-js';
+
+const hit = space.castShape(shape, translation, filter);
+const planes = space.collideMover(capsule, filter);
+const solved = solvePlanes(position, planes);
+const clipped = clipVelocity(velocity, planes);
+```
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Ground detection | Downward shape cast + normal angle check → `grounded`, `groundNormal`, `groundBody` |
+| Slope handling | `maxSlopeAngle` threshold — steeper slopes block movement; gentle slopes walk normally |
+| Step climbing | Up → forward → down cast sequence, bounded by `stepHeight` |
+| One-way platforms | Auto-configured PreListener — accept collision only when normal points up |
+| Moving platforms | Track kinematic body velocity; character inherits platform motion when grounded on it |
+| Snap to ground | Pre-step downward cast — prevents bouncing on slopes and stair edges |
+| Wall detection | Lateral shape casts → `wallLeft` / `wallRight` booleans + `wallNormal` |
+| Fluid/swim mode | Detect buoyancy shapes — reduce gravity, apply drag, enable swim movement |
+| Coyote time helper | `timeSinceGrounded` counter — game layer decides the window |
+| Collide-and-slide | Core algorithm: shape cast → slide along surface → repeat (max 3 iterations) |
+
+### Demo: Interactive Platformer Showcase
+
+Wide scrolling level (~3000×600 px) demonstrating every feature, with keyboard controls
+(WASD/arrows + Space). Requires a **camera system** in the demo framework (see below).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ★ Coins                Moving Platform →                                       │
+│                          ═══════                    ┌──┐                        │
+│         ┌──┐                                  steps │  │                        │
+│  ───    │  │ step                              ─────┘  └───                     │
+│  ─────  └──┘        /                                        ≈≈≈≈≈≈≈≈          │
+│                    / slope        ═══════                    ≈ water ≈          │
+│  ─ ─ ─ ─ ─       /                                          ≈≈≈≈≈≈≈≈          │
+│  one-way      ═══════                                                           │
+│                                                                                 │
+│  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Demo Framework: Camera System
+
+New opt-in camera for demos whose physics world exceeds the 900×500 canvas viewport:
+
+- **`demo.camera`** config — `{ follow: bodyRef, offset, bounds, lerp, deadzone }`
+- Camera state stored per-demo, managed by DemoRunner
+- `Canvas2DAdapter` applies `ctx.translate(-camX, -camY)` before rendering
+- `drawGrid()` extended to tile infinitely within viewport
+- Pointer events inverse-transformed from screen → world coords
+- Other demos unaffected (no camera = identity transform)
+- Reusable by future demos (e.g. large constraint scenes, vehicle levels)
+
+### Implementation Order
+
+1. Camera system in demo framework (DemoRunner + Canvas2DAdapter + renderer)
+2. `CharacterController` core — collide-and-slide, `move()`, ground detection
+3. Slope handling + step climbing
+4. One-way platforms (PreListener auto-setup)
+5. Moving platform tracking
+6. Snap to ground + wall detection
+7. Fluid/swim mode integration
+8. Coyote time / helper properties
+9. Interactive platformer demo (wide level, keyboard controls)
+10. Unit + integration tests
+11. Docs update (API reference, guide, CLAUDE.md, README)
+
+### Competitive Analysis
+
+- **Rapier 2D**: High-level `KinematicCharacterController` with config. Known issues: moving
+  platforms broken (GitHub #488), slope angle settings were non-functional for months. Generic
+  design disclaimer: "may not work perfectly out-of-the-box for all game types."
+- **Box2D v3.1**: Low-level toolkit (`b2World_CastMover` + `b2SolvePlanes`). Capsule only.
+  Labeled "experimental." No built-in ground/slope/step helpers.
+- **Matter.js / Planck.js**: No character controller at all — developers build from scratch.
+- **Celeste / Hollow Knight**: Custom pixel-by-pixel systems with no physics engine for character
+  movement. Validates the geometric approach over dynamic bodies.
 
 ---
 

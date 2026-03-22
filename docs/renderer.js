@@ -150,18 +150,28 @@ export function drawConstraints(ctx, space) {
 
 /**
  * Draw a subtle background grid.
+ * When camX/camY are provided, tiles the grid to cover the visible viewport
+ * so the grid scrolls naturally with the camera.
  * @param {CanvasRenderingContext2D} ctx
- * @param {number} W
- * @param {number} H
+ * @param {number} W — viewport width
+ * @param {number} H — viewport height
+ * @param {number} [camX=0] — camera X offset (world coords of viewport top-left)
+ * @param {number} [camY=0] — camera Y offset (world coords of viewport top-left)
  */
-export function drawGrid(ctx, W, H) {
+export function drawGrid(ctx, W, H, camX = 0, camY = 0) {
+  const step = 50;
   ctx.strokeStyle = "#1a2030";
   ctx.lineWidth = 0.5;
-  for (let x = 0; x < W; x += 50) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  // Compute world-space range visible in the viewport
+  const startX = Math.floor(camX / step) * step;
+  const startY = Math.floor(camY / step) * step;
+  const endX = camX + W;
+  const endY = camY + H;
+  for (let x = startX; x <= endX; x += step) {
+    ctx.beginPath(); ctx.moveTo(x, startY); ctx.lineTo(x, endY); ctx.stroke();
   }
-  for (let y = 0; y < H; y += 50) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  for (let y = startY; y <= endY; y += step) {
+    ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke();
   }
 }
 

@@ -99,6 +99,12 @@ export type {
 
 // Helpers
 export { createConcaveBody, type ConcaveBodyOptions } from "./helpers/createConcaveBody";
+export {
+  CharacterController,
+  type CharacterControllerOptions,
+  type CharacterCollision,
+  type MoveResult,
+} from "./helpers/CharacterController";
 
 // List/Iterator registration (side-effect import — registers all typed list pairs)
 import "./util/registerLists";
