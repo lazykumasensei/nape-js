@@ -424,6 +424,56 @@ describe("CharacterController", () => {
       expect(playerBottom).toBeLessThanOrEqual(480 + 1); // 1px tolerance
     });
 
+    it("resolves overlap when character is pushed into thin platform", () => {
+      // Thin platform (8px) — thinner than character radius (12)
+      const platform = new Body(BodyType.STATIC, new Vec2(100, 450));
+      platform.shapes.add(new Polygon(Polygon.box(200, 8)));
+      platform.space = space;
+
+      // Place character so it overlaps the platform slightly
+      // Platform top=446, bottom=454. Character center at 456, radius=12, top edge=444 < 446
+      player.position = new Vec2(100, 456);
+      const cc = new CharacterController(space, player);
+      const RADIUS = 12;
+
+      // Move upward — should be pushed out, not stuck
+      cc.move(new Vec2(0, -5));
+      const playerTop = player.position.y - RADIUS;
+      // Should not be inside the platform (top at 446)
+      // Either pushed below (>= 454) or above (<= 446)
+      const insidePlatform = playerTop > 446 && playerTop < 454;
+      expect(insidePlatform).toBe(false);
+    });
+
+    it("does not get stuck on repeated jumps into thin platform", () => {
+      // Thin platform
+      const platform = new Body(BodyType.STATIC, new Vec2(100, 440));
+      platform.shapes.add(new Polygon(Polygon.box(200, 8)));
+      platform.space = space;
+
+      addFloor(space);
+      player.position = new Vec2(100, 465);
+      const cc = new CharacterController(space, player);
+      const RADIUS = 12;
+
+      // Simulate multiple jumps into the platform from below
+      for (let i = 0; i < 5; i++) {
+        cc.move(new Vec2(0, -20)); // jump up
+        cc.move(new Vec2(0, 20)); // fall back
+      }
+
+      // Character should not be stuck inside the platform
+      const py = player.position.y;
+      const platformTop = 440 - 4;
+      const platformBot = 440 + 4;
+      const topEdge = py - RADIUS;
+      const botEdge = py + RADIUS;
+      // Either fully above or fully below the platform
+      const fullyAbove = botEdge <= platformTop + 2;
+      const fullyBelow = topEdge >= platformBot - 2;
+      expect(fullyAbove || fullyBelow).toBe(true);
+    });
+
     it("character does not penetrate wall from the side", () => {
       addFloor(space);
       const wall = new Body(BodyType.STATIC, new Vec2(200, 450));

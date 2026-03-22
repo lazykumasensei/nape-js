@@ -488,10 +488,16 @@ export class CharacterController {
         break;
       }
 
-      // Advance to safe distance
-      const advanceDist = Math.max(0, safeDistance);
-      px += dirX * advanceDist;
-      py += dirY * advanceDist;
+      if (safeDistance < 0) {
+        // Already overlapping — push out along the hit normal
+        const pushDist = -safeDistance;
+        px += hit.normal.x * pushDist;
+        py += hit.normal.y * pushDist;
+      } else {
+        // Advance to safe distance
+        px += dirX * safeDistance;
+        py += dirY * safeDistance;
+      }
 
       // Record collision
       const nx = hit.normal.x;
@@ -500,10 +506,7 @@ export class CharacterController {
       if (hitBody && shape) {
         this._collisions.push({
           normal: new Vec2(nx, ny),
-          point: new Vec2(
-            px + dirX * (advanceDist + charRadius),
-            py + dirY * (advanceDist + charRadius),
-          ),
+          point: new Vec2(px + nx * charRadius, py + ny * charRadius),
           body: hitBody,
           shape,
         });
@@ -516,7 +519,7 @@ export class CharacterController {
       }
 
       // Compute remaining movement after collision
-      const usedDist = advanceDist;
+      const usedDist = Math.max(0, safeDistance);
       const leftover = mag - usedDist;
       if (leftover < MIN_MOVE_THRESHOLD) break;
 
