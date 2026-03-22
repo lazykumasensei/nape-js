@@ -282,9 +282,13 @@ export default {
       velY = -JUMP_SPEED;
       jumpBufferTimer = 0;
       jumped = true;
+    } else if (inWater && jumpJustPressed) {
+      // Swim jump — strong enough to leave the water
+      velY = -JUMP_SPEED * 0.7;
+      jumped = true;
     } else if (inWater && jumpKey) {
-      // Swim upward — weaker than jump, can hold key
-      velY = Math.max(velY - 600 * DT, -200);
+      // Swim upward — hold to rise gradually
+      velY = Math.max(velY - 800 * DT, -250);
       jumped = true;
     }
 
