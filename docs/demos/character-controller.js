@@ -106,7 +106,7 @@ export default {
     addStaticBox(space, 1775, floorY + 80, 350, 20);
 
     const hPlat = new Body(BodyType.KINEMATIC, new Vec2(1750, floorY + 20));
-    hPlat.shapes.add(new Polygon(Polygon.box(100, 12), undefined, new Material(0, 2, 2, 1)));
+    hPlat.shapes.add(new Polygon(Polygon.box(100, 12), new Material(0, 2, 2, 1)));
     hPlat.space = space;
     hPlat._hMoving = { minX: 1650, maxX: 1900, speed: 80 };
 
