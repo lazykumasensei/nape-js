@@ -100,13 +100,15 @@ export default {
     // ---- Section 4: Moving platforms (x: 1500–2100) ----
     addStaticBox(space, 1550, floorY, 100, 20);
 
+    const platMat = new Material(0, 2, 2, 1); // high friction so player sticks
+
     const hPlat = new Body(BodyType.KINEMATIC, new Vec2(1750, floorY - 50));
-    hPlat.shapes.add(new Polygon(Polygon.box(100, 12)));
+    hPlat.shapes.add(new Polygon(Polygon.box(100, 12), undefined, platMat));
     hPlat.space = space;
     hPlat._hMoving = { minX: 1650, maxX: 1900, speed: 80 };
 
     const vPlat = new Body(BodyType.KINEMATIC, new Vec2(2000, floorY - 100));
-    vPlat.shapes.add(new Polygon(Polygon.box(80, 12)));
+    vPlat.shapes.add(new Polygon(Polygon.box(80, 12), undefined, platMat));
     vPlat.space = space;
     vPlat._vMoving = { minY: floorY - 200, maxY: floorY - 50, speed: 60 };
 
@@ -256,6 +258,11 @@ export default {
     let moveX = 0;
     if (left) { moveX = -MOVE_SPEED; playerFacingRight = false; }
     if (right) { moveX = MOVE_SPEED; playerFacingRight = true; }
+
+    // Inherit moving platform velocity when grounded
+    if (result.grounded && result.groundBody && result.groundBody.type === BodyType.KINEMATIC) {
+      moveX += result.groundBody.velocity.x;
+    }
 
     // ---- Query state from last frame ----
     const result = cc.update();
