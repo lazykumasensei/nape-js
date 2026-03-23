@@ -2847,6 +2847,7 @@ export class ZPP_Collide {
 
   /** Point-in-capsule containment test. */
   static capsuleContains(cap: any, p: ZPP_Vec2): boolean {
+    ZPP_Collide._validateCapsuleSpine(cap);
     const t = ZPP_Collide._closestT(cap.spine1x, cap.spine1y, cap.spine2x, cap.spine2y, p.x, p.y);
     const cx = cap.spine1x + t * (cap.spine2x - cap.spine1x);
     const cy = cap.spine1y + t * (cap.spine2y - cap.spine1y);
@@ -2993,6 +2994,31 @@ export class ZPP_Collide {
   }
 
   /**
+   * Ensure capsule world-space spine endpoints are current.
+   * The spine is computed inside __validate_aabb, but the broadphase may not
+   * have re-validated the AABB since the last position integration, leaving
+   * spine1/spine2 stale.  This lightweight helper recomputes them from the
+   * body's current posx/posy/rot without touching the AABB dirty flag.
+   */
+  static _validateCapsuleSpine(cap: any): void {
+    const body = cap.body;
+    if (body == null) return;
+    if (body.zip_axis) {
+      body.zip_axis = false;
+      body.axisx = Math.sin(body.rot);
+      body.axisy = Math.cos(body.rot);
+    }
+    cap.worldCOMx = body.posx + (body.axisy * cap.localCOMx - body.axisx * cap.localCOMy);
+    cap.worldCOMy = body.posy + (cap.localCOMx * body.axisx + cap.localCOMy * body.axisy);
+    const dx = body.axisy * cap.halfLength;
+    const dy = body.axisx * cap.halfLength;
+    cap.spine1x = cap.worldCOMx - dx;
+    cap.spine1y = cap.worldCOMy - dy;
+    cap.spine2x = cap.worldCOMx + dx;
+    cap.spine2y = cap.worldCOMy + dy;
+  }
+
+  /**
    * Capsule contact collision dispatcher.
    * s2 is always the capsule (type=2). s1 is circle (0), polygon (1), or capsule (2).
    */
@@ -3004,6 +3030,10 @@ export class ZPP_Collide {
     napeNs: any,
   ): boolean {
     const cap2 = s2.capsule;
+
+    // Ensure capsule spine endpoints are up to date (they live in __validate_aabb)
+    ZPP_Collide._validateCapsuleSpine(cap2);
+    if (s1.type == 2) ZPP_Collide._validateCapsuleSpine(s1.capsule);
 
     if (s1.type == 0) {
       // circle-capsule
@@ -3025,6 +3055,8 @@ export class ZPP_Collide {
     rev: boolean,
     napeNs: any,
   ): boolean {
+    // Ensure spine endpoints are current
+    ZPP_Collide._validateCapsuleSpine(cap);
     // Find closest point on capsule spine to circle center
     const t = ZPP_Collide._closestT(
       cap.spine1x,
@@ -3108,6 +3140,9 @@ export class ZPP_Collide {
     rev: boolean,
     napeNs: any,
   ): boolean {
+    // Ensure spine endpoints are current for both capsules
+    ZPP_Collide._validateCapsuleSpine(cap1);
+    ZPP_Collide._validateCapsuleSpine(cap2);
     const minDist = cap1.radius + cap2.radius;
     const eps = napeNs.Config.epsilon;
 
@@ -3299,6 +3334,9 @@ export class ZPP_Collide {
     rev: boolean,
     napeNs: any,
   ): boolean {
+    // Ensure spine endpoints are current (body may have moved since last AABB validation)
+    ZPP_Collide._validateCapsuleSpine(cap);
+
     // SAT phase 1: polygon edge normals vs capsule
     // For each edge, the minimum separation is min(proj(spine1), proj(spine2)) - edge.gprojection - cap.radius
     let bestDist = -1e100;
@@ -3400,7 +3438,9 @@ export class ZPP_Collide {
       setLr(co.inner, capLocalRef(t));
     };
 
-    // Helper: add a vertex contact for spine endpoint vs a polygon vertex
+    // Helper: add a vertex contact for spine endpoint vs a polygon vertex.
+    // Uses the best-edge normal direction (not the capsule→vertex direction) to
+    // prevent normal-flip jitter when transitioning from face to vertex contact.
     const addVertexContact = (
       t: number,
       sx: number,
@@ -3412,32 +3452,29 @@ export class ZPP_Collide {
       const py = vy - sy;
       const distSqr = px * px + py * py;
       if (distSqr > cap.radius * cap.radius) return false;
-      const co = ZPP_Collide._getOrCreateContact(arb, 0, arb.stamp);
+
+      // Use edge normal for vertex contacts too — keeps ptype/normal consistent
+      // with face contacts and prevents the solver from seeing a sudden normal flip.
+      arb.nx = rev ? -bestEdge.gnormx : bestEdge.gnormx;
+      arb.ny = rev ? -bestEdge.gnormy : bestEdge.gnormy;
       arb.radius = cap.radius;
-      arb.ptype = 0;
+      arb.lproj = bestEdge.lprojection;
+      arb.lnormx = bestEdge.lnormx;
+      arb.lnormy = bestEdge.lnormy;
+      arb.ptype = rev ? 1 : 0;
+      arb.rev = rev;
       arb.__ref_edge1 = bestEdge;
       arb.__ref_vertex = 0;
-      if (distSqr < napeNs.Config.epsilon * napeNs.Config.epsilon) {
-        // Coincident: use edge normal as fallback
-        co.px = sx;
-        co.py = sy;
-        arb.nx = rev ? -bestEdge.gnormx : bestEdge.gnormx;
-        arb.ny = rev ? -bestEdge.gnormy : bestEdge.gnormy;
-        co.dist = -cap.radius;
-      } else {
-        const invDist = 1.0 / Math.sqrt(distSqr);
-        const dist = 1.0 / invDist;
-        // nx points from spine endpoint toward polygon vertex (outward from capsule)
-        const nx = px * invDist;
-        const ny = py * invDist;
-        // Contact point on capsule surface in direction of vertex
-        co.px = sx + nx * cap.radius;
-        co.py = sy + ny * cap.radius;
-        // Normal: from capsule toward polygon (outward from capsule body1)
-        arb.nx = rev ? -nx : nx;
-        arb.ny = rev ? -ny : ny;
-        co.dist = dist - cap.radius;
-      }
+
+      // Penetration depth along edge normal
+      const proj = bestEdge.gnormx * sx + bestEdge.gnormy * sy;
+      const d = proj - bestEdge.gprojection - cap.radius;
+      if (d > 0) return false;
+
+      const co = ZPP_Collide._getOrCreateContact(arb, 0, arb.stamp);
+      co.px = sx - bestEdge.gnormx * (cap.radius + d * 0.5);
+      co.py = sy - bestEdge.gnormy * (cap.radius + d * 0.5);
+      co.dist = d;
       co.stamp = arb.stamp;
       co.posOnly = false;
       setLr(co.inner, capLocalRef(t));
@@ -3557,6 +3594,10 @@ export class ZPP_Collide {
   /** Capsule test collision dispatcher (boolean only). */
   static _capsuleTestCollide(s1: ZPP_Shape, s2: ZPP_Shape): boolean {
     const cap2 = s2.capsule;
+
+    // Ensure capsule spine endpoints are up to date
+    ZPP_Collide._validateCapsuleSpine(cap2);
+    if (s1.type == 2) ZPP_Collide._validateCapsuleSpine(s1.capsule);
 
     if (s1.type == 0) {
       // circle-capsule

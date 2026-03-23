@@ -869,7 +869,9 @@ export class ZPP_SweepPhase extends ZPP_Broadphase {
             const result =
               a.shape.type == 0
                 ? ray.circlesect(a.shape.circle, inner, mint)
-                : ray.polysect(a.shape.polygon, inner, mint);
+                : a.shape.type == 2
+                  ? ray.capsect(a.shape.capsule, inner, mint)
+                  : ray.polysect(a.shape.polygon, inner, mint);
             if (result != null) {
               if (result.zpp_inner.next != null) {
                 throw new Error("Error: This object has been disposed of and cannot be used");
@@ -921,7 +923,9 @@ export class ZPP_SweepPhase extends ZPP_Broadphase {
             const result1 =
               a1.shape.type == 0
                 ? ray.circlesect(a1.shape.circle, inner, mint)
-                : ray.polysect(a1.shape.polygon, inner, mint);
+                : a1.shape.type == 2
+                  ? ray.capsect(a1.shape.capsule, inner, mint)
+                  : ray.polysect(a1.shape.polygon, inner, mint);
             if (result1 != null) {
               if (result1.zpp_inner.next != null) {
                 throw new Error("Error: This object has been disposed of and cannot be used");
@@ -971,7 +975,9 @@ export class ZPP_SweepPhase extends ZPP_Broadphase {
             const result2 =
               a2.shape.type == 0
                 ? ray.circlesect(a2.shape.circle, inner, mint)
-                : ray.polysect(a2.shape.polygon, inner, mint);
+                : a2.shape.type == 2
+                  ? ray.capsect(a2.shape.capsule, inner, mint)
+                  : ray.polysect(a2.shape.polygon, inner, mint);
             if (result2 != null) {
               if (result2.zpp_inner.next != null) {
                 throw new Error("Error: This object has been disposed of and cannot be used");
@@ -1039,6 +1045,8 @@ export class ZPP_SweepPhase extends ZPP_Broadphase {
           if (t >= 0) {
             if (a.shape.type == 0) {
               ray.circlesect2(a.shape.circle, inner, ret);
+            } else if (a.shape.type == 2) {
+              ray.capsect2(a.shape.capsule, inner, ret);
             } else {
               ray.polysect2(a.shape.polygon, inner, ret);
             }
@@ -1079,6 +1087,8 @@ export class ZPP_SweepPhase extends ZPP_Broadphase {
           if (t1 >= 0) {
             if (a1.shape.type == 0) {
               ray.circlesect2(a1.shape.circle, inner, ret);
+            } else if (a1.shape.type == 2) {
+              ray.capsect2(a1.shape.capsule, inner, ret);
             } else {
               ray.polysect2(a1.shape.polygon, inner, ret);
             }
@@ -1113,6 +1123,8 @@ export class ZPP_SweepPhase extends ZPP_Broadphase {
           if (t2 >= 0) {
             if (a2.shape.type == 0) {
               ray.circlesect2(a2.shape.circle, inner, ret);
+            } else if (a2.shape.type == 2) {
+              ray.capsect2(a2.shape.capsule, inner, ret);
             } else {
               ray.polysect2(a2.shape.polygon, inner, ret);
             }

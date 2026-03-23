@@ -1,5 +1,5 @@
 import {
-  Body, BodyType, Vec2, Circle, Polygon, Material, CbType, CbEvent,
+  Body, BodyType, Vec2, Circle, Capsule, Polygon, Material, CbType, CbEvent,
   InteractionType, InteractionListener, PreListener, PreFlag,
   CharacterController, FluidProperties,
 } from "../nape-js.esm.js";
@@ -11,7 +11,9 @@ import { drawBody, drawConstraints, drawGrid, COLORS } from "../renderer.js";
 
 const WORLD_W = 4000;
 const WORLD_H = 600;
-const PLAYER_R = 14;
+const PLAYER_W = 20;   // capsule diameter (end-cap width)
+const PLAYER_H = 36;   // capsule total height (standing)
+const PLAYER_R = PLAYER_W / 2; // half-width for bounds clamping
 const ONEWAY_GROUP = 1 << 9;
 const GRAVITY = 600;
 const MOVE_SPEED = 180;
@@ -100,11 +102,12 @@ export default {
     addCoin(space, 380, 308, coinTag);
 
     // ---- Section 2: Steps (x: 500–900) ----
+    // Use smaller step increments (6px) so the capsule's rounded bottom can climb smoothly
     const stepBase = floorY - 10;
-    for (let i = 0; i < 6; i++) {
-      addStaticBox(space, 580 + i * 36, stepBase - i * 10, 34, 10 + i * 10);
+    for (let i = 0; i < 8; i++) {
+      addStaticBox(space, 560 + i * 30, stepBase - i * 6, 28, 6 + i * 6);
     }
-    addCoin(space, 760, stepBase - 90, coinTag);
+    addCoin(space, 760, stepBase - 70, coinTag);
 
     // ---- Section 3: Slopes (x: 900–1500) ----
     addSlopeRamp(space, 950, floorY - 10, 300, 80, false);
@@ -196,11 +199,13 @@ export default {
     addStaticBox(space, 3800, 280, 100, 16);
     addCoin(space, 3800, 250, coinTag);
 
-    // ---- Player (dynamic body) ----
+    // ---- Player (dynamic body — capsule shape) ----
     player = new Body(BodyType.DYNAMIC, new Vec2(100, floorY - 30));
-    const playerShape = new Circle(PLAYER_R, undefined, new Material(0, 0.3, 0.3, 1));
+    // Capsule(width, height): spine along X-axis, so rotate body 90° for upright
+    const playerShape = new Capsule(PLAYER_H, PLAYER_W, undefined, new Material(0, 0.3, 0.3, 1));
     playerShape.cbTypes.add(playerTag);
     player.shapes.add(playerShape);
+    player.rotation = Math.PI / 2; // stand upright
     player.allowRotation = false;
     player.isBullet = true;
     player.space = space;
@@ -502,7 +507,7 @@ export default {
       const py = player.position.y;
       ctx.fillStyle = cc?.grounded ? "#3fb950" : "#f85149";
       ctx.beginPath();
-      ctx.arc(px + (playerFacingRight ? 5 : -5), py - 6, 2, 0, Math.PI * 2);
+      ctx.arc(px + (playerFacingRight ? 4 : -4), py - PLAYER_H / 2 + 8, 2, 0, Math.PI * 2);
       ctx.fill();
     }
 
