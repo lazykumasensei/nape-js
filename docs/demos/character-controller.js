@@ -59,9 +59,10 @@ export default {
 
     const floorY = WORLD_H - 10;
 
-    // ---- Floor (with gap for water zone at x: 2160–2640) ----
-    addStaticBox(space, 1080, floorY, 2160, 20);       // left section: x 0–2160
-    addStaticBox(space, 2920, floorY, 560, 20);         // right section: x 2640–3200
+    // ---- Floor (with gaps for moving platforms and water) ----
+    addStaticBox(space, 800, floorY, 1600, 20);          // x: 0–1600
+    addStaticBox(space, 2130, floorY, 60, 20);           // x: 2100–2160 (bridge)
+    addStaticBox(space, 2920, floorY, 560, 20);          // x: 2640–3200
 
     // ---- Left/right walls ----
     addStaticBox(space, -10, WORLD_H / 2, 20, WORLD_H);
@@ -97,24 +98,28 @@ export default {
     addCoin(space, 1200, floorY - 110, coinTag);
     addCoin(space, 1050, floorY - 50, coinTag);
 
-    // ---- Section 4: Moving platforms (x: 1500–2100) ----
-    addStaticBox(space, 1550, floorY, 100, 20);
+    // ---- Section 4: Moving platforms (x: 1600–2100, pit below) ----
+    // Pit floor (catch if player falls)
+    addStaticBox(space, 1850, floorY + 100, 500, 20);
 
     const platMat = new Material(0, 2, 2, 1); // high friction so player sticks
 
-    const hPlat = new Body(BodyType.KINEMATIC, new Vec2(1750, floorY - 50));
+    // Horizontal moving platform
+    const hPlat = new Body(BodyType.KINEMATIC, new Vec2(1750, floorY + 40));
     hPlat.shapes.add(new Polygon(Polygon.box(100, 12), undefined, platMat));
     hPlat.space = space;
     hPlat._hMoving = { minX: 1650, maxX: 1900, speed: 80 };
 
-    const vPlat = new Body(BodyType.KINEMATIC, new Vec2(2000, floorY - 100));
+    // Vertical moving platform
+    const vPlat = new Body(BodyType.KINEMATIC, new Vec2(2000, floorY + 20));
     vPlat.shapes.add(new Polygon(Polygon.box(80, 12), undefined, platMat));
     vPlat.space = space;
-    vPlat._vMoving = { minY: floorY - 200, maxY: floorY - 50, speed: 60 };
+    vPlat._vMoving = { minY: floorY - 60, maxY: floorY + 60, speed: 60 };
 
-    addStaticBox(space, 2100, floorY - 200, 100, 16);
-    addCoin(space, 2100, floorY - 230, coinTag);
-    addCoin(space, 1750, floorY - 80, coinTag);
+    // Landing platform on the other side
+    addStaticBox(space, 2100, floorY - 20, 100, 16);
+    addCoin(space, 2100, floorY - 50, coinTag);
+    addCoin(space, 1750, floorY + 10, coinTag);
 
     // ---- Section 5: Water (x: 2160–2640) ----
     // Pool walls and floor — inner width = 480
