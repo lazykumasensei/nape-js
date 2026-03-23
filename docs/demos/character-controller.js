@@ -237,7 +237,6 @@ export default {
         if (px >= m.maxX) m._dir = -1;
         if (px <= m.minX) m._dir = 1;
         body.velocity = new Vec2(m._dir * m.speed, 0);
-        body.surfaceVel = new Vec2(-m._dir * m.speed, 0);
       }
       if (body._vMoving) {
         const m = body._vMoving;
@@ -303,19 +302,13 @@ export default {
     }
 
     // Apply velocity — only override what's needed, preserve engine physics
-    const curVx = player.velocity.x;
     const curVy = player.velocity.y;
 
-    // Horizontal: blend input toward desired speed without killing friction
-    let targetVx = moveX; // desired input velocity
-    let newVx;
-    if (result.grounded) {
-      // On ground: snap to desired speed (friction handles platform carry)
-      newVx = targetVx || curVx; // if no input, keep engine velocity (friction)
-    } else {
-      // In air: direct control
-      newVx = targetVx;
-    }
+    // Moving platform: add platform velocity so player rides with it
+    const platVx = result.onMovingPlatform ? result.groundBody.velocity.x : 0;
+
+    // Horizontal: player input + platform carry (no friction accumulation)
+    const newVx = moveX + platVx;
 
     // Vertical
     let newVy = curVy; // default: let engine handle gravity/buoyancy
