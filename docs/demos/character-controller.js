@@ -243,7 +243,7 @@ export default {
     const jumpJustPressed = jumpKey && !prevJumpKey;
     prevJumpKey = jumpKey;
 
-    // ---- Update moving platforms (position-based, set velocity for physics) ----
+    // ---- Update moving platforms (velocity only — position set by space.step) ----
     for (const body of space.bodies) {
       if (body._hMoving) {
         const m = body._hMoving;
@@ -251,8 +251,6 @@ export default {
         const px = body.position.x;
         if (px >= m.maxX) m._dir = -1;
         if (px <= m.minX) m._dir = 1;
-        const dx = m._dir * m.speed * DT;
-        body.position = new Vec2(px + dx, body.position.y);
         body.velocity = new Vec2(m._dir * m.speed, 0);
       }
       if (body._vMoving) {
@@ -261,8 +259,6 @@ export default {
         const py = body.position.y;
         if (py >= m.maxY) m._dir = -1;
         if (py <= m.minY) m._dir = 1;
-        const dy = m._dir * m.speed * DT;
-        body.position = new Vec2(body.position.x, py + dy);
         body.velocity = new Vec2(0, m._dir * m.speed);
       }
     }
