@@ -123,9 +123,6 @@ export default {
     const waterShape = new Polygon(Polygon.box(480, 80));
     waterShape.fluidEnabled = true;
     waterShape.fluidProperties = new FluidProperties(1.5, 3);
-    // Disable collision so the player sinks into the water, keep fluid interaction
-    waterShape.filter.collisionMask = 0;
-    waterShape.filter.collisionGroup = 0;
     water.shapes.add(waterShape);
     water.space = space;
     water._isWater = true;
@@ -192,7 +189,7 @@ export default {
       follow: player,
       offsetX: 0,
       offsetY: -30,
-      bounds: { minX: 0, minY: 0, maxX: WORLD_W, maxY: WORLD_H },
+      bounds: { minX: 0, minY: 0, maxX: WORLD_W, maxY: WORLD_H + 120 },
       lerp: 0.12,
     };
 
@@ -259,9 +256,14 @@ export default {
     // Check if player is in water (has active fluid arbiters)
     let inWater = false;
     try {
-      const arbs = player.arbiters;
-      for (let i = 0; i < arbs.length; i++) {
-        if (arbs.at(i).isFluidArbiter()) { inWater = true; break; }
+      const arbs = space.arbiters;
+      const arbCount = arbs.zpp_gl();
+      for (let i = 0; i < arbCount; i++) {
+        const a = arbs.at(i);
+        if (a.isFluidArbiter() && (a.body1 === player || a.body2 === player)) {
+          inWater = true;
+          break;
+        }
       }
     } catch (_) {}
 
