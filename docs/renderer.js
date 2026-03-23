@@ -19,6 +19,9 @@ export const COLORS = [
 ];
 
 export function bodyColor(body) {
+  // Allow full custom color via _color (e.g. ice platforms)
+  const customColor = body.userData?._color;
+  if (customColor) return customColor;
   // Allow explicit color override via _colorIdx (e.g. one-way platforms, player)
   const overrideIdx = body.userData?._colorIdx;
   if (overrideIdx != null && overrideIdx > 0) {

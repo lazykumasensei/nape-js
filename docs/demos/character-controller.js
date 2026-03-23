@@ -9,7 +9,7 @@ import { drawBody, drawConstraints, drawGrid, COLORS } from "../renderer.js";
 // Constants
 // ---------------------------------------------------------------------------
 
-const WORLD_W = 3200;
+const WORLD_W = 4000;
 const WORLD_H = 600;
 const PLAYER_R = 14;
 const ONEWAY_GROUP = 1 << 9;
@@ -18,6 +18,13 @@ const MOVE_SPEED = 180;
 const JUMP_SPEED = 380;
 const COYOTE_MS = 100;
 const JUMP_BUFFER_MS = 100;
+const WALL_JUMP_VX = 200;       // horizontal kick-off speed
+const WALL_JUMP_VY = -340;      // upward speed (slightly less than ground jump)
+const WALL_SLIDE_MAX_VY = 80;   // max fall speed while wall-sliding
+const WALL_JUMP_LOCK_MS = 150;  // briefly lock horizontal input after wall-jump
+const ICE_ACCEL = 300;          // horizontal acceleration on ice (px/s²)
+const ICE_DECEL = 150;          // deceleration on ice when no input (px/s²)
+const BOUNCE_SPEED = 600;       // upward launch speed from bounce pads
 const DT = 1 / 60;
 
 // ---------------------------------------------------------------------------
@@ -33,6 +40,12 @@ let velY = 0;
 let playerFacingRight = true;
 let coinCount = 0;
 let coinPopups = []; // { x, y, timer }
+let wallJumpLockTimer = 0;
+let wallJumpKickVx = 0;
+let wallSliding = false;
+let lastWallJumpSide = 0; // -1 = jumped off left wall, +1 = off right wall, 0 = none
+let onIce = false;
+let iceVx = 0; // tracked horizontal velocity on ice (persists across frames)
 
 // ---------------------------------------------------------------------------
 // Demo definition
@@ -43,8 +56,8 @@ export default {
   label: "Character Controller",
   featured: true,
   featuredOrder: 11,
-  tags: ["CharacterController", "Platformer", "Camera", "One-Way", "Slope"],
-  desc: "WASD/Arrow keys to move, <b>Space</b> to jump. Features: slopes, one-way platforms, moving platforms, coyote time. Uses the built-in <code>CharacterController</code> class with dynamic body physics.",
+  tags: ["CharacterController", "Platformer", "Camera", "One-Way", "Slope", "Wall-Jump", "Ice"],
+  desc: "WASD/Arrow keys to move, <b>Space</b> to jump. Features: slopes, one-way platforms, moving platforms, wall-slide, wall-jump, ice, coyote time. Uses the built-in <code>CharacterController</code> class with dynamic body physics.",
   walls: false,
   canvas2dOnly: true,
 
@@ -60,10 +73,11 @@ export default {
     const floorY = WORLD_H - 10;
 
     // ---- Floor (with gaps for hPlat zone and water) ----
-    // x: 0–1600 | gap 1600–1950 (hPlat) | 1950–2160 | gap 2160–2640 (water) | 2640–3200
+    // x: 0–1600 | gap 1600–1950 (hPlat) | 1950–2160 | gap 2160–2640 (water) | 2640–2830 solid | 2830–3500 ice | 3500–4000
     addStaticBox(space, 800, floorY, 1600, 20);
     addStaticBox(space, 2055, floorY, 210, 20);
-    addStaticBox(space, 2920, floorY, 560, 20);
+    addStaticBox(space, 2760, floorY, 240, 20);    // solid between water and ice (2640–2880)
+    addStaticBox(space, 3750, floorY, 500, 20);
 
     // ---- Left/right walls ----
     addStaticBox(space, -10, WORLD_H / 2, 20, WORLD_H);
@@ -140,17 +154,47 @@ export default {
     addCoin(space, 2300, floorY + 20, coinTag);
     addCoin(space, 2500, floorY + 20, coinTag);
 
-    // ---- Section 6: Wall zone (x: 2600–2900) ----
-    addStaticBox(space, 2700, floorY - 80, 16, 160);
-    addStaticBox(space, 2800, floorY - 80, 16, 160);
-    addOneWay(space, 2750, floorY - 170, 80, platformTag);
-    addCoin(space, 2750, floorY - 200, coinTag);
+    // ---- Section 6: Wall-jump shaft (x: 2680–2820) ----
+    // Tall vertical shaft — enter from the left, wall-jump up, exit at top-right
+    const shaftL = 2680, shaftR = 2820;
+    const shaftW = 16;
+    const shaftH = 300;                           // tall enough to require wall-jumps
+    const shaftTop = floorY - shaftH;             // top of the shaft walls
+    const shaftCY = floorY - shaftH / 2;          // center Y of shaft walls
+    // Left wall: opening at bottom (door height ~60px) so player walks in
+    const doorH = 60;
+    const leftSolidH = shaftH - doorH;            // solid part above the door
+    const leftCY = shaftTop + leftSolidH / 2;
+    addStaticBox(space, shaftL, leftCY, shaftW, leftSolidH);          // left wall (upper)
+    addStaticBox(space, shaftR, shaftCY, shaftW, shaftH);             // right wall (full)
+    // Cap: one-way platform — player wall-jumps up through it, lands on top
+    addOneWay(space, (shaftL + shaftR) / 2, shaftTop, shaftR - shaftL + 40, platformTag);
+    // Coins going up the shaft
+    addCoin(space, (shaftL + shaftR) / 2, floorY - 80, coinTag);
+    addCoin(space, (shaftL + shaftR) / 2, floorY - 180, coinTag);
+    addCoin(space, (shaftL + shaftR) / 2, shaftTop - 30, coinTag);   // on top of shaft
 
-    // ---- Section 7: Final stretch (x: 2900–3100) ----
-    addOneWay(space, 2950, 400, 100, platformTag);
-    addOneWay(space, 3050, 330, 80, platformTag);
-    addStaticBox(space, 3100, 280, 100, 16);
-    addCoin(space, 3100, 250, coinTag);
+    // ---- Bounce pad: between shaft and ice, launches back up to shaft top ----
+    addBouncePad(space, 2850, floorY - 6, 50);
+
+    // ---- Section 6b: Ice zone (x: 2880–3500) ----
+    // Long slippery ice floor — player slides, hard to stop
+    addIce(space, 3190, floorY - 6, 620);
+    addCoin(space, 2900, floorY - 30, coinTag);
+    addCoin(space, 3100, floorY - 30, coinTag);
+    addCoin(space, 3300, floorY - 30, coinTag);
+    // Small ice obstacles to dodge while sliding
+    addStaticBox(space, 3000, floorY - 20, 16, 40);
+    addStaticBox(space, 3250, floorY - 20, 16, 40);
+
+    // ---- Bounce pad: launch up to final stretch ----
+    addBouncePad(space, 3520, floorY - 6, 50);
+
+    // ---- Section 7: Final stretch (x: 3500–3900) ----
+    addOneWay(space, 3600, 400, 100, platformTag);
+    addOneWay(space, 3700, 330, 80, platformTag);
+    addStaticBox(space, 3800, 280, 100, 16);
+    addCoin(space, 3800, 250, coinTag);
 
     // ---- Player (dynamic body) ----
     player = new Body(BodyType.DYNAMIC, new Vec2(100, floorY - 30));
@@ -211,6 +255,12 @@ export default {
     playerFacingRight = true;
     coinCount = 0;
     coinPopups = [];
+    wallJumpLockTimer = 0;
+    wallJumpKickVx = 0;
+    wallSliding = false;
+    lastWallJumpSide = 0;
+    onIce = false;
+    iceVx = 0;
 
     // Keyboard handling
     this._onKeyDown = (e) => {
@@ -277,6 +327,34 @@ export default {
       }
     } catch (_) {}
 
+    // ---- Ice detection ----
+    const wasOnIce = onIce;
+    onIce = result.grounded && result.groundBody?.userData?._isIce;
+    if (onIce) {
+      // First frame on ice: inherit current movement speed
+      if (!wasOnIce) {
+        iceVx = moveX;
+      }
+      // Slippery: gradually accelerate/decelerate using persistent iceVx
+      const targetVx = moveX; // 0, -MOVE_SPEED, or +MOVE_SPEED
+      if (targetVx !== 0) {
+        const diff = targetVx - iceVx;
+        iceVx += Math.sign(diff) * Math.min(Math.abs(diff), ICE_ACCEL * DT);
+      } else {
+        if (Math.abs(iceVx) < ICE_DECEL * DT) {
+          iceVx = 0;
+        } else {
+          iceVx -= Math.sign(iceVx) * ICE_DECEL * DT;
+        }
+      }
+      moveX = iceVx;
+    } else {
+      iceVx = 0;
+    }
+
+    // ---- Bounce pad detection ----
+    const onBounce = result.grounded && result.groundBody?.userData?._isBounce;
+
     // ---- Vertical velocity ----
     velY = player.velocity.y;
 
@@ -287,17 +365,53 @@ export default {
       jumpBufferTimer = Math.max(0, jumpBufferTimer - 1000 * DT);
     }
 
-    // Jump / swim
+    // Wall-jump lock timer (briefly prevents horizontal override after wall-jump)
+    wallJumpLockTimer = Math.max(0, wallJumpLockTimer - 1000 * DT);
+
+    // ---- Wall-slide detection ----
+    const onWall = !result.grounded && (result.wallLeft || result.wallRight);
+    const holdingIntoWall =
+      (result.wallLeft && left) || (result.wallRight && right);
+    wallSliding = onWall && holdingIntoWall && velY >= 0;
+
+    // Reset wall-jump side tracker when grounded
+    if (result.grounded) {
+      lastWallJumpSide = 0;
+    }
+
+    // Jump / swim / wall-jump
     const canJump = result.grounded || result.timeSinceGrounded * 1000 < COYOTE_MS || inWater;
+    // Wall-jump allowed only if touching the OPPOSITE wall from last wall-jump
+    const wallSide = result.wallLeft ? -1 : result.wallRight ? 1 : 0;
+    const canWallJump = !result.grounded && onWall && wallSide !== lastWallJumpSide;
     let jumped = false;
+    let wallJumped = false;
+
     if (jumpBufferTimer > 0 && canJump) {
       velY = inWater ? -JUMP_SPEED * 0.7 : -JUMP_SPEED;
       jumpBufferTimer = 0;
       jumped = true;
+      lastWallJumpSide = 0; // ground jump resets tracker
+    } else if (jumpBufferTimer > 0 && canWallJump) {
+      // Wall-jump: kick away from wall + upward boost
+      velY = WALL_JUMP_VY;
+      wallJumpKickVx = result.wallLeft ? WALL_JUMP_VX : -WALL_JUMP_VX;
+      moveX = wallJumpKickVx;
+      playerFacingRight = result.wallLeft; // face away from wall
+      wallJumpLockTimer = WALL_JUMP_LOCK_MS;
+      jumpBufferTimer = 0;
+      wallJumped = true;
+      lastWallJumpSide = wallSide; // remember which wall we jumped off
     }
 
-    // Variable jump height — cut upward velocity on release (not in water)
-    if (!inWater && !jumpKey && velY < 0) {
+    // Bounce pad: override vertical velocity with strong upward launch
+    if (onBounce) {
+      velY = -BOUNCE_SPEED;
+      jumped = true;
+    }
+
+    // Variable jump height — cut upward velocity on release (not in water, not bounced)
+    if (!inWater && !onBounce && !jumpKey && velY < 0) {
       velY *= 0.85;
     }
 
@@ -308,12 +422,21 @@ export default {
     const platVx = result.onMovingPlatform ? result.groundBody.velocity.x : 0;
 
     // Horizontal: player input + platform carry (no friction accumulation)
-    const newVx = moveX + platVx;
+    // During wall-jump lock, use the wall-jump kick direction instead of input
+    let newVx;
+    if (wallJumpLockTimer > 0) {
+      newVx = wallJumpKickVx; // maintain kick direction during lock period
+    } else {
+      newVx = moveX + platVx;
+    }
 
     // Vertical
     let newVy = curVy; // default: let engine handle gravity/buoyancy
-    if (jumped) {
+    if (jumped || wallJumped) {
       newVy = velY;
+    } else if (wallSliding && curVy > WALL_SLIDE_MAX_VY) {
+      // Wall-slide: cap downward velocity for slower descent
+      newVy = WALL_SLIDE_MAX_VY;
     } else if (!jumpKey && curVy < 0 && !inWater) {
       newVy = velY; // variable jump height cut
     }
@@ -405,12 +528,20 @@ export default {
     ctx.fillText(`\u25CF ${coinCount}`, W - 60, 20);
 
     if (cc) {
-      const state = cc.grounded ? "GROUNDED" : "AIRBORNE";
-      ctx.fillStyle = cc.grounded ? "#3fb950" : "#f85149";
+      const state = wallSliding ? "WALL-SLIDE" : cc.grounded ? "GROUNDED" : "AIRBORNE";
+      ctx.fillStyle = wallSliding ? "#a371f7" : cc.grounded ? "#3fb950" : "#f85149";
       ctx.fillText(state, 10, 40);
       if (cc.timeSinceGrounded > 0 && cc.timeSinceGrounded * 1000 < COYOTE_MS) {
         ctx.fillStyle = "#d29922";
         ctx.fillText("COYOTE", 100, 40);
+      }
+      if (wallJumpLockTimer > 0) {
+        ctx.fillStyle = "#a371f7";
+        ctx.fillText("WALL-JUMP", 100, 40);
+      }
+      if (onIce) {
+        ctx.fillStyle = "#8cd2ff";
+        ctx.fillText("ICE", 100, 40);
       }
     }
 
@@ -421,15 +552,14 @@ export default {
     ctx.fillText("\u25AC one-way (jump through)", 10, ly);
     ctx.fillStyle = "#607888";
     ctx.fillText("\u25AC solid", 200, ly);
+    ctx.fillStyle = "#f85149";
+    ctx.fillText("\u25AC bounce pad", 260, ly);
+    ctx.fillStyle = "#8cd2ff";
+    ctx.fillText("\u25AC ice (slippery)", 370, ly);
     ctx.fillStyle = "#d29922";
-    ctx.fillText("\u25CF coin", 260, ly);
+    ctx.fillText("\u25CF coin", 510, ly);
   },
 
-  click(x, y, space, W, H) {
-    const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-    b.shapes.add(new Circle(8));
-    b.space = space;
-  },
 };
 
 // ---------------------------------------------------------------------------
@@ -462,6 +592,29 @@ function addCoin(space, cx, cy, coinTag) {
   b.shapes.add(shape);
   b.space = space;
   try { b.userData._colorIdx = 1; } catch (_) {}
+  return b;
+}
+
+function addBouncePad(space, cx, cy, w) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  // High elasticity material — launches the player upward
+  b.shapes.add(new Polygon(Polygon.box(w, 10), new Material(3, 0.5, 0.5, 1)));
+  b.space = space;
+  try {
+    b.userData._color = { fill: "rgba(248,81,73,0.3)", stroke: "#f85149" };
+    b.userData._isBounce = true;
+  } catch (_) {}
+  return b;
+}
+
+function addIce(space, cx, cy, w) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  b.shapes.add(new Polygon(Polygon.box(w, 12)));
+  b.space = space;
+  try {
+    b.userData._color = { fill: "rgba(140,210,255,0.25)", stroke: "#8cd2ff" };
+    b.userData._isIce = true;
+  } catch (_) {}
   return b;
 }
 
