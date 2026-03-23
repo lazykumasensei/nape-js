@@ -255,6 +255,9 @@ export default {
     const jumpJustPressed = jumpKey && !prevJumpKey;
     prevJumpKey = jumpKey;
 
+    // ---- Query state from last frame ----
+    const result = cc.update();
+
     let moveX = 0;
     if (left) { moveX = -MOVE_SPEED; playerFacingRight = false; }
     if (right) { moveX = MOVE_SPEED; playerFacingRight = true; }
@@ -263,9 +266,6 @@ export default {
     if (result.grounded && result.groundBody && result.groundBody.type === BodyType.KINEMATIC) {
       moveX += result.groundBody.velocity.x;
     }
-
-    // ---- Query state from last frame ----
-    const result = cc.update();
 
     // Check if player is in water (has active fluid arbiters)
     let inWater = false;
