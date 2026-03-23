@@ -298,12 +298,23 @@ export default {
       velY *= 0.85;
     }
 
-    // Only override vertical velocity when jumping/swimming or cutting jump.
-    // Otherwise let the engine handle gravity + buoyancy naturally.
-    if (jumped || (!jumpKey && player.velocity.y < 0 && !inWater)) {
+    // Inherit platform velocity when grounded on kinematic
+    let platVy = 0;
+    if (result.grounded && result.groundBody && result.groundBody.type === BodyType.KINEMATIC) {
+      moveX += result.groundBody.velocity.x;
+      platVy = result.groundBody.velocity.y;
+    }
+
+    // Apply velocity
+    if (jumped) {
+      player.velocity = new Vec2(moveX, velY);
+    } else if (!jumpKey && player.velocity.y < 0 && !inWater) {
+      // Variable jump height cut
       player.velocity = new Vec2(moveX, velY);
     } else {
-      player.velocity = new Vec2(moveX, player.velocity.y);
+      // Normal: keep engine vertical velocity, add platform vertical if on one
+      const vy = platVy !== 0 ? platVy : player.velocity.y;
+      player.velocity = new Vec2(moveX, vy);
     }
 
     // Clamp player to world bounds
