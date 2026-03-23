@@ -302,24 +302,30 @@ export default {
       velY *= 0.85;
     }
 
-    // Inherit platform velocity when grounded on kinematic
-    let platVy = 0;
-    if (result.grounded && result.groundBody && result.groundBody.type === BodyType.KINEMATIC) {
-      moveX += result.groundBody.velocity.x;
-      platVy = result.groundBody.velocity.y;
+    // Apply velocity — only override what's needed, preserve engine physics
+    const curVx = player.velocity.x;
+    const curVy = player.velocity.y;
+
+    // Horizontal: blend input toward desired speed without killing friction
+    let targetVx = moveX; // desired input velocity
+    let newVx;
+    if (result.grounded) {
+      // On ground: snap to desired speed (friction handles platform carry)
+      newVx = targetVx || curVx; // if no input, keep engine velocity (friction)
+    } else {
+      // In air: direct control
+      newVx = targetVx;
     }
 
-    // Apply velocity
+    // Vertical
+    let newVy = curVy; // default: let engine handle gravity/buoyancy
     if (jumped) {
-      player.velocity = new Vec2(moveX, velY);
-    } else if (!jumpKey && player.velocity.y < 0 && !inWater) {
-      // Variable jump height cut
-      player.velocity = new Vec2(moveX, velY);
-    } else {
-      // Normal: keep engine vertical velocity, add platform vertical if on one
-      const vy = platVy !== 0 ? platVy : player.velocity.y;
-      player.velocity = new Vec2(moveX, vy);
+      newVy = velY;
+    } else if (!jumpKey && curVy < 0 && !inWater) {
+      newVy = velY; // variable jump height cut
     }
+
+    player.velocity = new Vec2(newVx, newVy);
 
     // Clamp player to world bounds
     const px = player.position.x;
