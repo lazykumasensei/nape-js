@@ -114,18 +114,25 @@ export default {
     addCoin(space, 2100, floorY - 230, coinTag);
     addCoin(space, 1750, floorY - 80, coinTag);
 
-    // ---- Section 5: Water (x: 2200–2600) ----
-    addStaticBox(space, 2400, floorY + 100, 500, 20);
-    addStaticBox(space, 2150, floorY + 40, 20, 100);
-    addStaticBox(space, 2650, floorY + 40, 20, 100);
+    // ---- Section 5: Water (x: 2160–2640) ----
+    // Pool walls and floor — inner width = 480
+    const poolL = 2160, poolR = 2640, poolCX = 2400;
+    const poolTop = floorY, poolBot = floorY + 110;
+    const poolH = poolBot - poolTop;
+    addStaticBox(space, poolCX, poolBot, poolR - poolL + 20, 20);                  // floor
+    addStaticBox(space, poolL - 10, poolTop + poolH / 2, 20, poolH);               // left wall
+    addStaticBox(space, poolR + 10, poolTop + poolH / 2, 20, poolH);               // right wall
 
-    const water = new Body(BodyType.STATIC, new Vec2(2400, floorY + 30));
-    const waterShape = new Polygon(Polygon.box(480, 80));
+    // Water fills the entire pool interior
+    const water = new Body(BodyType.STATIC, new Vec2(poolCX, poolTop + poolH / 2));
+    const waterShape = new Polygon(Polygon.box(poolR - poolL, poolH));
     waterShape.fluidEnabled = true;
     waterShape.fluidProperties = new FluidProperties(1.5, 3);
     water.shapes.add(waterShape);
     water.space = space;
     water._isWater = true;
+    water._waterW = poolR - poolL;
+    water._waterH = poolH;
 
     addCoin(space, 2300, floorY + 20, coinTag);
     addCoin(space, 2500, floorY + 20, coinTag);
@@ -329,15 +336,17 @@ export default {
       if (body._isWater) {
         const px = body.position.x;
         const py = body.position.y;
+        const hw = (body._waterW || 480) / 2;
+        const hh = (body._waterH || 80) / 2;
         ctx.fillStyle = "rgba(50,120,220,0.15)";
-        ctx.fillRect(px - 240, py - 40, 480, 80);
+        ctx.fillRect(px - hw, py - hh, hw * 2, hh * 2);
         ctx.strokeStyle = "rgba(80,160,255,0.3)";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        const waveY = py - 40;
-        for (let x = px - 240; x <= px + 240; x += 4) {
+        const waveY = py - hh;
+        for (let x = px - hw; x <= px + hw; x += 4) {
           const wy = waveY + Math.sin((x + performance.now() * 0.003) * 0.05) * 3;
-          x === px - 240 ? ctx.moveTo(x, wy) : ctx.lineTo(x, wy);
+          x === px - hw ? ctx.moveTo(x, wy) : ctx.lineTo(x, wy);
         }
         ctx.stroke();
       }
