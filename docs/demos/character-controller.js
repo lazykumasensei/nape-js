@@ -59,9 +59,11 @@ export default {
 
     const floorY = WORLD_H - 10;
 
-    // ---- Floor (with gap for water zone at x: 2160–2640) ----
-    addStaticBox(space, 1080, floorY, 2160, 20);       // left section: x 0–2160
-    addStaticBox(space, 2920, floorY, 560, 20);         // right section: x 2640–3200
+    // ---- Floor (with gaps for hPlat zone and water) ----
+    // x: 0–1600 | gap 1600–1950 (hPlat) | 1950–2160 | gap 2160–2640 (water) | 2640–3200
+    addStaticBox(space, 800, floorY, 1600, 20);
+    addStaticBox(space, 2055, floorY, 210, 20);
+    addStaticBox(space, 2920, floorY, 560, 20);
 
     // ---- Left/right walls ----
     addStaticBox(space, -10, WORLD_H / 2, 20, WORLD_H);
@@ -100,11 +102,13 @@ export default {
     // ---- Section 4: Moving platforms (x: 1500–2100) ----
     addStaticBox(space, 1550, floorY, 100, 20);
 
-    const hPlat = new Body(BodyType.KINEMATIC, new Vec2(1750, floorY - 50));
+    // Catch floor under hPlat gap
+    addStaticBox(space, 1775, floorY + 80, 350, 20);
+
+    const hPlat = new Body(BodyType.KINEMATIC, new Vec2(1750, floorY + 20));
     hPlat.shapes.add(new Polygon(Polygon.box(100, 12), undefined, new Material(0, 2, 2, 1)));
     hPlat.space = space;
     hPlat._hMoving = { minX: 1650, maxX: 1900, speed: 80 };
-    // surfaceVel updated each frame to carry the player along
 
     const vPlat = new Body(BodyType.KINEMATIC, new Vec2(2000, floorY - 100));
     vPlat.shapes.add(new Polygon(Polygon.box(80, 12)));
