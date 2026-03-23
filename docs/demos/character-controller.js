@@ -232,6 +232,17 @@ export default {
   step(space, W, H) {
     if (!cc || !player) return;
 
+    // ---- Query state BEFORE moving platforms (so raycast sees old positions) ----
+    const result = cc.update();
+
+    // ---- Input ----
+    const left = keys["ArrowLeft"] || keys["KeyA"];
+    const right = keys["ArrowRight"] || keys["KeyD"];
+    const jumpKey = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
+
+    const jumpJustPressed = jumpKey && !prevJumpKey;
+    prevJumpKey = jumpKey;
+
     // ---- Update moving platforms (position-based, set velocity for physics) ----
     for (const body of space.bodies) {
       if (body._hMoving) {
@@ -255,17 +266,6 @@ export default {
         body.velocity = new Vec2(0, m._dir * m.speed);
       }
     }
-
-    // ---- Input ----
-    const left = keys["ArrowLeft"] || keys["KeyA"];
-    const right = keys["ArrowRight"] || keys["KeyD"];
-    const jumpKey = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
-
-    const jumpJustPressed = jumpKey && !prevJumpKey;
-    prevJumpKey = jumpKey;
-
-    // ---- Query state from last frame ----
-    const result = cc.update();
 
     let moveX = 0;
     if (left) { moveX = -MOVE_SPEED; playerFacingRight = false; }
