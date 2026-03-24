@@ -4,6 +4,7 @@ import {
   CharacterController, FluidProperties,
 } from "../nape-js.esm.js";
 import { drawBody, drawConstraints, drawGrid, COLORS } from "../renderer.js";
+import { loadThree } from "../renderers/threejs-adapter.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -48,6 +49,7 @@ let wallSliding = false;
 let lastWallJumpSide = 0; // -1 = jumped off left wall, +1 = off right wall, 0 = none
 let onIce = false;
 let iceVx = 0; // tracked horizontal velocity on ice (persists across frames)
+let _THREE = null;
 
 // ---------------------------------------------------------------------------
 // Demo definition
@@ -61,7 +63,6 @@ export default {
   tags: ["CharacterController", "Platformer", "Camera", "One-Way", "Slope", "Wall-Jump", "Ice"],
   desc: "WASD/Arrow keys to move, <b>Space</b> to jump. Features: slopes, one-way platforms, moving platforms, wall-slide, wall-jump, ice, coyote time. Uses the built-in <code>CharacterController</code> class with dynamic body physics.",
   walls: false,
-  canvas2dOnly: true,
 
   camera: null,
 
@@ -563,6 +564,273 @@ export default {
     ctx.fillText("\u25AC ice (slippery)", 370, ly);
     ctx.fillStyle = "#d29922";
     ctx.fillText("\u25CF coin", 510, ly);
+  },
+
+  // ---- PixiJS render ----
+  renderPixi(adapter, space, W, H, showOutlines, camX = 0, camY = 0) {
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    // Sync body sprites
+    adapter.syncBodies(space);
+
+    // Apply camera offset to the stage
+    app.stage.x = -camX;
+    app.stage.y = -camY;
+
+    // Lazy-create water overlay graphics
+    if (!app.stage._ccWaterGfx) {
+      app.stage._ccWaterGfx = new PIXI.Graphics();
+      app.stage.addChild(app.stage._ccWaterGfx);
+    }
+    const waterGfx = app.stage._ccWaterGfx;
+    waterGfx.clear();
+
+    // Draw water zones
+    for (const body of space.bodies) {
+      if (!body._isWater) continue;
+      const px = body.position.x;
+      const py = body.position.y;
+      const hw = (body._waterW || 480) / 2;
+      const hh = (body._waterH || 80) / 2;
+
+      // Water fill
+      waterGfx.rect(px - hw, py - hh, hw * 2, hh * 2);
+      waterGfx.fill({ color: 0x3278dc, alpha: 0.15 });
+
+      // Animated wave line
+      const now = performance.now();
+      const waveY = py - hh;
+      waterGfx.moveTo(px - hw, waveY + Math.sin((px - hw + now * 0.003) * 0.05) * 3);
+      for (let x = px - hw + 4; x <= px + hw; x += 4) {
+        const wy = waveY + Math.sin((x + now * 0.003) * 0.05) * 3;
+        waterGfx.lineTo(x, wy);
+      }
+      waterGfx.stroke({ color: 0x50a0ff, width: 1.5, alpha: 0.5 });
+    }
+
+    // Keep water on top
+    app.stage.setChildIndex(waterGfx, app.stage.children.length - 1);
+
+    // Lazy-create player eye + coin popup overlay
+    if (!app.stage._ccOverlayGfx) {
+      app.stage._ccOverlayGfx = new PIXI.Graphics();
+      app.stage.addChild(app.stage._ccOverlayGfx);
+    }
+    const overlay = app.stage._ccOverlayGfx;
+    overlay.clear();
+
+    // Player eye
+    if (player) {
+      const px = player.position.x;
+      const py = player.position.y;
+      const eyeColor = cc?.grounded ? 0x3fb950 : 0xf85149;
+      overlay.circle(px + (playerFacingRight ? 4 : -4), py - PLAYER_H / 2 + 8, 2);
+      overlay.fill({ color: eyeColor, alpha: 1 });
+    }
+
+    // Coin popups (world space)
+    for (const p of coinPopups) {
+      const alpha = Math.min(1, p.timer * 2);
+      overlay.circle(p.x, p.y, 1);
+      overlay.fill({ color: 0xd29922, alpha });
+    }
+
+    app.stage.setChildIndex(overlay, app.stage.children.length - 1);
+
+    app.render();
+  },
+
+  // ---- Three.js render ----
+  render3d(renderer, scene, camera, space, W, H, camX = 0, camY = 0) {
+    // Lazy-load THREE
+    if (!_THREE) {
+      loadThree().then(mod => { _THREE = mod; });
+      renderer.render(scene, camera);
+      return;
+    }
+
+    // Camera offset — move Three.js camera to follow player
+    const baseCamX = W / 2;
+    const baseCamY = -H / 2;
+    const camZ = camera.position.z; // preserve Z distance
+    camera.position.set(baseCamX + camX, baseCamY - camY, camZ);
+    camera.lookAt(baseCamX + camX, baseCamY - camY, 0);
+
+    // Lazy mesh set on the scene
+    if (!scene.userData._ccMeshes) scene.userData._ccMeshes = [];
+    const meshes = scene.userData._ccMeshes;
+
+    const MESH_COLORS = [
+      0x4fc3f7, 0xffb74d, 0x81c784, 0xef5350,
+      0xce93d8, 0x4dd0e1, 0xfff176, 0xff8a65,
+    ];
+
+    // Remove stale
+    const spaceBodies = new Set();
+    for (const body of space.bodies) spaceBodies.add(body);
+    for (let i = meshes.length - 1; i >= 0; i--) {
+      if (!spaceBodies.has(meshes[i].body)) {
+        scene.remove(meshes[i].mesh);
+        meshes[i].mesh.traverse(c => {
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) {
+            if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+            else c.material.dispose();
+          }
+        });
+        meshes.splice(i, 1);
+      }
+    }
+
+    // Add new
+    const tracked = new Set(meshes.map(m => m.body));
+    for (const body of space.bodies) {
+      if (tracked.has(body)) continue;
+      if (body.userData?._hidden3d) continue;
+      if (body._isWater) continue; // water rendered separately
+
+      for (const shape of body.shapes) {
+        let geom;
+        if (shape.isCircle()) {
+          geom = new _THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
+        } else if (shape.isCapsule()) {
+          const cap = shape.castCapsule;
+          const hl = cap.halfLength;
+          const r = cap.radius;
+          const pts = [];
+          const segs = 12;
+          for (let i = -segs; i <= segs; i++) {
+            const a = (i / segs) * Math.PI / 2;
+            pts.push(new _THREE.Vector2(hl + Math.cos(a) * r, Math.sin(a) * r));
+          }
+          for (let i = -segs; i <= segs; i++) {
+            const a = Math.PI + (i / segs) * Math.PI / 2;
+            pts.push(new _THREE.Vector2(-hl + Math.cos(a) * r, Math.sin(a) * r));
+          }
+          geom = new _THREE.ExtrudeGeometry(
+            new _THREE.Shape(pts),
+            { depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2 },
+          );
+          geom.applyMatrix4(new _THREE.Matrix4().makeScale(1, -1, 1));
+          geom.computeVertexNormals();
+          geom.translate(0, 0, -15);
+        } else if (shape.isPolygon()) {
+          const verts = shape.castPolygon.localVerts;
+          if (verts.length < 3) continue;
+          const pts = [];
+          for (let v = 0; v < verts.length; v++) {
+            pts.push(new _THREE.Vector2(verts.at(v).x, verts.at(v).y));
+          }
+          geom = new _THREE.ExtrudeGeometry(
+            new _THREE.Shape(pts),
+            { depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2 },
+          );
+          geom.applyMatrix4(new _THREE.Matrix4().makeScale(1, -1, 1));
+          geom.computeVertexNormals();
+          geom.translate(0, 0, -15);
+        }
+        if (!geom) continue;
+
+        // Custom colors for special bodies
+        let color;
+        if (body.userData?._color) {
+          // Bounce pad / ice — parse hex stroke color
+          const hex = body.userData._color.stroke;
+          color = parseInt(hex.replace("#", ""), 16);
+        } else if (body.userData?._colorIdx !== undefined) {
+          const cIdx = body.userData._colorIdx % MESH_COLORS.length;
+          color = body.isStatic() ? 0x455a64 : MESH_COLORS[cIdx];
+        } else {
+          color = body.isStatic() ? 0x455a64 : MESH_COLORS[0];
+        }
+
+        const mesh = new _THREE.Mesh(geom, new _THREE.MeshPhongMaterial({
+          color, shininess: 80, specular: 0x444444, side: _THREE.DoubleSide,
+        }));
+        scene.add(mesh);
+        const edges = new _THREE.LineSegments(
+          new _THREE.EdgesGeometry(geom, 15),
+          new _THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }),
+        );
+        mesh.add(edges);
+        meshes.push({ mesh, body, edges });
+      }
+    }
+
+    // Water volume (lazy create)
+    if (!scene.userData._ccWater) {
+      for (const body of space.bodies) {
+        if (!body._isWater) continue;
+        const ww = body._waterW || 480;
+        const wh = body._waterH || 80;
+        const volGeom = new _THREE.BoxGeometry(ww, wh, 60);
+        const volMat = new _THREE.MeshPhongMaterial({
+          color: 0x1e90ff, transparent: true, opacity: 0.25,
+          emissive: 0x0e4478, emissiveIntensity: 0.6,
+          side: _THREE.DoubleSide, depthWrite: false,
+        });
+        const volMesh = new _THREE.Mesh(volGeom, volMat);
+        volMesh.position.set(body.position.x, -body.position.y, 0);
+        volMesh.renderOrder = 999;
+        scene.add(volMesh);
+        scene.userData._ccWater = volMesh;
+        break;
+      }
+    }
+
+    // Sync positions
+    for (const { mesh, body } of meshes) {
+      mesh.position.set(body.position.x, -body.position.y, 0);
+      mesh.rotation.z = -body.rotation;
+    }
+
+    renderer.render(scene, camera);
+  },
+
+  // ---- HUD overlay (used by both Three.js and PixiJS modes) ----
+  render3dOverlay(ctx, space, W, H) {
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = "12px monospace";
+    ctx.fillText("WASD / Arrow keys to move, Space to jump", 10, 20);
+
+    // Coin counter
+    ctx.fillStyle = "#d29922";
+    ctx.fillText(`\u25CF ${coinCount}`, W - 60, 20);
+
+    if (cc) {
+      const state = wallSliding ? "WALL-SLIDE" : cc.grounded ? "GROUNDED" : "AIRBORNE";
+      ctx.fillStyle = wallSliding ? "#a371f7" : cc.grounded ? "#3fb950" : "#f85149";
+      ctx.fillText(state, 10, 40);
+      if (cc.timeSinceGrounded > 0 && cc.timeSinceGrounded * 1000 < COYOTE_MS) {
+        ctx.fillStyle = "#d29922";
+        ctx.fillText("COYOTE", 100, 40);
+      }
+      if (wallJumpLockTimer > 0) {
+        ctx.fillStyle = "#a371f7";
+        ctx.fillText("WALL-JUMP", 100, 40);
+      }
+      if (onIce) {
+        ctx.fillStyle = "#8cd2ff";
+        ctx.fillText("ICE", 100, 40);
+      }
+    }
+
+    // Legend
+    const ly = H - 12;
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#a371f7";
+    ctx.fillText("\u25AC one-way (jump through)", 10, ly);
+    ctx.fillStyle = "#607888";
+    ctx.fillText("\u25AC solid", 200, ly);
+    ctx.fillStyle = "#f85149";
+    ctx.fillText("\u25AC bounce pad", 260, ly);
+    ctx.fillStyle = "#8cd2ff";
+    ctx.fillText("\u25AC ice (slippery)", 370, ly);
+    ctx.fillStyle = "#d29922";
+    ctx.fillText("\u25CF coin", 510, ly);
+    ctx.restore();
   },
 
 };

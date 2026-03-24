@@ -340,13 +340,13 @@ export class DemoRunner {
         ro.canvas2d = (ctx, sp, w, h, outlines, cx, cy) => demoDef.render(ctx, sp, w, h, outlines, cx, cy);
       }
       if (demoDef.render3d) {
-        ro.threejs = (adapter, sp, w, h, outlines) => {
+        ro.threejs = (adapter, sp, w, h, outlines, cx, cy) => {
           const r = adapter.getRenderer(), s = adapter.getScene(), c = adapter.getCamera();
-          demoDef.render3d(r, s, c, sp, w, h);
+          demoDef.render3d(r, s, c, sp, w, h, cx, cy);
         };
       }
       if (demoDef.renderPixi) {
-        ro.pixijs = (adapter, sp, w, h, outlines) => demoDef.renderPixi(adapter, sp, w, h, outlines);
+        ro.pixijs = (adapter, sp, w, h, outlines, cx, cy) => demoDef.renderPixi(adapter, sp, w, h, outlines, cx, cy);
       }
       if (demoDef.render3dOverlay) {
         // overlay is used by threejs and pixijs modes (canvas2d custom render

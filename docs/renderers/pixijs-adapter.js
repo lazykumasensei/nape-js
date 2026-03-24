@@ -137,11 +137,11 @@ export class PixiJSAdapter {
   // Per-frame rendering
   // ---------------------------------------------------------------------------
 
-  renderFrame(space, W, H, { showOutlines, overrides }) {
+  renderFrame(space, W, H, { showOutlines, overrides, camX = 0, camY = 0 }) {
     if (!this.#app) return;
 
     if (overrides?.pixijs) {
-      overrides.pixijs(this, space, W, H, showOutlines);
+      overrides.pixijs(this, space, W, H, showOutlines, camX, camY);
     } else {
       // Sync bodies: add new, remove stale
       this.#syncBodies(space);

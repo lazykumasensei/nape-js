@@ -178,11 +178,11 @@ export class ThreeJSAdapter {
   // Per-frame rendering
   // ---------------------------------------------------------------------------
 
-  renderFrame(space, W, H, { showOutlines, overrides }) {
+  renderFrame(space, W, H, { showOutlines, overrides, camX = 0, camY = 0 }) {
     if (!this.#renderer || !this.#scene) return;
 
     if (overrides?.threejs) {
-      overrides.threejs(this, space, W, H, showOutlines);
+      overrides.threejs(this, space, W, H, showOutlines, camX, camY);
       // Clear + draw overlay if provided
       if (this.#overlayCtx) {
         this.#overlayCtx.clearRect(0, 0, W, H);
