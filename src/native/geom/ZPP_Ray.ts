@@ -751,8 +751,14 @@ export class ZPP_Ray {
         let nx = hx - cx;
         let ny = hy - cy;
         const d = Math.sqrt(nx * nx + ny * ny);
-        if (d > 0) { nx /= d; ny /= d; }
-        if (inside) { nx = -nx; ny = -ny; }
+        if (d > 0) {
+          nx /= d;
+          ny /= d;
+        }
+        if (inside) {
+          nx = -nx;
+          ny = -ny;
+        }
         bestT = t;
         bestNx = nx;
         bestNy = ny;
@@ -799,7 +805,10 @@ export class ZPP_Ray {
         const isInner = nx * this.dirx + ny * this.diry > 0;
         let fnx = nx;
         let fny = ny;
-        if (isInner) { fnx = -nx; fny = -ny; }
+        if (isInner) {
+          fnx = -nx;
+          fny = -ny;
+        }
         bestT = t;
         bestNx = fnx;
         bestNy = fny;
@@ -843,8 +852,18 @@ export class ZPP_Ray {
 
     // Helper to track min/max
     const track = (t: number, nx: number, ny: number, isInner: boolean) => {
-      if (t < bestT) { bestT = t; bestNx = nx; bestNy = ny; bestInner = isInner; }
-      if (t > worstT) { worstT = t; worstNx = nx; worstNy = ny; worstInner = isInner; }
+      if (t < bestT) {
+        bestT = t;
+        bestNx = nx;
+        bestNy = ny;
+        bestInner = isInner;
+      }
+      if (t > worstT) {
+        worstT = t;
+        worstNx = nx;
+        worstNy = ny;
+        worstInner = isInner;
+      }
     };
 
     // --- Test two end-cap circles ---
@@ -885,8 +904,14 @@ export class ZPP_Ray {
         let nx = hx - cx;
         let ny = hy - cy;
         const d = Math.sqrt(nx * nx + ny * ny);
-        if (d > 0) { nx /= d; ny /= d; }
-        if (inside) { nx = -nx; ny = -ny; }
+        if (d > 0) {
+          nx /= d;
+          ny /= d;
+        }
+        if (inside) {
+          nx = -nx;
+          ny = -ny;
+        }
         track(t, nx, ny, inside);
       }
     }
@@ -925,7 +950,10 @@ export class ZPP_Ray {
         const isInner = nx * this.dirx + ny * this.diry > 0;
         let fnx = nx;
         let fny = ny;
-        if (isInner) { fnx = -nx; fny = -ny; }
+        if (isInner) {
+          fnx = -nx;
+          fny = -ny;
+        }
         track(t, fnx, fny, isInner);
       }
     }

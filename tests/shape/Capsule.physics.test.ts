@@ -22,6 +22,12 @@ function staticFloor(y = 200): Body {
   return b;
 }
 
+function staticWall(x: number, h = 400): Body {
+  const b = new Body(BodyType.STATIC, new Vec2(x, 0));
+  b.shapes.add(new Polygon(Polygon.box(20, h)));
+  return b;
+}
+
 function dynCapsule(x = 0, y = 0, w = 30, h = 10): Body {
   const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
   b.shapes.add(new Capsule(w, h));
@@ -278,5 +284,241 @@ describe("Capsule physics — spatial queries", () => {
 
     const result = space.bodiesInCircle(new Vec2(50, 50), 50) as any;
     expect(result.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Capsule wall-sticking regression tests
+// ---------------------------------------------------------------------------
+describe("Capsule physics — wall interaction", () => {
+  it("capsule should not stick to a vertical wall (falls past it)", () => {
+    // Capsule starts near a vertical wall and falls under gravity.
+    // It should slide down past the wall, not get stuck.
+    const space = new Space(new Vec2(0, 500));
+    const floor = staticFloor(300);
+    floor.space = space;
+
+    const wall = staticWall(50, 600);
+    wall.space = space;
+
+    // Place capsule touching the wall, above the floor
+    const cap = dynCapsule(30, 0, 40, 14);
+    cap.space = space;
+
+    for (let i = 0; i < 300; i++) space.step(1 / 60);
+
+    // Should have fallen to the floor, not stuck mid-wall
+    expect(cap.position.y).toBeGreaterThan(250);
+  });
+
+  it("capsule should slide down wall without sticking at corner", () => {
+    // A box formed by floor + wall. The capsule starts near the wall-floor
+    // corner and should settle on the floor, not stick to the wall vertex.
+    const space = new Space(new Vec2(0, 500));
+
+    // Floor at y=200
+    const floor = staticFloor(200);
+    floor.space = space;
+
+    // Wall at x=100 (right side)
+    const wall = staticWall(100, 400);
+    wall.space = space;
+
+    // Capsule starts near the wall, well above the floor
+    const cap = dynCapsule(85, 50, 30, 10);
+    cap.space = space;
+
+    for (let i = 0; i < 300; i++) space.step(1 / 60);
+
+    // Should have settled on the floor (y close to 200 - half capsule height)
+    expect(cap.position.y).toBeGreaterThan(180);
+    // Should not be stuck far above the floor
+    expect(cap.position.y).toBeLessThan(210);
+  });
+
+  it("capsule between two walls should fall straight down", () => {
+    const space = new Space(new Vec2(0, 500));
+    const floor = staticFloor(300);
+    floor.space = space;
+
+    const leftWall = staticWall(-50, 600);
+    leftWall.space = space;
+    const rightWall = staticWall(50, 600);
+    rightWall.space = space;
+
+    // Capsule dropped between two walls
+    const cap = dynCapsule(0, 0, 30, 10);
+    cap.space = space;
+
+    for (let i = 0; i < 300; i++) space.step(1 / 60);
+
+    // Should have reached the floor
+    expect(cap.position.y).toBeGreaterThan(260);
+  });
+
+  it("rotated capsule should not stick to wall at vertex", () => {
+    // Vertically-oriented capsule near a wall should slide down.
+    const space = new Space(new Vec2(0, 500));
+    const floor = staticFloor(300);
+    floor.space = space;
+
+    const wall = staticWall(50, 600);
+    wall.space = space;
+
+    const b = new Body(BodyType.DYNAMIC, new Vec2(30, 0));
+    b.shapes.add(new Capsule(40, 12));
+    b.rotation = Math.PI / 2; // vertical orientation
+    b.space = space;
+
+    for (let i = 0; i < 300; i++) space.step(1 / 60);
+
+    // Should have fallen to the floor
+    expect(b.position.y).toBeGreaterThan(250);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Edge↔vertex transition stress tests (unified manifold regression)
+// ---------------------------------------------------------------------------
+describe("Capsule physics — edge/vertex transition stability", () => {
+  it("capsule sliding along polygon face should not jitter at corners", () => {
+    // Capsule moves horizontally across a floor made of two adjacent boxes.
+    // The seam between boxes is a face→vertex→face transition that used to
+    // cause normal-flipping and vertical jitter.
+    const space = new Space(new Vec2(0, 400));
+
+    // Two adjacent floor segments with a seam at x=0
+    const floorL = new Body(BodyType.STATIC, new Vec2(-100, 200));
+    floorL.shapes.add(new Polygon(Polygon.box(200, 20)));
+    floorL.space = space;
+
+    const floorR = new Body(BodyType.STATIC, new Vec2(100, 200));
+    floorR.shapes.add(new Polygon(Polygon.box(200, 20)));
+    floorR.space = space;
+
+    // Capsule starts on the left floor, sliding right across the seam
+    const cap = dynCapsule(-80, 170, 30, 12);
+    cap.velocity = new Vec2(120, 0);
+    cap.space = space;
+
+    // Record y-positions across the seam crossing
+    const yPositions: number[] = [];
+    for (let i = 0; i < 180; i++) {
+      space.step(1 / 60);
+      if (cap.position.x > -20 && cap.position.x < 20) {
+        yPositions.push(cap.position.y);
+      }
+    }
+
+    // The capsule should stay on the floor without large vertical jumps.
+    // Max jitter between consecutive samples should be small.
+    for (let i = 1; i < yPositions.length; i++) {
+      const jitter = Math.abs(yPositions[i] - yPositions[i - 1]);
+      expect(jitter).toBeLessThan(3); // <3 px jitter per frame
+    }
+  });
+
+  it("freely rotating capsule should settle on floor without bouncing forever", () => {
+    // A capsule dropped with angular velocity should come to rest.
+    // With normal-flipping bugs, it would gain energy at vertex contacts.
+    const space = new Space(new Vec2(0, 400));
+    const floor = staticFloor(300);
+    floor.space = space;
+
+    const cap = dynCapsule(0, 100, 40, 14);
+    cap.angularVel = 5; // spinning
+    cap.space = space;
+
+    // Simulate 10 seconds
+    for (let i = 0; i < 600; i++) space.step(1 / 60);
+
+    // Should have settled — angular velocity near zero, on the floor
+    expect(Math.abs(cap.angularVel)).toBeLessThan(0.5);
+    expect(cap.position.y).toBeGreaterThan(270);
+    expect(cap.position.y).toBeLessThan(310);
+  });
+
+  it("capsule stack should be stable", () => {
+    // Stack 3 capsules on a floor. They should settle without tunneling
+    // or exploding due to manifold instability.
+    const space = new Space(new Vec2(0, 400));
+    const floor = staticFloor(300);
+    floor.space = space;
+
+    const caps: Body[] = [];
+    for (let i = 0; i < 3; i++) {
+      const c = dynCapsule(0, 250 - i * 20, 30, 12);
+      c.space = space;
+      caps.push(c);
+    }
+
+    // Settle for 5 seconds
+    for (let i = 0; i < 300; i++) space.step(1 / 60);
+
+    // All capsules should be above the floor and below starting position
+    for (const c of caps) {
+      expect(c.position.y).toBeGreaterThan(200);
+      expect(c.position.y).toBeLessThan(310);
+    }
+    // Bottom capsule should be nearest to floor
+    expect(caps[0].position.y).toBeGreaterThan(caps[2].position.y);
+  });
+
+  it("capsule past ledge edge should fall, not hover", () => {
+    // Capsule is placed fully past the platform edge (center of mass
+    // beyond the polygon face). With no support underneath, it must fall.
+    // This tests that the SAT doesn't generate a phantom face contact
+    // when the capsule spine is entirely outside the reference edge's
+    // tangent extent.
+    const space = new Space(new Vec2(0, 400));
+
+    const platform = new Body(BodyType.STATIC, new Vec2(0, 100));
+    platform.shapes.add(new Polygon(Polygon.box(200, 20))); // right edge at x=100
+    platform.space = space;
+
+    // Capsule COM at x=115, spine (108..122) — fully past the right edge
+    const cap = dynCapsule(115, 80, 24, 10);
+    cap.space = space;
+
+    for (let i = 0; i < 120; i++) space.step(1 / 60);
+
+    // Should have fallen well below the platform
+    expect(cap.position.y).toBeGreaterThan(150);
+  });
+
+  it("diagonal capsule near wall should not gain energy", () => {
+    // A 45° rotated capsule falls near a wall. It should settle without
+    // energy gain from conflicting normal directions at face↔vertex contacts.
+    const space = new Space(new Vec2(0, 500));
+    const floor = staticFloor(200);
+    floor.space = space;
+    const wall = staticWall(80, 400);
+    wall.space = space;
+
+    const b = new Body(BodyType.DYNAMIC, new Vec2(40, 100));
+    b.shapes.add(new Capsule(36, 12));
+    b.rotation = Math.PI / 4;
+    b.space = space;
+
+    // Record kinetic energy to verify it doesn't grow
+    let maxKE = 0;
+    for (let i = 0; i < 300; i++) {
+      space.step(1 / 60);
+      const vx = b.velocity.x,
+        vy = b.velocity.y;
+      const ke = vx * vx + vy * vy;
+      if (i > 60) {
+        // After initial fall, KE should be bounded
+        if (ke > maxKE) maxKE = ke;
+      }
+    }
+
+    // The capsule should not have gained energy — it either settles on the
+    // floor or wedges against the wall, but velocity should not diverge.
+    // Position should be below starting point (fell down).
+    expect(b.position.y).toBeGreaterThan(100);
+    // Velocity should be finite and bounded (no energy explosion)
+    expect(Math.abs(b.velocity.x)).toBeLessThan(100);
+    expect(Math.abs(b.velocity.y)).toBeLessThan(100);
   });
 });

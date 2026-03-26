@@ -508,3 +508,135 @@ describe("ZPP_Collide — bodyContains", () => {
     expect(ZPP_Collide.bodyContains(zppBody, point)).toBe(false);
   });
 });
+
+// -------------------------------------------------------------------------
+// 9. capsuleContains boundary (point exactly on capsule surface)
+// -------------------------------------------------------------------------
+
+describe("ZPP_Collide — capsuleContains boundary", () => {
+  it("point exactly on capsule surface (at radius distance) returns true", () => {
+    const space = new Space(new Vec2(0, 0));
+    const b = staticBody(new Capsule(40, 20), 0, 0);
+    b.space = space;
+    const zppShape = getZppShape(b, space);
+    // Point exactly at radius distance from spine center (y = 10)
+    const point = { x: 0, y: 10 };
+    expect(ZPP_Collide.shapeContains(zppShape, point)).toBe(true);
+  });
+
+  it("point just outside capsule surface returns false", () => {
+    const space = new Space(new Vec2(0, 0));
+    const b = staticBody(new Capsule(40, 20), 0, 0);
+    b.space = space;
+    const zppShape = getZppShape(b, space);
+    // Point just beyond radius
+    const point = { x: 0, y: 10.01 };
+    expect(ZPP_Collide.shapeContains(zppShape, point)).toBe(false);
+  });
+});
+
+// -------------------------------------------------------------------------
+// 10. containTest — capsule contains polygon
+// -------------------------------------------------------------------------
+
+describe("ZPP_Collide — capsule contains polygon", () => {
+  it("large capsule fully contains a small polygon", () => {
+    const space = new Space(new Vec2(0, 0));
+    // Large capsule: width=200, height=100 → halfLength=50, radius=50
+    const capBody = staticBody(new Capsule(200, 100), 0, 0);
+    capBody.space = space;
+    // Small polygon (10×10 box) centered inside
+    const polyBody = staticBody(new Polygon(Polygon.box(10, 10)), 0, 0);
+    polyBody.space = space;
+    space.step(1 / 60);
+
+    const zppCap = (capBody as any).zpp_inner.shapes.head.elt;
+    const zppPoly = (polyBody as any).zpp_inner.shapes.head.elt;
+    ZPP_Geom.validateShape(zppCap);
+    ZPP_Geom.validateShape(zppPoly);
+    expect(ZPP_Collide.containTest(zppCap, zppPoly)).toBe(true);
+  });
+
+  it("small capsule does not contain a large polygon", () => {
+    const space = new Space(new Vec2(0, 0));
+    const capBody = staticBody(new Capsule(20, 10), 0, 0);
+    capBody.space = space;
+    const polyBody = staticBody(new Polygon(Polygon.box(100, 100)), 0, 0);
+    polyBody.space = space;
+    space.step(1 / 60);
+
+    const zppCap = (capBody as any).zpp_inner.shapes.head.elt;
+    const zppPoly = (polyBody as any).zpp_inner.shapes.head.elt;
+    ZPP_Geom.validateShape(zppCap);
+    ZPP_Geom.validateShape(zppPoly);
+    expect(ZPP_Collide.containTest(zppCap, zppPoly)).toBe(false);
+  });
+
+  it("capsule does not contain polygon that extends beyond endcap", () => {
+    const space = new Space(new Vec2(0, 0));
+    // Capsule: width=100, height=40 → halfLength=30, radius=20
+    const capBody = staticBody(new Capsule(100, 40), 0, 0);
+    capBody.space = space;
+    // Wide polygon that extends past capsule tips
+    const polyBody = staticBody(new Polygon(Polygon.box(120, 10)), 0, 0);
+    polyBody.space = space;
+    space.step(1 / 60);
+
+    const zppCap = (capBody as any).zpp_inner.shapes.head.elt;
+    const zppPoly = (polyBody as any).zpp_inner.shapes.head.elt;
+    ZPP_Geom.validateShape(zppCap);
+    ZPP_Geom.validateShape(zppPoly);
+    expect(ZPP_Collide.containTest(zppCap, zppPoly)).toBe(false);
+  });
+});
+
+// -------------------------------------------------------------------------
+// 11. containTest — capsule contains capsule
+// -------------------------------------------------------------------------
+
+describe("ZPP_Collide — capsule contains capsule", () => {
+  it("large capsule fully contains a small capsule", () => {
+    const space = new Space(new Vec2(0, 0));
+    const bigCap = staticBody(new Capsule(200, 100), 0, 0);
+    bigCap.space = space;
+    const smallCap = staticBody(new Capsule(40, 20), 0, 0);
+    smallCap.space = space;
+    space.step(1 / 60);
+
+    const zppBig = (bigCap as any).zpp_inner.shapes.head.elt;
+    const zppSmall = (smallCap as any).zpp_inner.shapes.head.elt;
+    ZPP_Geom.validateShape(zppBig);
+    ZPP_Geom.validateShape(zppSmall);
+    expect(ZPP_Collide.containTest(zppBig, zppSmall)).toBe(true);
+  });
+
+  it("same-size capsules do not contain each other (unless perfectly overlapping)", () => {
+    const space = new Space(new Vec2(0, 0));
+    const cap1 = staticBody(new Capsule(60, 30), 10, 0);
+    cap1.space = space;
+    const cap2 = staticBody(new Capsule(60, 30), -10, 0);
+    cap2.space = space;
+    space.step(1 / 60);
+
+    const zpp1 = (cap1 as any).zpp_inner.shapes.head.elt;
+    const zpp2 = (cap2 as any).zpp_inner.shapes.head.elt;
+    ZPP_Geom.validateShape(zpp1);
+    ZPP_Geom.validateShape(zpp2);
+    expect(ZPP_Collide.containTest(zpp1, zpp2)).toBe(false);
+  });
+
+  it("small capsule cannot contain large capsule", () => {
+    const space = new Space(new Vec2(0, 0));
+    const smallCap = staticBody(new Capsule(20, 10), 0, 0);
+    smallCap.space = space;
+    const bigCap = staticBody(new Capsule(200, 100), 0, 0);
+    bigCap.space = space;
+    space.step(1 / 60);
+
+    const zppSmall = (smallCap as any).zpp_inner.shapes.head.elt;
+    const zppBig = (bigCap as any).zpp_inner.shapes.head.elt;
+    ZPP_Geom.validateShape(zppSmall);
+    ZPP_Geom.validateShape(zppBig);
+    expect(ZPP_Collide.containTest(zppSmall, zppBig)).toBe(false);
+  });
+});
