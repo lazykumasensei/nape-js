@@ -3707,12 +3707,6 @@ export class ZPP_Collide {
       (c0d > -eps && c1d > -eps && vtxSep < c0d && vtxSep < c1d) ||
       (spineFullyClipped && isVertexVertex);
 
-    // When segments are tangent-disjoint (capsule spine is fully past the
-    // polygon edge in the tangent direction), there is no face contact.
-    // Skip vertex-vertex too — without face support the capsule should fall
-    // freely rather than clinging to the polygon corner via a radial contact.
-    if (tangentDisjoint) return false;
-
     if (
       isVertexVertex &&
       closestDist > eps &&
