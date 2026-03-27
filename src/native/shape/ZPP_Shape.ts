@@ -185,7 +185,7 @@ export class ZPP_Shape {
   }
 
   isCapsule(): boolean {
-    return this.type === 2;
+    return !!(this as any)._isCapsule;
   }
 
   // --- Sweep radius ---

@@ -57,6 +57,10 @@ export class Shape extends Interactor {
     if (!inner) return null as unknown as Shape;
 
     // Dispatch to concrete subclass wrapper based on runtime type.
+    // Check _isCapsule flag first (capsule is polygon-backed, type=1).
+    const zppInner = inner.zpp_inner ?? inner;
+    if (zppInner._isCapsule && _capsuleWrap) return _capsuleWrap(inner);
+
     // Check both TS method (isCircle/isPolygon) and compiled field (zpp_inner.type)
     // because compiled objects may not have the TS methods on their prototype.
     const type = inner.isCircle
@@ -64,8 +68,8 @@ export class Shape extends Interactor {
         ? 0
         : inner.isPolygon?.()
           ? 1
-          : -1
-      : (inner.zpp_inner?.type ?? -1);
+          : (zppInner.type ?? -1)
+      : (zppInner.type ?? -1);
     if (type === 0 && _circleWrap) return _circleWrap(inner);
     if (type === 1 && _polygonWrap) return _polygonWrap(inner);
     if (type === 2 && _capsuleWrap) return _capsuleWrap(inner);
@@ -102,9 +106,9 @@ export class Shape extends Interactor {
     return (this as any).zpp_inner.type === 1;
   }
 
-  /** Returns true if this is a Capsule shape. */
+  /** Returns true if this is a Capsule shape (polygon-backed stadium). */
   isCapsule(): boolean {
-    return (this as any).zpp_inner.type === 2;
+    return !!(this as any).zpp_inner._isCapsule;
   }
 
   /**
@@ -160,8 +164,8 @@ export class Shape extends Interactor {
   /** Cast to Capsule, or null if this is not a capsule. */
   get castCapsule(): Shape | null {
     const zpp = (this as any).zpp_inner;
-    if (zpp.type === 2) {
-      const outer = zpp.capsule.outer_zn;
+    if (zpp._isCapsule) {
+      const outer = zpp.outer;
       return _capsuleWrap ? _capsuleWrap(outer) : outer;
     }
     return null;
@@ -184,10 +188,8 @@ export class Shape extends Interactor {
     if (zpp.wrap_localCOM == null) {
       if (zpp.type === 0) {
         zpp.circle.setupLocalCOM();
-      } else if (zpp.type === 1) {
-        zpp.polygon.setupLocalCOM();
       } else {
-        zpp.capsule.setupLocalCOM();
+        zpp.polygon.setupLocalCOM();
       }
     }
     return zpp.wrap_localCOM;
@@ -211,10 +213,8 @@ export class Shape extends Interactor {
     if (zpp.wrap_localCOM == null) {
       if (zpp.type === 0) {
         zpp.circle.setupLocalCOM();
-      } else if (zpp.type === 1) {
-        zpp.polygon.setupLocalCOM();
       } else {
-        zpp.capsule.setupLocalCOM();
+        zpp.polygon.setupLocalCOM();
       }
     }
     // Set via the wrapper (triggers _invalidate callback)

@@ -4,17 +4,60 @@ import { Vec2, type NapeInner, type Writable } from "../geom/Vec2";
 import { Material } from "../phys/Material";
 import { InteractionFilter } from "../dynamics/InteractionFilter";
 import { Shape, _bindCapsuleWrap } from "./Shape";
-import { ZPP_Capsule } from "../native/shape/ZPP_Capsule";
+import { ShapeType } from "./ShapeType";
+import { ZPP_Polygon } from "../native/shape/ZPP_Polygon";
 import { ZPP_CbType } from "../native/callbacks/ZPP_CbType";
 import { ZPP_Material } from "../native/phys/ZPP_Material";
 import { ZPP_InteractionFilter } from "../native/dynamics/ZPP_InteractionFilter";
-import { ZPP_Const } from "../native/util/ZPP_Const";
+
+/**
+ * Number of segments per semicircular end-cap.
+ * 8 segments = 16 vertices for the full capsule (smooth stadium shape).
+ */
+const CAP_SEGMENTS = 8;
+
+/**
+ * Generate stadium (capsule) polygon vertices in CCW winding order.
+ *
+ * The shape is centred at the origin. The spine runs along the local X-axis.
+ * - Total width  = 2 * (halfLength + radius)
+ * - Total height = 2 * radius
+ *
+ * @returns Array of {x, y} local-space vertices.
+ */
+function generateStadiumVertices(
+  halfLength: number,
+  radius: number,
+  segments: number = CAP_SEGMENTS,
+): Array<{ x: number; y: number }> {
+  const verts: Array<{ x: number; y: number }> = [];
+
+  // Right semicircle (center at +halfLength, 0): from -PI/2 to +PI/2
+  for (let i = 0; i <= segments; i++) {
+    const angle = -Math.PI / 2 + (Math.PI * i) / segments;
+    verts.push({
+      x: halfLength + radius * Math.cos(angle),
+      y: radius * Math.sin(angle),
+    });
+  }
+
+  // Left semicircle (center at -halfLength, 0): from +PI/2 to +3*PI/2
+  for (let i = 0; i <= segments; i++) {
+    const angle = Math.PI / 2 + (Math.PI * i) / segments;
+    verts.push({
+      x: -halfLength + radius * Math.cos(angle),
+      y: radius * Math.sin(angle),
+    });
+  }
+
+  return verts;
+}
 
 /**
  * A capsule physics shape — a line segment with a radius (stadium geometry).
  *
- * Geometrically equivalent to a rectangle with two semicircular end-caps.
- * The spine runs along the **local X-axis** through localCOM.
+ * Internally backed by a convex polygon approximation for robust collision
+ * detection. The polygon uses the engine's well-tested SAT narrowphase.
  *
  * - Total width  = 2 * (halfLength + radius)
  * - Total height = 2 * radius
@@ -26,8 +69,14 @@ import { ZPP_Const } from "../native/util/ZPP_Const";
  * ```
  */
 export class Capsule extends Shape {
-  /** @internal */
-  zpp_inner_zn!: ZPP_Capsule;
+  /** @internal — The underlying ZPP_Polygon that handles physics. */
+  zpp_inner_zn!: ZPP_Polygon;
+
+  /** @internal — Stored capsule radius (half height). */
+  private _radius: number;
+
+  /** @internal — Stored half-spine-length. */
+  private _halfLength: number;
 
   /**
    * Create a capsule with the given total width and height.
@@ -47,8 +96,6 @@ export class Capsule extends Shape {
   ) {
     super();
 
-    const nape = getNape();
-
     // Validate
     if (width !== width || height !== height) {
       throw new Error("Error: Capsule dimensions cannot be NaN");
@@ -63,7 +110,11 @@ export class Capsule extends Shape {
     const radius = height / 2;
     const halfLength = (width - height) / 2;
 
-    const zpp = new ZPP_Capsule();
+    this._radius = radius;
+    this._halfLength = halfLength;
+
+    // --- Create ZPP_Polygon internally (type=1) ---
+    const zpp = new ZPP_Polygon();
     this.zpp_inner_zn = zpp;
     (this as any).zpp_inner = zpp;
     this.zpp_inner_i = zpp;
@@ -74,36 +125,34 @@ export class Capsule extends Shape {
     // _inner = this so Shape-level methods work
     (this as Writable<Capsule>)._inner = this as any;
 
-    // --- Set radius ---
-    if (radius < nape.Config.epsilon) {
-      throw new Error("Error: Capsule radius (" + radius + ") must be > Config.epsilon");
-    }
-    if (radius > ZPP_Const.FMAX) {
-      throw new Error("Error: Capsule radius (" + radius + ") must be < PR(Const).FMAX");
-    }
-    zpp.radius = radius;
-    zpp.halfLength = halfLength;
-    zpp.invalidate_radius();
-    if (halfLength > 0) {
-      zpp.invalidate_halfLength();
-    }
+    // Mark this polygon as a capsule for isCapsule() / castCapsule / debug draw
+    (zpp as any)._isCapsule = true;
+    (zpp as any)._capsuleRadius = radius;
+    (zpp as any)._capsuleHalfLength = halfLength;
 
-    // --- Handle localCOM ---
+    // --- Parse localCOM offset ---
+    let comX = 0;
+    let comY = 0;
     if (localCOM != null) {
       if ((localCOM as any).zpp_disp) {
         throw new Error("Error: Vec2 has been disposed and cannot be used!");
       }
       const inner = localCOM.zpp_inner;
       if (inner._validate != null) inner._validate();
-      zpp.localCOMx = inner.x;
+      comX = inner.x;
       if (inner._validate != null) inner._validate();
-      zpp.localCOMy = inner.y;
+      comY = inner.y;
       if (inner.weak) {
         localCOM.dispose();
       }
-    } else {
-      zpp.localCOMx = 0;
-      zpp.localCOMy = 0;
+    }
+
+    // --- Generate stadium polygon vertices (offset by localCOM) ---
+    const verts = generateStadiumVertices(halfLength, radius);
+    if (zpp.wrap_lverts == null) zpp.getlverts();
+    for (const v of verts) {
+      const vec = new Vec2(v.x + comX, v.y + comY);
+      zpp.wrap_lverts.push(vec);
     }
 
     // --- Handle material ---
@@ -144,12 +193,14 @@ export class Capsule extends Shape {
   static _wrap(inner: NapeInner): Capsule {
     if (!inner) return null as unknown as Capsule;
     if (inner instanceof Capsule) return inner;
-    if (inner instanceof ZPP_Capsule) {
-      return getOrCreate(inner, (zpp: ZPP_Capsule) => {
+    if (inner instanceof ZPP_Polygon && (inner as any)._isCapsule) {
+      return getOrCreate(inner, (zpp: ZPP_Polygon) => {
         const c = Object.create(Capsule.prototype) as Capsule;
         c.zpp_inner_zn = zpp;
         (c as any).zpp_inner = zpp;
         c.zpp_inner_i = zpp;
+        c._radius = (zpp as any)._capsuleRadius ?? 0;
+        c._halfLength = (zpp as any)._capsuleHalfLength ?? 0;
         zpp.outer = c;
         zpp.outer_zn = c;
         zpp.outer_i = c;
@@ -157,13 +208,15 @@ export class Capsule extends Shape {
         return c;
       });
     }
-    // Handle compiled objects (has zpp_inner_zn → extract ZPP_Capsule)
+    // Handle compiled objects (has zpp_inner_zn → extract ZPP_Polygon)
     if (inner.zpp_inner_zn) return Capsule._wrap(inner.zpp_inner_zn);
     // Fallback: wrap compiled inner directly
     return getOrCreate(inner, (raw) => {
       const c = Object.create(Capsule.prototype) as Capsule;
       (c as Writable<Capsule>)._inner = raw;
       c.zpp_inner_i = raw.zpp_inner_i;
+      c._radius = (raw as any)._capsuleRadius ?? 0;
+      c._halfLength = (raw as any)._capsuleHalfLength ?? 0;
       return c;
     });
   }
@@ -172,9 +225,24 @@ export class Capsule extends Shape {
   // Properties
   // ---------------------------------------------------------------------------
 
-  /** The capsule's end-cap radius (half the height). Must be > 0. */
+  /** Override type to return CAPSULE (internally backed by polygon). */
+  override get type(): ShapeType {
+    return ShapeType.CAPSULE;
+  }
+
+  /** A capsule is not a plain polygon from the user's perspective. */
+  override isPolygon(): boolean {
+    return false;
+  }
+
+  /** A capsule identifies as capsule. */
+  override isCapsule(): boolean {
+    return true;
+  }
+
+  /** The capsule's end-cap radius (half the height). */
   get radius(): number {
-    return this.zpp_inner_zn.radius;
+    return (this.zpp_inner_zn as any)._capsuleRadius ?? this._radius;
   }
   set radius(value: number) {
     const zpp = this.zpp_inner_zn;
@@ -185,24 +253,22 @@ export class Capsule extends Shape {
         "Error: Cannot modify radius of Capsule contained in static object once added to space",
       );
     }
-    if (value !== zpp.radius) {
+    if (value !== this._radius) {
       if (value !== value) {
         throw new Error("Error: Capsule::radius cannot be NaN");
       }
       if (value < nape.Config.epsilon) {
         throw new Error("Error: Capsule::radius (" + value + ") must be > Config.epsilon");
       }
-      if (value > ZPP_Const.FMAX) {
-        throw new Error("Error: Capsule::radius (" + value + ") must be < PR(Const).FMAX");
-      }
-      zpp.radius = value;
-      zpp.invalidate_radius();
+      this._radius = value;
+      (zpp as any)._capsuleRadius = value;
+      this._regenerateVertices();
     }
   }
 
   /** Half the spine length. Total width = 2 * (halfLength + radius). */
   get halfLength(): number {
-    return this.zpp_inner_zn.halfLength;
+    return (this.zpp_inner_zn as any)._capsuleHalfLength ?? this._halfLength;
   }
   set halfLength(value: number) {
     const zpp = this.zpp_inner_zn;
@@ -212,26 +278,50 @@ export class Capsule extends Shape {
         "Error: Cannot modify halfLength of Capsule contained in static object once added to space",
       );
     }
-    if (value !== zpp.halfLength) {
+    if (value !== this._halfLength) {
       if (value !== value) {
         throw new Error("Error: Capsule::halfLength cannot be NaN");
       }
       if (value < 0) {
         throw new Error("Error: Capsule::halfLength (" + value + ") must be >= 0");
       }
-      zpp.halfLength = value;
-      zpp.invalidate_halfLength();
+      this._halfLength = value;
+      (zpp as any)._capsuleHalfLength = value;
+      this._regenerateVertices();
+    }
+  }
+
+  /** @internal — Regenerate polygon vertices after radius/halfLength change. */
+  private _regenerateVertices(): void {
+    const zpp = this.zpp_inner_zn;
+
+    // Get current localCOM offset from existing vertices centroid
+    zpp.validate_localCOM();
+    const comX = zpp.localCOMx;
+    const comY = zpp.localCOMy;
+
+    // Clear existing vertices
+    if (zpp.wrap_lverts == null) zpp.getlverts();
+    while (zpp.wrap_lverts.length > 0) {
+      zpp.wrap_lverts.pop();
+    }
+
+    // Generate new vertices
+    const verts = generateStadiumVertices(this._halfLength, this._radius);
+    for (const v of verts) {
+      const vec = new Vec2(v.x + comX, v.y + comY);
+      zpp.wrap_lverts.push(vec);
     }
   }
 
   /** Total width of the capsule (tip to tip). */
   get width(): number {
-    return 2 * (this.zpp_inner_zn.halfLength + this.zpp_inner_zn.radius);
+    return 2 * (this.halfLength + this.radius);
   }
 
   /** Total height of the capsule (diameter of end-caps). */
   get height(): number {
-    return 2 * this.zpp_inner_zn.radius;
+    return 2 * this.radius;
   }
 }
 

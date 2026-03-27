@@ -1161,6 +1161,14 @@ export class ZPP_Polygon {
       cx_ite = cx_ite.next;
     }
     this.invalidate_lverts();
+
+    // Update capsule metadata if this polygon backs a capsule
+    const self = this as any;
+    if (self._isCapsule) {
+      const factor = ((sx < 0 ? -sx : sx) + (sy < 0 ? -sy : sy)) / 2;
+      self._capsuleRadius *= factor;
+      self._capsuleHalfLength *= factor;
+    }
   }
 
   __rotate(ax: number, ay: number): void {
@@ -1188,6 +1196,25 @@ export class ZPP_Polygon {
 
   __copy(): any {
     const nape = ZPP_Polygon._nape;
+    const self = this as any;
+
+    // If this polygon is a capsule, copy via Capsule constructor to preserve flags
+    if (self._isCapsule) {
+      const width = 2 * (self._capsuleHalfLength + self._capsuleRadius);
+      const height = 2 * self._capsuleRadius;
+      // Ensure localCOM is computed from vertex centroid before reading
+      this.validate_localCOM();
+      const lx = this.localCOMx;
+      const ly = this.localCOMy;
+      let lcom: any = undefined;
+      if (lx !== 0 || ly !== 0) {
+        lcom = new nape.geom.Vec2(lx, ly);
+        lcom.zpp_inner.weak = true;
+      }
+      const ret = new nape.shape.Capsule(width, height, lcom).zpp_inner_zn;
+      return ret;
+    }
+
     if (this.outer_zn.zpp_inner_zn.wrap_lverts == null) {
       this.outer_zn.zpp_inner_zn.getlverts();
     }
