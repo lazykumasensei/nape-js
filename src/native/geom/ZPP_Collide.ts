@@ -3372,20 +3372,20 @@ export class ZPP_Collide {
   /**
    * Polygon vs Capsule contact generation — Box2D v3 unified manifold.
    *
-   * Capsule is treated as a 2-vertex rounded polygon (spine endpoints + radius).
-   * SAT on core shapes (polygon edges + spine perpendicular), then:
-   *   1. Always attempt edge clipping first (polygon edge as reference,
-   *      capsule spine as incident). This produces up to 2 contacts with
-   *      the reference edge normal — the common, stable case.
-   *   2. Only when core shapes are still separated AND edge clipping produces
-   *      contacts with substantially worse separation than the segment-to-
-   *      segment closest-point distance, fall back to a single vertex-vertex
-   *      contact with radial normal.
+   * Capsule is treated as a 2-vertex rounded polygon (spine + radius).
+   * Bidirectional SAT (polygon edges AND capsule spine normals) picks the
+   * reference face.  When the capsule spine perpendicular produces larger
+   * separation than any polygon edge, the capsule side becomes reference —
+   * this is the key difference from the old one-sided SAT that caused
+   * capsules to stick at polygon corners.
    *
-   * This ordering ("edge first, vertex fallback") prevents normal-flipping
-   * at face↔vertex transitions — the edge normal is kept as long as it
-   * produces a reasonable manifold, providing smooth sliding along faces and
-   * around corners.
+   * After choosing the reference face, the algorithm:
+   *   1. Clips the incident edge against the reference face's tangent
+   *      extents, producing up to 2 contacts with the face normal.
+   *   2. Computes segment-to-segment closest distance.  If vertex-vertex
+   *      separation is substantially better than the clipped manifold AND
+   *      the closest feature is at segment endpoints, falls back to a
+   *      single circle-style contact with radial normal.
    */
   static _polyCapsuleContact(
     poly: any,
@@ -3396,10 +3396,10 @@ export class ZPP_Collide {
   ): boolean {
     // Spine already validated by _capsuleContactCollide dispatcher
     const eps = napeNs.Config.epsilon;
-    const radius = cap.radius; // capsule radius (polygon radius = 0)
-    const linearSlop = 0.005; // Box2D LINEAR_SLOP equivalent
+    const radius = cap.radius;
+    const linearSlop = 0.005;
 
-    // ── SAT phase 1: polygon edge normals (on core vertices, no radius) ──
+    // ── SAT phase 1: polygon edge normals → separationA ────────────────
     let bestEdgeSep = -1e100;
     let bestEdge: any = null;
 
@@ -3418,38 +3418,224 @@ export class ZPP_Collide {
       cx_ite = cx_ite.next;
     }
 
-    // ── SAT phase 2: capsule spine perpendicular axis ──────────────────
+    // ── SAT phase 2: capsule spine normals → separationB ───────────────
+    // The capsule has two "edge normals": spine perpendicular and its negation.
     const spineDx = cap.spine2x - cap.spine1x;
     const spineDy = cap.spine2y - cap.spine1y;
     const spineLen2 = spineDx * spineDx + spineDy * spineDy;
+    let spineLen = 0;
+    let spineNx = 0,
+      spineNy = 0;
+    let bestCapsuleSep = -1e100;
+    let bestCapsuleEdge = 0; // 0 = +normal, 1 = -normal
+    let capsuleIsReference = false;
+
     if (spineLen2 > 1e-12) {
-      const spineLen = Math.sqrt(spineLen2);
-      const spineNx = -spineDy / spineLen;
-      const spineNy = spineDx / spineLen;
-      const capProj = spineNx * cap.worldCOMx + spineNy * cap.worldCOMy;
-      let minV = 1e100;
-      let maxV = -1e100;
-      let vite2 = poly.gverts.next;
-      while (vite2 != null) {
-        const k = spineNx * vite2.x + spineNy * vite2.y;
-        if (k < minV) minV = k;
-        if (k > maxV) maxV = k;
-        vite2 = vite2.next;
+      spineLen = Math.sqrt(spineLen2);
+      spineNx = -spineDy / spineLen;
+      spineNy = spineDx / spineLen;
+
+      for (let ce = 0; ce < 2; ce++) {
+        const enx = ce === 0 ? spineNx : -spineNx;
+        const eny = ce === 0 ? spineNy : -spineNy;
+        // Capsule edge projection: dot(normal, capCOM)
+        const capEdgeProj = enx * cap.worldCOMx + eny * cap.worldCOMy;
+        // Find minimum projection of polygon vertices onto this normal
+        let minVertProj = 1e100;
+        let vite = poly.gverts.next;
+        while (vite != null) {
+          const k = enx * vite.x + eny * vite.y;
+          if (k < minVertProj) minVertProj = k;
+          vite = vite.next;
+        }
+        const sep = minVertProj - capEdgeProj;
+        if (sep > radius) return false;
+        if (sep > bestCapsuleSep) {
+          bestCapsuleSep = sep;
+          bestCapsuleEdge = ce;
+        }
       }
-      if (minV > capProj + radius) return false;
-      if (maxV < capProj - radius) return false;
+
+      capsuleIsReference = bestCapsuleSep > bestEdgeSep;
     }
 
-    // ── Reference edge endpoints ───────────────────────────────────────
+    // ── Helper: capsule local reference from spine parameter t ─────────
+    const capLocalRef = (t: number) => cap.localCOMx + (2 * t - 1) * cap.halfLength;
+
+    // ── Helper: world→polygon-body-local transform ─────────────────────
+    const toPolyLocal = (wx: number, wy: number): [number, number] => {
+      const dx = wx - poly.body.posx;
+      const dy = wy - poly.body.posy;
+      return [
+        dx * poly.body.axisy + dy * poly.body.axisx,
+        dy * poly.body.axisy - dx * poly.body.axisx,
+      ];
+    };
+
+    // ══════════════════════════════════════════════════════════════════════
+    // PATH A: Capsule is reference — capsule spine normal as contact normal
+    // ══════════════════════════════════════════════════════════════════════
+    if (capsuleIsReference) {
+      const refNx = bestCapsuleEdge === 0 ? spineNx : -spineNx;
+      const refNy = bestCapsuleEdge === 0 ? spineNy : -spineNy;
+      const capEdgeProj = refNx * cap.worldCOMx + refNy * cap.worldCOMy;
+
+      // Find incident edge on polygon (most anti-parallel normal)
+      let incEdge: any = null;
+      let minDot = 1e100;
+      cx_ite = poly.edges.head;
+      while (cx_ite != null) {
+        const edge = cx_ite.elt;
+        const dot = refNx * edge.gnormx + refNy * edge.gnormy;
+        if (dot < minDot) {
+          minDot = dot;
+          incEdge = edge;
+        }
+        cx_ite = cx_ite.next;
+      }
+
+      // Clip incident edge against capsule spine tangent extents
+      const tanx = spineDx / spineLen;
+      const tany = spineDy / spineLen;
+      const tanLo = tanx * cap.spine1x + tany * cap.spine1y;
+      const tanHi = tanx * cap.spine2x + tany * cap.spine2y;
+      const lo = tanLo < tanHi ? tanLo : tanHi;
+      const hi = tanLo < tanHi ? tanHi : tanLo;
+
+      let ic0x = incEdge.gp0.x,
+        ic0y = incEdge.gp0.y;
+      let ic1x = incEdge.gp1.x,
+        ic1y = incEdge.gp1.y;
+
+      const proj0 = tanx * ic0x + tany * ic0y;
+      const proj1 = tanx * ic1x + tany * ic1y;
+
+      // Tangent-disjoint check (Box2D b2ClipPolygons early-out)
+      const incLo = proj0 < proj1 ? proj0 : proj1;
+      const incHi = proj0 < proj1 ? proj1 : proj0;
+      if (incHi < lo || hi < incLo) {
+        // Segments are disjoint in tangent direction — no face contact.
+        // Fall through to vertex-vertex below.
+      } else {
+        // Clip lower end
+        const edgeLen = proj1 - proj0;
+        if (Math.abs(edgeLen) > 1e-12) {
+          if (proj0 < lo) {
+            const t0 = (lo - proj0) / edgeLen;
+            ic0x += (ic1x - ic0x) * t0;
+            ic0y += (ic1y - ic0y) * t0;
+          }
+          if (proj1 > hi) {
+            const t1 = (hi - proj0) / edgeLen;
+            ic1x = incEdge.gp0.x + (incEdge.gp1.x - incEdge.gp0.x) * t1;
+            ic1y = incEdge.gp0.y + (incEdge.gp1.y - incEdge.gp0.y) * t1;
+          }
+          if (proj0 > hi) {
+            const t0 = (hi - proj0) / edgeLen;
+            ic0x += (ic1x - incEdge.gp0.x) * t0;
+            ic0y += (ic1y - incEdge.gp0.y) * t0;
+          }
+          if (proj1 < lo) {
+            const t1 = (lo - proj0) / edgeLen;
+            ic1x = incEdge.gp0.x + (incEdge.gp1.x - incEdge.gp0.x) * t1;
+            ic1y = incEdge.gp0.y + (incEdge.gp1.y - incEdge.gp0.y) * t1;
+          }
+        }
+
+        const ic0d = refNx * ic0x + refNy * ic0y - capEdgeProj - radius;
+        const ic1d = refNx * ic1x + refNy * ic1y - capEdgeProj - radius;
+
+        if (ic0d <= 0 || ic1d <= 0) {
+          // Valid capsule-as-reference contacts
+          let nx = refNx;
+          let ny = refNy;
+
+          // Capsule local normal: spine perpendicular in capsule body frame
+          // Spine runs along local X; perpendicular is (0, +/-1)
+          const capLnormX = 0;
+          const capLnormY = bestCapsuleEdge === 0 ? 1 : -1;
+          const capLproj = capLnormX * cap.localCOMx + capLnormY * cap.localCOMy;
+
+          arb.lnormx = capLnormX;
+          arb.lnormy = capLnormY;
+          arb.lproj = capLproj;
+          arb.radius = radius;
+          arb.rev = rev;
+          // Capsule is reference: ptype flipped vs polygon-as-reference
+          arb.ptype = rev ? 0 : 1;
+          arb.__ref_edge1 = incEdge;
+          arb.__ref_vertex = 0;
+
+          if (rev) {
+            nx = -nx;
+            ny = -ny;
+          }
+
+          // Contact 0
+          {
+            const hash = arb.rev ? 1 : 0;
+            const co = ZPP_Collide._getOrCreateContact(arb, hash, arb.stamp);
+            co.px = ic0x - refNx * (radius + ic0d * 0.5);
+            co.py = ic0y - refNy * (radius + ic0d * 0.5);
+            arb.nx = nx;
+            arb.ny = ny;
+            co.dist = ic0d;
+            co.stamp = arb.stamp;
+            co.posOnly = false;
+            // lr1 = polygon vertex in polygon-body-local frame
+            const [lr0x, lr0y] = toPolyLocal(ic0x, ic0y);
+            co.inner.lr1x = lr0x;
+            co.inner.lr1y = lr0y;
+            co.inner.lr2x = 0;
+            co.inner.lr2y = 0;
+          }
+
+          // Contact 1
+          {
+            const hash = arb.rev ? 0 : 1;
+            const co = ZPP_Collide._getOrCreateContact(arb, hash, arb.stamp);
+            co.px = ic1x - refNx * (radius + ic1d * 0.5);
+            co.py = ic1y - refNy * (radius + ic1d * 0.5);
+            arb.nx = nx;
+            arb.ny = ny;
+            co.dist = ic1d;
+            co.stamp = arb.stamp;
+            co.posOnly = false;
+            const [lr1x, lr1y] = toPolyLocal(ic1x, ic1y);
+            co.inner.lr1x = lr1x;
+            co.inner.lr1y = lr1y;
+            co.inner.lr2x = 0;
+            co.inner.lr2y = 0;
+          }
+
+          return true;
+        }
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // PATH B: Polygon is reference — polygon edge normal as contact normal
+    // ══════════════════════════════════════════════════════════════════════
     const refV0x = bestEdge.gp0.x,
       refV0y = bestEdge.gp0.y;
     const refV1x = bestEdge.gp1.x,
       refV1y = bestEdge.gp1.y;
 
-    // ── Helper: capsule local reference from spine parameter t ─────────
-    const capLocalRef = (t: number) => cap.localCOMx + (2 * t - 1) * cap.halfLength;
+    // Tangent-disjoint check (Box2D b2ClipPolygons early-out):
+    // If the capsule spine and reference edge don't overlap in the tangent
+    // direction, edge clipping cannot produce a valid face contact.
+    const edgeTanx = bestEdge.gnormy; // tangent = perp(normal)
+    const edgeTany = -bestEdge.gnormx;
+    const refTan0 = edgeTanx * refV0x + edgeTany * refV0y;
+    const refTan1 = edgeTanx * refV1x + edgeTany * refV1y;
+    const refTanLo = refTan0 < refTan1 ? refTan0 : refTan1;
+    const refTanHi = refTan0 < refTan1 ? refTan1 : refTan0;
+    const capTan0 = edgeTanx * cap.spine1x + edgeTany * cap.spine1y;
+    const capTan1 = edgeTanx * cap.spine2x + edgeTany * cap.spine2y;
+    const capTanLo = capTan0 < capTan1 ? capTan0 : capTan1;
+    const capTanHi = capTan0 < capTan1 ? capTan1 : capTan0;
+    const tangentDisjoint = capTanHi < refTanLo || refTanHi < capTanLo;
 
-    // ── Step 1: Always attempt edge clipping first ─────────────────────
     // Clip capsule spine against reference edge's tangent extents
     let c0x = cap.spine1x,
       c0y = cap.spine1y;
@@ -3457,7 +3643,12 @@ export class ZPP_Collide {
       ec1y = cap.spine2y;
     let c0t = 0.0,
       c1t = 1.0;
-    {
+    let c0d = 1e100,
+      c1d = 1e100;
+    let edgeClipValid = false;
+    let edgeMinSep = 1e100;
+
+    if (!tangentDisjoint) {
       const dvx = ec1x - c0x;
       const dvy = ec1y - c0y;
       const cd0 = bestEdge.gnormy * c0x - bestEdge.gnormx * c0y;
@@ -3478,16 +3669,14 @@ export class ZPP_Collide {
           c1t = 1.0 + tB;
         }
       }
+
+      c0d = c0x * bestEdge.gnormx + c0y * bestEdge.gnormy - bestEdge.gprojection - radius;
+      c1d = ec1x * bestEdge.gnormx + ec1y * bestEdge.gnormy - bestEdge.gprojection - radius;
+      edgeClipValid = c0d <= 0 || c1d <= 0;
+      edgeMinSep = edgeClipValid ? Math.min(c0d, c1d) : 1e100;
     }
 
-    const c0d = c0x * bestEdge.gnormx + c0y * bestEdge.gnormy - bestEdge.gprojection - radius;
-    const c1d = ec1x * bestEdge.gnormx + ec1y * bestEdge.gnormy - bestEdge.gprojection - radius;
-    const edgeClipValid = c0d <= 0 || c1d <= 0;
-    // Minimum separation produced by edge clipping (best of the two contacts)
-    const edgeMinSep = edgeClipValid ? Math.min(c0d, c1d) : 1e100;
-
-    // ── Step 2: Compute segment-to-segment closest distance ────────────
-    // This tells us if vertex-vertex would produce a better manifold.
+    // ── Segment-to-segment closest distance (for vertex-vertex fallback) ──
     const [f1, f2] = ZPP_Collide._closestTT(
       refV0x,
       refV0y,
@@ -3508,37 +3697,21 @@ export class ZPP_Collide {
     const closestDist = Math.sqrt(closestDist2);
     const vtxSep = closestDist - radius;
 
-    // ── Step 3: Decide — use edge clipping or vertex-vertex fallback ───
-    // Box2D v3 logic: prefer edge clipping for stability, but switch to
-    // vertex-vertex when the edge manifold is clearly wrong.
-    //
-    // Use vertex-vertex when ALL of:
-    //   (a) closest feature is at segment endpoints (vertex-vertex)
-    //   (b) closestDist is valid (> eps)
-    //   (c) EITHER:
-    //       - core shapes are separated AND vtx separation is substantially
-    //         better than edge clipping (standard Box2D v3 path), OR
-    //       - edge clipping is invalid (both c0d > 0 && c1d > 0) but
-    //         vertex-vertex still shows contact (vtxSep < 0), OR
-    //       - edge clipping contact quality is poor: both clipped contacts
-    //         have positive separation (barely touching via edge) but
-    //         vertex-vertex has negative separation (clearly overlapping)
+    // ── Vertex-vertex fallback decision ─────────────────────────────────
     const isVertexVertex = (f1 <= eps || f1 >= 1 - eps) && (f2 <= eps || f2 >= 1 - eps);
     const coreSeparated = bestEdgeSep > 0.1 * linearSlop;
     const vtxSubstantiallyBetter = vtxSep + 0.1 * linearSlop < edgeMinSep;
-    // Edge clipping is "poor" when it doesn't produce clearly better contacts
-    // than vertex-vertex. This happens when:
-    //   - edge clipping is outright invalid (both contacts separated), OR
-    //   - edge clipping barely touches (both separations near zero) while
-    //     vertex-vertex shows deeper contact, OR
-    //   - the capsule spine was fully clipped to one end of the edge
-    //     (c0t ≈ c1t), meaning the spine doesn't actually overlap the edge
-    //     tangentially — the contact is at the polygon's corner, not its face.
     const spineFullyClipped = Math.abs(c1t - c0t) < 0.05;
     const edgeClipPoor =
       !edgeClipValid ||
       (c0d > -eps && c1d > -eps && vtxSep < c0d && vtxSep < c1d) ||
       (spineFullyClipped && isVertexVertex);
+
+    // When segments are tangent-disjoint (capsule spine is fully past the
+    // polygon edge in the tangent direction), there is no face contact.
+    // Skip vertex-vertex too — without face support the capsule should fall
+    // freely rather than clinging to the polygon corner via a radial contact.
+    if (tangentDisjoint) return false;
 
     if (
       isVertexVertex &&
@@ -3546,24 +3719,17 @@ export class ZPP_Collide {
       vtxSep < radius &&
       ((coreSeparated && vtxSubstantiallyBetter) || edgeClipPoor)
     ) {
-      // Vertex-vertex fallback: single circle-style contact with radial normal.
       const invDist = 1.0 / closestDist;
       let nx = cdx * invDist;
       let ny = cdy * invDist;
 
-      // Contact at midpoint between polygon surface and capsule surface
       const c2x = closest2x - nx * radius;
       const c2y = closest2y - ny * radius;
       const px = (closest1x + c2x) * 0.5;
       const py = (closest1y + c2y) * 0.5;
 
       const capLrX = capLocalRef(f2);
-
-      // Polygon-local vertex reference
-      const pvx = closest1x - poly.body.posx;
-      const pvy = closest1y - poly.body.posy;
-      const polyLrX = pvx * poly.body.axisy + pvy * poly.body.axisx;
-      const polyLrY = pvy * poly.body.axisy - pvx * poly.body.axisx;
+      const [polyLrX, polyLrY] = toPolyLocal(closest1x, closest1y);
 
       if (rev) {
         nx = -nx;
@@ -3580,7 +3746,7 @@ export class ZPP_Collide {
       co.posOnly = false;
 
       arb.radius = radius;
-      arb.ptype = 2; // circle-style
+      arb.ptype = 2;
       arb.__ref_edge1 = bestEdge;
       arb.__ref_vertex = -1;
 
@@ -3598,7 +3764,7 @@ export class ZPP_Collide {
       return true;
     }
 
-    // ── Edge clipping wins — generate up to 2 contacts with edge normal ──
+    // ── Edge clipping (polygon as reference) ────────────────────────────
     if (!edgeClipValid) return false;
 
     let nx = bestEdge.gnormx;
