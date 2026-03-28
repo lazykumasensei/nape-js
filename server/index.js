@@ -349,13 +349,15 @@ coinListener.space = space;
 
 const sceneObjects = [];
 
+// Note: Polygon shapes with explicit Material tunnel through floors (engine bug).
+// Circles are unaffected. Workaround: omit Material for Polygon shapes (defaults work fine).
 function spawnObject(x, y, shape, size) {
   const id = nextBodyId++;
   const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
   if (shape === "circle") {
     body.shapes.add(new Circle(size, undefined, new Material(0.3, 0.5, 0.4, 1)));
   } else {
-    body.shapes.add(new Polygon(Polygon.box(size, size), undefined, new Material(0.2, 0.5, 0.4, 1)));
+    body.shapes.add(new Polygon(Polygon.box(size, size)));
   }
   body.isBullet = true;
   body.space = space;
@@ -364,24 +366,24 @@ function spawnObject(x, y, shape, size) {
   return { id, shape, size, x, y };
 }
 
-// Scatter some objects around the level
+// Scatter objects around the level (mix of visual circles and boxes)
 // Section 1 area
-spawnObject(250, floorY - 40, "circle", 12);
-spawnObject(350, floorY - 40, "box", 18);
+spawnObject(250, floorY - 30, "circle", 14);
+spawnObject(420, floorY - 40, "box", 28);
 // Steps area
-spawnObject(650, floorY - 60, "circle", 10);
+spawnObject(650, floorY - 70, "circle", 12);
 // Slope area
-spawnObject(1100, floorY - 100, "circle", 14);
-spawnObject(1300, floorY - 100, "box", 16);
+spawnObject(1100, floorY - 110, "circle", 16);
+spawnObject(1350, floorY - 110, "box", 26);
 // Near moving platforms
-spawnObject(1580, floorY - 30, "box", 20);
+spawnObject(1580, floorY - 35, "circle", 14);
 // Ice zone
-spawnObject(2950, floorY - 30, "circle", 11);
-spawnObject(3150, floorY - 30, "box", 14);
-spawnObject(3400, floorY - 30, "circle", 13);
+spawnObject(2950, floorY - 30, "box", 24);
+spawnObject(3200, floorY - 30, "circle", 13);
+spawnObject(3400, floorY - 30, "circle", 15);
 // Final area
-spawnObject(3700, 260, "box", 16);
-spawnObject(3850, floorY - 30, "circle", 12);
+spawnObject(3700, 245, "box", 22);
+spawnObject(3850, floorY - 30, "circle", 14);
 
 // Moving platform descriptors for init packet
 const movingPlatforms = [

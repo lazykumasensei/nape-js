@@ -92,6 +92,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | P54 — Performance benchmark page          | S      | adoption  | low    | ✅ Done |
 | P55 — npm/SEO optimization                | XS     | adoption  | low    | ✅ Done |
 | P56 — Interactive playground              | S-M    | adoption  | low    | ⬜ Not started |
+| P57 — Polygon + Material tunneling bug    | M      | stability | medium | ⬜ Not started |
 
 ---
 
@@ -327,3 +328,39 @@ Browser-based sandbox for instant try-out without local setup:
 - StackBlitz or CodeSandbox template with pre-configured nape-js
 - Editable examples: falling shapes, constraints, fluid sim, CCD
 - Link from README and docs landing page
+
+---
+
+## Bug: P57 — Polygon + Material Tunneling
+
+**Effort: M | Impact: stability | Risk: medium**
+
+Dynamic `Polygon` shapes with an explicit `Material` parameter tunnel through static `Polygon` floors (fall through without collision). Discovered 2026-03-28 during multiplayer platformer development.
+
+**Reproduction:**
+```js
+const floor = new Body(BodyType.STATIC, new Vec2(200, 290));
+floor.shapes.add(new Polygon(Polygon.box(400, 20)));
+floor.space = space;
+
+// This tunnels through the floor:
+const box = new Body(BodyType.DYNAMIC, new Vec2(200, 100));
+box.shapes.add(new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1)));
+box.space = space;
+
+// This works fine (no Material):
+const box2 = new Body(BodyType.DYNAMIC, new Vec2(300, 100));
+box2.shapes.add(new Polygon(Polygon.box(28, 28)));
+box2.space = space;
+```
+
+**Findings:**
+- Only affects `Polygon` shapes — `Circle` and `Capsule` with explicit `Material` work correctly
+- Even a single dynamic Polygon + Material tunnels (no multi-body requirement)
+- `isBullet = true` does NOT prevent the tunneling
+- Velocity/position iterations do NOT help
+- Default material (omitting the parameter) works fine
+
+**Workaround:** Omit the `Material` parameter for `Polygon` shapes — use engine defaults. If custom material properties are needed for Polygon bodies, set them on the shape after creation (untested — needs verification).
+
+**Likely cause:** Material constructor or assignment path corrupts narrowphase state for Polygon-Polygon contact generation. Investigation needed in `ZPP_CollidePoly` or `ZPP_ProcessBody` material handling.

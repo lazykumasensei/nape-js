@@ -73,5 +73,6 @@ Completed: P21–P43, P45, P46, P47, P48, P50, P51, P52, P53, P54, P55. Cancelle
 | Performance benchmark    | ✅ Done — P54 (nape-js vs Matter.js vs Planck.js vs Rapier) |
 | npm/SEO optimization     | ✅ Done — P55 (keywords, meta tags, JSON-LD, social card) |
 | Interactive playground   | ⬜ Planned — P56 (StackBlitz/CodeSandbox template) |
+| Polygon+Material bug     | ⬜ Open — P57 (dynamic Polygon + explicit Material tunnels through floors) |
 
 Full roadmap with details, competitor analysis, and history: `docs/guides/roadmap.md`
