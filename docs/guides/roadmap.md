@@ -87,7 +87,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | P29 — Test coverage ≥80%                  | L      | safety    | none   | 🔶 ~54% (3251 tests) |
 | P44 — PixiJS integration package          | M      | adoption  | low    | 🔶 Phase 1 done |
 | P45 — Character controller                | M      | DX        | medium | ✅ Done |
-| P47 — CJS bundle dedup (serialization)    | S      | bundle    | low    | ⬜ Not started |
+| P47 — CJS bundle dedup (serialization)    | S      | bundle    | low    | ✅ Done |
 | P51 — Sub-stepping solver                 | M      | stability | low    | ✅ Done |
 | P54 — Performance benchmark page          | S      | adoption  | low    | ✅ Done |
 | P55 — npm/SEO optimization                | XS     | adoption  | low    | ✅ Done |
@@ -248,12 +248,14 @@ New opt-in camera for demos whose physics world exceeds the 900×500 canvas view
 
 ---
 
-## Planned: P47 — CJS Bundle Dedup
+## Done: P47 — CJS Bundle Dedup
 
 **Effort: S | Impact: bundle size | Risk: low**
 
-The serialization CJS bundle duplicates the entire engine (902 KB). The ESM version
-correctly code-splits (8.2 KB). Fix via tsup config: `splitting`, `treeshake`, `target: es2020`.
+The serialization CJS bundle duplicated the entire engine (920 KB). Fixed by adding
+`splitting`, `treeshake`, and `target: "es2020"` to tsup config. CJS now code-splits
+into shared chunks — `serialization/index.cjs` dropped from 920 KB to 22 KB,
+`index.cjs` from 1006 KB to 103 KB.
 
 ---
 

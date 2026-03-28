@@ -8,6 +8,9 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   minify: true,
+  splitting: true,
+  treeshake: true,
+  target: "es2020",
   define: {
     __PACKAGE_VERSION__: JSON.stringify(pkg.version),
   },

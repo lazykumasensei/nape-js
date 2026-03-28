@@ -14,7 +14,7 @@ A fully typed TypeScript 2D physics engine — modernized rewrite of the origina
 - **Serialization** — JSON (`spaceToJSON` / `spaceFromJSON`) + binary (`spaceToBinary` / `spaceFromBinary`) for save/load/multiplayer rollback
 - **Debug draw** — abstract `DebugDraw` interface (Box2D pattern), reference impls for Canvas/Three.js/PixiJS/p5.js
 - **Character controller** — geometric collide-and-slide (`CharacterController` class), ground/slope/step/one-way/moving platform support
-- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 4655 tests
+- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 4666 tests
 
 ## Build & Test
 
@@ -61,14 +61,14 @@ iterator patterns, ESM constraints) see `docs/guides/architecture.md`.
 
 ## Current Status
 
-Completed: P21–P43, P45, P46, P48, P50, P51, P52, P53, P54, P55. Cancelled: P34, P36, P49.
+Completed: P21–P43, P45, P46, P47, P48, P50, P51, P52, P53, P54, P55. Cancelled: P34, P36, P49.
 
 | What                     | Status |
 | ------------------------ | ------ |
-| Test coverage            | 🔶 ~60% statements (4655 tests), target ≥80% — P29 |
+| Test coverage            | 🔶 ~60% statements (4666 tests), target ≥80% — P29 |
 | PixiJS integration       | 🔶 Phase 1 done (CodePen demos + Sprite adapter); npm package pending — P44 |
 | Character controller     | ✅ Done — P45 (`CharacterController` class, camera system, platformer demo) |
-| CJS bundle dedup         | ⬜ Planned — P47 |
+| CJS bundle dedup         | ✅ Done — P47 (splitting + treeshake, serialization CJS 920→22 KB) |
 | Sub-stepping solver      | ✅ Done — P51 (`space.subSteps`, tunneling demo) |
 | Performance benchmark    | ✅ Done — P54 (nape-js vs Matter.js vs Planck.js vs Rapier) |
 | npm/SEO optimization     | ✅ Done — P55 (keywords, meta tags, JSON-LD, social card) |
