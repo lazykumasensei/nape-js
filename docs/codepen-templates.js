@@ -223,6 +223,7 @@ const TEMPLATES = {
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
   Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
+  CharacterController,
 } from "${NAPE_CDN}";
 
 const canvas = document.getElementById("demoCanvas");
@@ -241,10 +242,11 @@ ${code}`;
     buildJS(code) {
       return `import * as THREE from "${THREE_CDN}";
 import {
-  Space, Body, BodyType, Vec2, Circle, Polygon,
+  Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
-  Material, InteractionFilter, InteractionGroup,
+  Material, FluidProperties, InteractionFilter, InteractionGroup,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
+  CharacterController,
 } from "${NAPE_CDN}";
 
 ${WALLS_HELPER}
@@ -262,6 +264,7 @@ import {
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
   Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
+  CharacterController,
 } from "${NAPE_CDN}";
 
 const container = document.getElementById("container");

@@ -50,6 +50,9 @@ let lastWallJumpSide = 0; // -1 = jumped off left wall, +1 = off right wall, 0 =
 let onIce = false;
 let iceVx = 0; // tracked horizontal velocity on ice (persists across frames)
 let _THREE = null;
+let _lastCamX = 0;
+let _lastCamY = 0;
+let _nonCanvasRenderer = false; // true when render3d or renderPixi is active
 
 // ---------------------------------------------------------------------------
 // Demo definition
@@ -267,6 +270,7 @@ export default {
     lastWallJumpSide = 0;
     onIce = false;
     iceVx = 0;
+    _nonCanvasRenderer = false;
 
     // Keyboard handling
     this._onKeyDown = (e) => {
@@ -469,6 +473,7 @@ export default {
 
   // ---- Custom render (camera-aware) ----
   render(ctx, space, W, H, showOutlines, camX = 0, camY = 0) {
+    _nonCanvasRenderer = false;
     ctx.save();
     ctx.translate(-camX, -camY);
 
@@ -568,6 +573,10 @@ export default {
 
   // ---- PixiJS render ----
   renderPixi(adapter, space, W, H, showOutlines, camX = 0, camY = 0) {
+    _lastCamX = camX;
+    _lastCamY = camY;
+    _nonCanvasRenderer = true;
+
     const { PIXI, app } = adapter.getEngine();
     if (!PIXI || !app) return;
 
@@ -612,7 +621,7 @@ export default {
     // Keep water on top
     app.stage.setChildIndex(waterGfx, app.stage.children.length - 1);
 
-    // Lazy-create player eye + coin popup overlay
+    // Lazy-create player eye overlay
     if (!app.stage._ccOverlayGfx) {
       app.stage._ccOverlayGfx = new PIXI.Graphics();
       app.stage.addChild(app.stage._ccOverlayGfx);
@@ -629,13 +638,6 @@ export default {
       overlay.fill({ color: eyeColor, alpha: 1 });
     }
 
-    // Coin popups (world space)
-    for (const p of coinPopups) {
-      const alpha = Math.min(1, p.timer * 2);
-      overlay.circle(p.x, p.y, 1);
-      overlay.fill({ color: 0xd29922, alpha });
-    }
-
     app.stage.setChildIndex(overlay, app.stage.children.length - 1);
 
     app.render();
@@ -643,6 +645,10 @@ export default {
 
   // ---- Three.js render ----
   render3d(renderer, scene, camera, space, W, H, camX = 0, camY = 0) {
+    _lastCamX = camX;
+    _lastCamY = camY;
+    _nonCanvasRenderer = true;
+
     // Lazy-load THREE
     if (!_THREE) {
       loadThree().then(mod => { _THREE = mod; });
@@ -791,6 +797,34 @@ export default {
   // ---- HUD overlay (used by both Three.js and PixiJS modes) ----
   render3dOverlay(ctx, space, W, H) {
     ctx.save();
+
+    // ---- World-space elements (projected to screen) ----
+    // Only draw in 3D/PixiJS modes — the 2D canvas render() already handles these
+    if (_nonCanvasRenderer) {
+      // Player eye
+      if (player) {
+        const sx = player.position.x - _lastCamX;
+        const sy = player.position.y - _lastCamY;
+        ctx.fillStyle = cc?.grounded ? "#3fb950" : "#f85149";
+        ctx.beginPath();
+        ctx.arc(sx + (playerFacingRight ? 4 : -4), sy - PLAYER_H / 2 + 8, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Coin pickup popups (world → screen)
+      for (const p of coinPopups) {
+        const sx = p.x - _lastCamX;
+        const sy = p.y - _lastCamY;
+        const alpha = Math.min(1, p.timer * 2);
+        ctx.fillStyle = `rgba(210,153,34,${alpha})`;
+        ctx.font = "bold 14px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("+1", sx, sy);
+      }
+      ctx.textAlign = "left";
+    }
+
+    // ---- HUD (screen space) ----
     ctx.fillStyle = "rgba(255,255,255,0.7)";
     ctx.font = "12px monospace";
     ctx.fillText("WASD / Arrow keys to move, Space to jump", 10, 20);
@@ -833,6 +867,547 @@ export default {
     ctx.restore();
   },
 
+  // ---- CodePen code ----
+  code2d: `// Character Controller — WASD/Arrows + Space to jump
+const W = canvas.width, H = canvas.height;
+const space = new Space(new Vec2(0, 600));
+const MOVE_SPEED = 180, JUMP_SPEED = 380;
+const platformTag = new CbType();
+const playerTag = new CbType();
+const coinTag = new CbType();
+
+// Floor + walls
+const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - 10));
+floor.shapes.add(new Polygon(Polygon.box(W, 20))); floor.space = space;
+const leftWall = new Body(BodyType.STATIC, new Vec2(10, H / 2));
+leftWall.shapes.add(new Polygon(Polygon.box(20, H))); leftWall.space = space;
+const rightWall = new Body(BodyType.STATIC, new Vec2(W - 10, H / 2));
+rightWall.shapes.add(new Polygon(Polygon.box(20, H))); rightWall.space = space;
+
+// One-way platforms
+function addOneWay(cx, cy, w) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  const s = new Polygon(Polygon.box(w, 8));
+  s.cbTypes.add(platformTag);
+  b.shapes.add(s); b.space = space;
+  try { b.userData._colorIdx = 4; } catch (_) {}
+}
+addOneWay(200, H - 100, 120);
+addOneWay(450, H - 160, 100);
+addOneWay(700, H - 100, 120);
+addOneWay(350, H - 250, 140);
+addOneWay(600, H - 320, 100);
+
+// Solid platforms
+const mid = new Body(BodyType.STATIC, new Vec2(150, H - 200));
+mid.shapes.add(new Polygon(Polygon.box(100, 16))); mid.space = space;
+const top = new Body(BodyType.STATIC, new Vec2(750, H - 250));
+top.shapes.add(new Polygon(Polygon.box(100, 16))); top.space = space;
+
+// Coins
+let coinCount = 0;
+const coinPopups = [];
+function addCoin(cx, cy) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  const s = new Circle(5); s.sensorEnabled = true; s.cbTypes.add(coinTag);
+  b.shapes.add(s); b.space = space;
+  try { b.userData._colorIdx = 1; } catch (_) {}
+}
+addCoin(200, H - 130); addCoin(450, H - 190);
+addCoin(700, H - 130); addCoin(350, H - 280);
+addCoin(600, H - 350); addCoin(150, H - 230);
+addCoin(750, H - 280);
+
+// Player (capsule)
+const player = new Body(BodyType.DYNAMIC, new Vec2(100, H - 60));
+const playerShape = new Capsule(36, 20, undefined, new Material(0, 0.3, 0.3, 1));
+playerShape.cbTypes.add(playerTag);
+player.shapes.add(playerShape);
+player.rotation = Math.PI / 2;
+player.allowRotation = false;
+player.isBullet = true;
+player.space = space;
+try { player.userData._colorIdx = 3; } catch (_) {}
+
+// Coin pickup
+const coinListener = new InteractionListener(
+  CbEvent.BEGIN, InteractionType.SENSOR, playerTag, coinTag,
+  (cb) => {
+    const b1 = cb.int1.castBody ?? cb.int1.castShape?.body;
+    const b2 = cb.int2.castBody ?? cb.int2.castShape?.body;
+    const coin = (b1 && b1 !== player) ? b1 : b2;
+    if (coin && coin.space) {
+      coinPopups.push({ x: coin.position.x, y: coin.position.y - 10, timer: 1.0 });
+      coin.space = null; coinCount++;
+    }
+  },
+);
+coinListener.space = space;
+
+// Character Controller
+const cc = new CharacterController(space, player, {
+  maxSlopeAngle: Math.PI / 3,
+  oneWayPlatformTag: platformTag,
+  characterTag: playerTag,
+});
+
+// Input
+const keys = {};
+let prevJump = false, facingRight = true;
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (["Space", "ArrowUp", "KeyW"].includes(e.code)) e.preventDefault();
+});
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+function loop() {
+  const left = keys["ArrowLeft"] || keys["KeyA"];
+  const right = keys["ArrowRight"] || keys["KeyD"];
+  const jumpKey = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
+  const jumpPressed = jumpKey && !prevJump;
+  prevJump = jumpKey;
+
+  let moveX = 0;
+  if (left) { moveX = -MOVE_SPEED; facingRight = false; }
+  if (right) { moveX = MOVE_SPEED; facingRight = true; }
+
+  const result = cc.update();
+  let velY = player.velocity.y;
+  if (jumpPressed && result.grounded) velY = -JUMP_SPEED;
+  if (!jumpKey && velY < 0) velY *= 0.85;
+  player.velocity = new Vec2(moveX, velY);
+
+  // Update coin popups
+  for (let i = coinPopups.length - 1; i >= 0; i--) {
+    coinPopups[i].timer -= 1/60;
+    coinPopups[i].y -= 30 / 60;
+    if (coinPopups[i].timer <= 0) coinPopups.splice(i, 1);
+  }
+
+  space.step(1 / 60, 10, 8);
+  ctx.clearRect(0, 0, W, H);
+  drawGrid();
+  for (const body of space.bodies) drawBody(body);
+
+  // Player eye
+  const px = player.position.x, py = player.position.y;
+  ctx.fillStyle = cc.grounded ? "#3fb950" : "#f85149";
+  ctx.beginPath();
+  ctx.arc(px + (facingRight ? 4 : -4), py - 10, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Coin popups
+  for (const p of coinPopups) {
+    const alpha = Math.min(1, p.timer * 2);
+    ctx.fillStyle = \`rgba(210,153,34,\${alpha})\`;
+    ctx.font = "bold 14px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("+1", p.x, p.y);
+  }
+  ctx.textAlign = "left";
+
+  // HUD
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = "12px monospace";
+  ctx.fillText("WASD / Arrows + Space to jump", 10, 20);
+  ctx.fillStyle = "#d29922";
+  ctx.fillText("● " + coinCount, W - 60, 20);
+  ctx.fillStyle = cc.grounded ? "#3fb950" : "#f85149";
+  ctx.fillText(cc.grounded ? "GROUNDED" : "AIRBORNE", 10, 40);
+
+  requestAnimationFrame(loop);
+}
+loop();`,
+
+  codePixi: `// Character Controller — WASD/Arrows + Space to jump
+const space = new Space(new Vec2(0, 600));
+const MOVE_SPEED = 180, JUMP_SPEED = 380;
+const platformTag = new CbType();
+const playerTag = new CbType();
+const coinTag = new CbType();
+
+// Floor + walls
+const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - 10));
+floor.shapes.add(new Polygon(Polygon.box(W, 20))); floor.space = space;
+const leftWall = new Body(BodyType.STATIC, new Vec2(10, H / 2));
+leftWall.shapes.add(new Polygon(Polygon.box(20, H))); leftWall.space = space;
+const rightWall = new Body(BodyType.STATIC, new Vec2(W - 10, H / 2));
+rightWall.shapes.add(new Polygon(Polygon.box(20, H))); rightWall.space = space;
+
+// One-way platforms
+function addOneWay(cx, cy, w) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  const s = new Polygon(Polygon.box(w, 8));
+  s.cbTypes.add(platformTag);
+  b.shapes.add(s); b.space = space;
+  try { b.userData._colorIdx = 4; } catch (_) {}
+}
+addOneWay(200, H - 100, 120);
+addOneWay(450, H - 160, 100);
+addOneWay(700, H - 100, 120);
+addOneWay(350, H - 250, 140);
+addOneWay(600, H - 320, 100);
+
+// Solid platforms
+const mid = new Body(BodyType.STATIC, new Vec2(150, H - 200));
+mid.shapes.add(new Polygon(Polygon.box(100, 16))); mid.space = space;
+const top2 = new Body(BodyType.STATIC, new Vec2(750, H - 250));
+top2.shapes.add(new Polygon(Polygon.box(100, 16))); top2.space = space;
+
+// Coins
+let coinCount = 0;
+const coinPopups = [];
+function addCoin(cx, cy) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  const s = new Circle(5); s.sensorEnabled = true; s.cbTypes.add(coinTag);
+  b.shapes.add(s); b.space = space;
+  try { b.userData._colorIdx = 1; } catch (_) {}
+}
+addCoin(200, H - 130); addCoin(450, H - 190);
+addCoin(700, H - 130); addCoin(350, H - 280);
+addCoin(600, H - 350); addCoin(150, H - 230);
+addCoin(750, H - 280);
+
+// Player (capsule)
+const player = new Body(BodyType.DYNAMIC, new Vec2(100, H - 60));
+const playerShape = new Capsule(36, 20, undefined, new Material(0, 0.3, 0.3, 1));
+playerShape.cbTypes.add(playerTag);
+player.shapes.add(playerShape);
+player.rotation = Math.PI / 2;
+player.allowRotation = false;
+player.isBullet = true;
+player.space = space;
+try { player.userData._colorIdx = 3; } catch (_) {}
+
+// Coin pickup
+const coinListener = new InteractionListener(
+  CbEvent.BEGIN, InteractionType.SENSOR, playerTag, coinTag,
+  (cb) => {
+    const b1 = cb.int1.castBody ?? cb.int1.castShape?.body;
+    const b2 = cb.int2.castBody ?? cb.int2.castShape?.body;
+    const coin = (b1 && b1 !== player) ? b1 : b2;
+    if (coin && coin.space) {
+      coinPopups.push({ x: coin.position.x, y: coin.position.y - 10, timer: 1.0 });
+      coin.space = null; coinCount++;
+    }
+  },
+);
+coinListener.space = space;
+
+// Character Controller
+const cc = new CharacterController(space, player, {
+  maxSlopeAngle: Math.PI / 3,
+  oneWayPlatformTag: platformTag,
+  characterTag: playerTag,
+});
+
+// Input
+const keys = {};
+let prevJump = false, facingRight = true;
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (["Space", "ArrowUp", "KeyW"].includes(e.code)) e.preventDefault();
+});
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+// Overlays
+const overlayGfx = new PIXI.Graphics();
+app.stage.addChild(overlayGfx);
+
+// HUD overlay canvas
+const hudCanvas = document.createElement("canvas");
+hudCanvas.width = W; hudCanvas.height = H;
+hudCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1";
+container.appendChild(hudCanvas);
+const hudCtx = hudCanvas.getContext("2d");
+
+function loop() {
+  const left = keys["ArrowLeft"] || keys["KeyA"];
+  const right = keys["ArrowRight"] || keys["KeyD"];
+  const jumpKey = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
+  const jumpPressed = jumpKey && !prevJump;
+  prevJump = jumpKey;
+
+  let moveX = 0;
+  if (left) { moveX = -MOVE_SPEED; facingRight = false; }
+  if (right) { moveX = MOVE_SPEED; facingRight = true; }
+
+  const result = cc.update();
+  let velY = player.velocity.y;
+  if (jumpPressed && result.grounded) velY = -JUMP_SPEED;
+  if (!jumpKey && velY < 0) velY *= 0.85;
+  player.velocity = new Vec2(moveX, velY);
+
+  for (let i = coinPopups.length - 1; i >= 0; i--) {
+    coinPopups[i].timer -= 1/60;
+    coinPopups[i].y -= 30 / 60;
+    if (coinPopups[i].timer <= 0) coinPopups.splice(i, 1);
+  }
+
+  space.step(1 / 60, 10, 8);
+  drawGrid();
+  syncBodies(space);
+
+  // Player eye + overlays
+  overlayGfx.clear();
+  const px = player.position.x, py = player.position.y;
+  overlayGfx.circle(px + (facingRight ? 4 : -4), py - 10, 2);
+  overlayGfx.fill({ color: cc.grounded ? 0x3fb950 : 0xf85149, alpha: 1 });
+  app.stage.setChildIndex(overlayGfx, app.stage.children.length - 1);
+  app.render();
+
+  // HUD
+  hudCtx.clearRect(0, 0, W, H);
+  // Coin popups
+  for (const p of coinPopups) {
+    const alpha = Math.min(1, p.timer * 2);
+    hudCtx.fillStyle = \`rgba(210,153,34,\${alpha})\`;
+    hudCtx.font = "bold 14px monospace";
+    hudCtx.textAlign = "center";
+    hudCtx.fillText("+1", p.x, p.y);
+  }
+  hudCtx.textAlign = "left";
+  hudCtx.fillStyle = "rgba(255,255,255,0.7)";
+  hudCtx.font = "12px monospace";
+  hudCtx.fillText("WASD / Arrows + Space to jump", 10, 20);
+  hudCtx.fillStyle = "#d29922";
+  hudCtx.fillText("● " + coinCount, W - 60, 20);
+  hudCtx.fillStyle = cc.grounded ? "#3fb950" : "#f85149";
+  hudCtx.fillText(cc.grounded ? "GROUNDED" : "AIRBORNE", 10, 40);
+
+  requestAnimationFrame(loop);
+}
+loop();`,
+
+  code3d: `// Setup Three.js scene
+const container = document.getElementById("container");
+const W = 900, H = 500;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d1117);
+const fov = 45;
+const camZ = (W / 2) / Math.tan((fov / 2) * Math.PI / 180) / (W / H);
+const camera = new THREE.PerspectiveCamera(fov, W / H, 1, camZ * 6);
+camera.position.set(W / 2, -H / 2, camZ);
+camera.lookAt(W / 2, -H / 2, 0);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H);
+container.appendChild(renderer.domElement);
+
+// HUD overlay canvas
+const hudCanvas = document.createElement("canvas");
+hudCanvas.width = W; hudCanvas.height = H;
+hudCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1";
+container.appendChild(hudCanvas);
+const hudCtx = hudCanvas.getContext("2d");
+
+// Lighting
+const keyLight = new THREE.DirectionalLight(0xfff5e0, 2.0);
+keyLight.position.set(-W*0.3, H*0.6, 800); scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0xadd8ff, 0.6);
+fillLight.position.set(W*1.2, -H*0.3, 400); scene.add(fillLight);
+scene.add(new THREE.AmbientLight(0x1a1a2e, 1.0));
+
+// Physics
+const space = new Space(new Vec2(0, 600));
+const MOVE_SPEED = 180, JUMP_SPEED = 380;
+const platformTag = new CbType();
+const playerTag = new CbType();
+const coinTag = new CbType();
+
+// Floor + walls
+const floorB = new Body(BodyType.STATIC, new Vec2(W / 2, H - 10));
+floorB.shapes.add(new Polygon(Polygon.box(W, 20))); floorB.space = space;
+const leftW = new Body(BodyType.STATIC, new Vec2(10, H / 2));
+leftW.shapes.add(new Polygon(Polygon.box(20, H))); leftW.space = space;
+const rightW = new Body(BodyType.STATIC, new Vec2(W - 10, H / 2));
+rightW.shapes.add(new Polygon(Polygon.box(20, H))); rightW.space = space;
+
+// One-way platforms
+function addOneWay(cx, cy, w) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  const s = new Polygon(Polygon.box(w, 8));
+  s.cbTypes.add(platformTag);
+  b.shapes.add(s); b.space = space;
+  try { b.userData._colorIdx = 4; } catch (_) {}
+}
+addOneWay(200, H - 100, 120);
+addOneWay(450, H - 160, 100);
+addOneWay(700, H - 100, 120);
+addOneWay(350, H - 250, 140);
+addOneWay(600, H - 320, 100);
+
+const mid = new Body(BodyType.STATIC, new Vec2(150, H - 200));
+mid.shapes.add(new Polygon(Polygon.box(100, 16))); mid.space = space;
+const topP = new Body(BodyType.STATIC, new Vec2(750, H - 250));
+topP.shapes.add(new Polygon(Polygon.box(100, 16))); topP.space = space;
+
+// Coins
+let coinCount = 0;
+const coinPopups = [];
+function addCoin(cx, cy) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  const s = new Circle(5); s.sensorEnabled = true; s.cbTypes.add(coinTag);
+  b.shapes.add(s); b.space = space;
+  try { b.userData._colorIdx = 1; } catch (_) {}
+}
+addCoin(200, H - 130); addCoin(450, H - 190);
+addCoin(700, H - 130); addCoin(350, H - 280);
+addCoin(600, H - 350); addCoin(150, H - 230);
+
+// Player
+const player = new Body(BodyType.DYNAMIC, new Vec2(100, H - 60));
+const pShape = new Capsule(36, 20, undefined, new Material(0, 0.3, 0.3, 1));
+pShape.cbTypes.add(playerTag);
+player.shapes.add(pShape);
+player.rotation = Math.PI / 2;
+player.allowRotation = false;
+player.isBullet = true;
+player.space = space;
+
+// Coin pickup
+const coinLis = new InteractionListener(
+  CbEvent.BEGIN, InteractionType.SENSOR, playerTag, coinTag,
+  (cb) => {
+    const b1 = cb.int1.castBody ?? cb.int1.castShape?.body;
+    const b2 = cb.int2.castBody ?? cb.int2.castShape?.body;
+    const coin = (b1 && b1 !== player) ? b1 : b2;
+    if (coin && coin.space) {
+      coinPopups.push({ x: coin.position.x, y: coin.position.y - 10, timer: 1.0 });
+      coin.space = null; coinCount++;
+    }
+  },
+);
+coinLis.space = space;
+
+const cc = new CharacterController(space, player, {
+  maxSlopeAngle: Math.PI / 3,
+  oneWayPlatformTag: platformTag,
+  characterTag: playerTag,
+});
+
+// Input
+const keys = {};
+let prevJump = false, facingRight = true;
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (["Space", "ArrowUp", "KeyW"].includes(e.code)) e.preventDefault();
+});
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+// 3D mesh management
+const MESH_COLORS = [0x4fc3f7, 0xffb74d, 0x81c784, 0xef5350, 0xce93d8, 0x4dd0e1];
+const meshes = [];
+const tracked = new Set();
+
+function addMesh(body) {
+  if (tracked.has(body)) return;
+  tracked.add(body);
+  for (const shape of body.shapes) {
+    let geom;
+    if (shape.isCircle()) {
+      geom = new THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
+    } else if (shape.isCapsule()) {
+      const cap = shape.castCapsule, hl = cap.halfLength, r = cap.radius;
+      const pts = [];
+      for (let i = -12; i <= 12; i++) {
+        const a = (i / 12) * Math.PI / 2;
+        pts.push(new THREE.Vector2(hl + Math.cos(a) * r, Math.sin(a) * r));
+      }
+      for (let i = -12; i <= 12; i++) {
+        const a = Math.PI + (i / 12) * Math.PI / 2;
+        pts.push(new THREE.Vector2(-hl + Math.cos(a) * r, Math.sin(a) * r));
+      }
+      geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts),
+        { depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2 });
+      geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
+      geom.computeVertexNormals();
+      geom.translate(0, 0, -15);
+    } else if (shape.isPolygon()) {
+      const verts = shape.castPolygon.localVerts;
+      if (verts.length < 3) continue;
+      const pts = [];
+      for (let v = 0; v < verts.length; v++) pts.push(new THREE.Vector2(verts.at(v).x, verts.at(v).y));
+      geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts),
+        { depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2 });
+      geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
+      geom.computeVertexNormals();
+      geom.translate(0, 0, -15);
+    }
+    if (!geom) continue;
+    const cIdx = (body.userData?._colorIdx ?? 0) % MESH_COLORS.length;
+    const color = body.isStatic() ? 0x455a64 : MESH_COLORS[cIdx];
+    const mesh = new THREE.Mesh(geom, new THREE.MeshPhongMaterial({
+      color, shininess: 80, specular: 0x444444, side: THREE.DoubleSide,
+    }));
+    scene.add(mesh);
+    meshes.push({ mesh, body });
+  }
+}
+
+function loop() {
+  const left = keys["ArrowLeft"] || keys["KeyA"];
+  const right = keys["ArrowRight"] || keys["KeyD"];
+  const jumpKey = keys["Space"] || keys["ArrowUp"] || keys["KeyW"];
+  const jumpPressed = jumpKey && !prevJump;
+  prevJump = jumpKey;
+
+  let moveX = 0;
+  if (left) { moveX = -MOVE_SPEED; facingRight = false; }
+  if (right) { moveX = MOVE_SPEED; facingRight = true; }
+
+  const result = cc.update();
+  let velY = player.velocity.y;
+  if (jumpPressed && result.grounded) velY = -JUMP_SPEED;
+  if (!jumpKey && velY < 0) velY *= 0.85;
+  player.velocity = new Vec2(moveX, velY);
+
+  for (let i = coinPopups.length - 1; i >= 0; i--) {
+    coinPopups[i].timer -= 1/60;
+    coinPopups[i].y -= 30 / 60;
+    if (coinPopups[i].timer <= 0) coinPopups.splice(i, 1);
+  }
+
+  space.step(1 / 60, 10, 8);
+
+  // Remove stale meshes
+  const alive = new Set();
+  for (const body of space.bodies) alive.add(body);
+  for (let i = meshes.length - 1; i >= 0; i--) {
+    if (!alive.has(meshes[i].body)) {
+      scene.remove(meshes[i].mesh);
+      tracked.delete(meshes[i].body);
+      meshes.splice(i, 1);
+    }
+  }
+  // Add + sync meshes
+  for (const body of space.bodies) addMesh(body);
+  for (const { mesh, body } of meshes) {
+    mesh.position.set(body.position.x, -body.position.y, 0);
+    mesh.rotation.z = -body.rotation;
+  }
+  renderer.render(scene, camera);
+
+  // HUD
+  hudCtx.clearRect(0, 0, W, H);
+  for (const p of coinPopups) {
+    const alpha = Math.min(1, p.timer * 2);
+    hudCtx.fillStyle = \`rgba(210,153,34,\${alpha})\`;
+    hudCtx.font = "bold 14px monospace";
+    hudCtx.textAlign = "center";
+    hudCtx.fillText("+1", p.x, p.y);
+  }
+  hudCtx.textAlign = "left";
+  hudCtx.fillStyle = "rgba(255,255,255,0.7)";
+  hudCtx.font = "12px monospace";
+  hudCtx.fillText("WASD / Arrows + Space to jump", 10, 20);
+  hudCtx.fillStyle = "#d29922";
+  hudCtx.fillText("● " + coinCount, W - 60, 20);
+  hudCtx.fillStyle = cc.grounded ? "#3fb950" : "#f85149";
+  hudCtx.fillText(cc.grounded ? "GROUNDED" : "AIRBORNE", 10, 40);
+
+  requestAnimationFrame(loop);
+}
+loop();`,
 };
 
 // ---------------------------------------------------------------------------

@@ -304,14 +304,28 @@ export class PixiJSAdapter {
   #drawBodyShapes(body, gfx, showOutlines) {
     gfx.clear();
 
-    const colorIdx = (body.userData?._colorIdx ?? 0) % FILL_COLORS.length;
-    const fillColor = body.isStatic()
-      ? STATIC_FILL
-      : body.isSleeping
-        ? SLEEPING_FILL
-        : FILL_COLORS[colorIdx];
-
-    const fillAlpha = body.isStatic() ? 0.15 : 0.25;
+    // Support custom _color (e.g. bounce pads, ice platforms)
+    const customColor = body.userData?._color;
+    let fillColor, fillAlpha;
+    if (customColor) {
+      fillColor = parseInt(customColor.stroke.replace("#", ""), 16);
+      fillAlpha = 0.25;
+    } else {
+      const overrideIdx = body.userData?._colorIdx;
+      const colorIdx = (overrideIdx ?? 0) % FILL_COLORS.length;
+      // Respect explicit _colorIdx even on static bodies (e.g. one-way platforms, coins)
+      if (overrideIdx != null && overrideIdx > 0) {
+        fillColor = FILL_COLORS[colorIdx];
+        fillAlpha = 0.25;
+      } else {
+        fillColor = body.isStatic()
+          ? STATIC_FILL
+          : body.isSleeping
+            ? SLEEPING_FILL
+            : FILL_COLORS[colorIdx];
+        fillAlpha = body.isStatic() ? 0.15 : 0.25;
+      }
+    }
 
     for (const shape of body.shapes) {
       if (shape.isCircle()) {
