@@ -14,15 +14,14 @@ import { ZPP_Body } from "../phys/ZPP_Body";
 import { ZPP_Shape } from "../shape/ZPP_Shape";
 import { getNape } from "../../core/engine";
 
-/** Check if shape is circle-like for CCD (circle or capsule). */
+/** Check if shape is circle for CCD. */
 function _isCircleLike(s: any): boolean {
-  return s.type === 0 || s.type === 2;
+  return s.type === 0;
 }
 
-/** Get effective CCD bounding radius from worldCOM for circle or capsule. */
+/** Get effective CCD bounding radius from worldCOM for circle. */
 function _ccdRadius(s: any): number {
-  if (s.type === 0) return s.circle.radius;
-  return s.capsule.halfLength + s.capsule.radius;
+  return s.circle.radius;
 }
 
 export class ZPP_SweepDistance {
@@ -94,7 +93,7 @@ export class ZPP_SweepDistance {
           }
         }
       }
-      if (s1.type == 0 || s1.type === 2) {
+      if (s1.type == 0) {
         s1.worldCOMx = b1.posx + (b1.axisy * s1.localCOMx - b1.axisx * s1.localCOMy);
         s1.worldCOMy = b1.posy + (s1.localCOMx * b1.axisx + s1.localCOMy * b1.axisy);
       } else {
@@ -157,7 +156,7 @@ export class ZPP_SweepDistance {
           }
         }
       }
-      if (s2.type == 0 || s2.type === 2) {
+      if (s2.type == 0) {
         s2.worldCOMx = b2.posx + (b2.axisy * s2.localCOMx - b2.axisx * s2.localCOMy);
         s2.worldCOMy = b2.posy + (s2.localCOMx * b2.axisx + s2.localCOMy * b2.axisy);
       } else {
@@ -690,7 +689,7 @@ export class ZPP_SweepDistance {
             }
           }
         }
-        if (s1.type == 0 || s1.type === 2) {
+        if (s1.type == 0) {
           s1.worldCOMx = b1.posx + (b1.axisy * s1.localCOMx - b1.axisx * s1.localCOMy);
           s1.worldCOMy = b1.posy + (s1.localCOMx * b1.axisx + s1.localCOMy * b1.axisy);
         } else {
@@ -753,7 +752,7 @@ export class ZPP_SweepDistance {
             }
           }
         }
-        if (s2.type == 0 || s2.type === 2) {
+        if (s2.type == 0) {
           s2.worldCOMx = b2.posx + (b2.axisy * s2.localCOMx - b2.axisx * s2.localCOMy);
           s2.worldCOMy = b2.posy + (s2.localCOMx * b2.axisx + s2.localCOMy * b2.axisy);
         } else {
@@ -1310,7 +1309,7 @@ export class ZPP_SweepDistance {
           }
         }
       }
-      if (s1.type == 0 || s1.type === 2) {
+      if (s1.type == 0) {
         s1.worldCOMx = b1.posx + (b1.axisy * s1.localCOMx - b1.axisx * s1.localCOMy);
         s1.worldCOMy = b1.posy + (s1.localCOMx * b1.axisx + s1.localCOMy * b1.axisy);
       } else {
@@ -1833,7 +1832,7 @@ export class ZPP_SweepDistance {
             }
           }
         }
-        if (s1.type == 0 || s1.type === 2) {
+        if (s1.type == 0) {
           s1.worldCOMx = b1.posx + (b1.axisy * s1.localCOMx - b1.axisx * s1.localCOMy);
           s1.worldCOMy = b1.posy + (s1.localCOMx * b1.axisx + s1.localCOMy * b1.axisy);
         } else {

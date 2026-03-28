@@ -1,7 +1,7 @@
 /**
  * ZPP_Shape — Internal base shape class for the nape physics engine.
  *
- * Base class for ZPP_Circle, ZPP_Polygon, and ZPP_Capsule. Inherits from compiled
+ * Base class for ZPP_Circle and ZPP_Polygon. Inherits from compiled
  * ZPP_Interactor. Manages AABB, COM, area/inertia, material, filter,
  * and broadphase data.
  *
@@ -80,10 +80,9 @@ export class ZPP_Shape {
   zip_sweepRadius = false;
   sweepCoef = 0;
 
-  // --- Instance: circle/polygon/capsule subtype references ---
+  // --- Instance: circle/polygon subtype references ---
   circle: any = null;
   polygon: any = null;
-  capsule: any = null;
 
   // --- Instance: material/filter/fluid ---
   refmaterial: any = null;
@@ -198,10 +197,8 @@ export class ZPP_Shape {
       this.zip_sweepRadius = false;
       if (this.type === 0) {
         this.circle.__validate_sweepRadius();
-      } else if (this.type === 1) {
-        this.polygon.__validate_sweepRadius();
       } else {
-        this.capsule.__validate_sweepRadius();
+        this.polygon.__validate_sweepRadius();
       }
     }
   }
@@ -210,10 +207,8 @@ export class ZPP_Shape {
   clear(): void {
     if (this.type === 0) {
       this.circle.__clear();
-    } else if (this.type === 1) {
-      this.polygon.__clear();
     } else {
-      this.capsule.__clear();
+      this.polygon.__clear();
     }
   }
 
@@ -224,10 +219,8 @@ export class ZPP_Shape {
         this.zip_aabb = false;
         if (this.type === 0) {
           this.circle.__validate_aabb();
-        } else if (this.type === 1) {
-          this.polygon.__validate_aabb();
         } else {
-          this.capsule.__validate_aabb();
+          this.polygon.__validate_aabb();
         }
       }
     }
@@ -236,10 +229,8 @@ export class ZPP_Shape {
   force_validate_aabb(): void {
     if (this.type === 0) {
       this.circle._force_validate_aabb();
-    } else if (this.type === 1) {
-      this.polygon._force_validate_aabb();
     } else {
-      this.capsule._force_validate_aabb();
+      this.polygon._force_validate_aabb();
     }
   }
 
@@ -256,10 +247,8 @@ export class ZPP_Shape {
       this.zip_area_inertia = false;
       if (this.type === 0) {
         this.circle.__validate_area_inertia();
-      } else if (this.type === 1) {
-        this.polygon.__validate_area_inertia();
       } else {
-        this.capsule.__validate_area_inertia();
+        this.polygon.__validate_area_inertia();
       }
     }
   }
@@ -271,10 +260,8 @@ export class ZPP_Shape {
       this.refmaterial.dynamicFriction = this.material.dynamicFriction;
       if (this.type === 0) {
         this.circle.__validate_angDrag();
-      } else if (this.type === 1) {
-        this.polygon.__validate_angDrag();
       } else {
-        this.capsule.__validate_angDrag();
+        this.polygon.__validate_angDrag();
       }
     }
   }
@@ -339,7 +326,7 @@ export class ZPP_Shape {
   invalidate_localCOM(): void {
     this.zip_localCOM = true;
     this.invalidate_area_inertia();
-    if (this.type === 0 || this.type === 2) {
+    if (this.type === 0) {
       this.zip_sweepRadius = true;
     }
     this.invalidate_angDrag();
@@ -490,12 +477,7 @@ export class ZPP_Shape {
   // --- Copy ---
   copy(): any {
     const zpp = ZPP_Shape._zpp;
-    const ret: any =
-      this.type === 0
-        ? this.circle.__copy()
-        : this.type === 1
-          ? this.polygon.__copy()
-          : this.capsule.__copy();
+    const ret: any = this.type === 0 ? this.circle.__copy() : this.polygon.__copy();
     if (!this.zip_area_inertia) {
       ret.area = this.area;
       ret.inertia = this.inertia;

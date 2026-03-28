@@ -195,8 +195,6 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
             _this.aabb.miny = _this.worldCOMy - ry;
             _this.aabb.maxx = _this.worldCOMx + rx;
             _this.aabb.maxy = _this.worldCOMy + ry;
-          } else if (shape.type == 2) {
-            shape.capsule.__validate_aabb();
           } else {
             const _this3 = shape.polygon;
             if (_this3.zip_gverts) {
@@ -876,9 +874,7 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
           const result =
             shape.type == 0
               ? ray.circlesect(shape.circle, inner, mint)
-              : shape.type == 2
-                ? ray.capsect(shape.capsule, inner, mint)
-                : ray.polysect(shape.polygon, inner, mint);
+              : ray.polysect(shape.polygon, inner, mint);
           if (result != null) {
             if (result.zpp_inner.next != null) {
               throw new Error("Error: This object has been disposed of and cannot be used");
@@ -942,8 +938,6 @@ export class ZPP_SpatialHashPhase extends ZPP_Broadphase {
         if (t >= 0) {
           if (shape.type == 0) {
             ray.circlesect2(shape.circle, inner, ret);
-          } else if (shape.type == 2) {
-            ray.capsect2(shape.capsule, inner, ret);
           } else {
             ray.polysect2(shape.polygon, inner, ret);
           }

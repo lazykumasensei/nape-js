@@ -155,8 +155,6 @@ export class ZPP_Broadphase {
               _this.aabb.miny = _this.worldCOMy - ry;
               _this.aabb.maxx = _this.worldCOMx + rx;
               _this.aabb.maxy = _this.worldCOMy + ry;
-            } else if (shape.type == 2) {
-              shape.capsule.__validate_aabb();
             } else {
               const _this3 = shape.polygon;
               if (_this3.zip_gverts) {
@@ -306,8 +304,6 @@ export class ZPP_Broadphase {
                 _this6.aabb.miny = _this6.worldCOMy - ry1;
                 _this6.aabb.maxx = _this6.worldCOMx + rx1;
                 _this6.aabb.maxy = _this6.worldCOMy + ry1;
-              } else if (shape.type == 2) {
-                shape.capsule.__validate_aabb();
               } else {
                 const _this9 = shape.polygon;
                 if (_this9.zip_gverts) {

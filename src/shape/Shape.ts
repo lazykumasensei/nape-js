@@ -72,7 +72,6 @@ export class Shape extends Interactor {
       : (zppInner.type ?? -1);
     if (type === 0 && _circleWrap) return _circleWrap(inner);
     if (type === 1 && _polygonWrap) return _polygonWrap(inner);
-    if (type === 2 && _capsuleWrap) return _capsuleWrap(inner);
 
     // Handle ZPP inner objects that have an outer
     if (inner.outer) return inner.outer;

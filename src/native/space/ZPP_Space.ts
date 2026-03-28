@@ -1799,33 +1799,6 @@ export class ZPP_Space {
             (_this.localCOMx * _this.body.axisx + _this.localCOMy * _this.body.axisy);
         }
       }
-    } else if (shape.type === 2) {
-      // Capsule: validate worldCOM (no polygon vertices/edges)
-      const _thisCap = shape.capsule;
-      if (_thisCap.zip_worldCOM) {
-        if (_thisCap.body != null) {
-          _thisCap.zip_worldCOM = false;
-          if (_thisCap.zip_localCOM) {
-            _thisCap.zip_localCOM = false;
-            if (_thisCap.wrap_localCOM != null) {
-              _thisCap.wrap_localCOM.zpp_inner.x = _thisCap.localCOMx;
-              _thisCap.wrap_localCOM.zpp_inner.y = _thisCap.localCOMy;
-            }
-          }
-          const _thisCapBody = _thisCap.body;
-          if (_thisCapBody.zip_axis) {
-            _thisCapBody.zip_axis = false;
-            _thisCapBody.axisx = Math.sin(_thisCapBody.rot);
-            _thisCapBody.axisy = Math.cos(_thisCapBody.rot);
-          }
-          _thisCap.worldCOMx =
-            _thisCap.body.posx +
-            (_thisCap.body.axisy * _thisCap.localCOMx - _thisCap.body.axisx * _thisCap.localCOMy);
-          _thisCap.worldCOMy =
-            _thisCap.body.posy +
-            (_thisCap.localCOMx * _thisCap.body.axisx + _thisCap.localCOMy * _thisCap.body.axisy);
-        }
-      }
     } else {
       const _this3 = shape.polygon;
       if (_this3.zip_gaxi) {
@@ -2043,7 +2016,7 @@ export class ZPP_Space {
           }
           const _this8 = (s.zpp_inner.body != null ? s.zpp_inner.body.outer : null).zpp_inner;
           const s1 = s.zpp_inner;
-          if (s1.type == 0 || s1.type === 2) {
+          if (s1.type == 0) {
             s1.worldCOMx =
               _this8.posx + (_this8.axisy * s1.localCOMx - _this8.axisx * s1.localCOMy);
             s1.worldCOMy =
@@ -2125,7 +2098,7 @@ export class ZPP_Space {
         }
       }
     }
-    if (shape.type == 0 || shape.type === 2) {
+    if (shape.type == 0) {
       shape.worldCOMx = body.posx + (body.axisy * shape.localCOMx - body.axisx * shape.localCOMy);
       shape.worldCOMy = body.posy + (shape.localCOMx * body.axisx + shape.localCOMy * body.axisy);
     } else {
@@ -2419,33 +2392,6 @@ export class ZPP_Space {
             (_this.localCOMx * _this.body.axisx + _this.localCOMy * _this.body.axisy);
         }
       }
-    } else if (s.type === 2) {
-      // Capsule: validate worldCOM (same as circle — no polygon vertices/edges)
-      const _thisCap = s.capsule;
-      if (_thisCap.zip_worldCOM) {
-        if (_thisCap.body != null) {
-          _thisCap.zip_worldCOM = false;
-          if (_thisCap.zip_localCOM) {
-            _thisCap.zip_localCOM = false;
-            if (_thisCap.wrap_localCOM != null) {
-              _thisCap.wrap_localCOM.zpp_inner.x = _thisCap.localCOMx;
-              _thisCap.wrap_localCOM.zpp_inner.y = _thisCap.localCOMy;
-            }
-          }
-          const _thisCapBody = _thisCap.body;
-          if (_thisCapBody.zip_axis) {
-            _thisCapBody.zip_axis = false;
-            _thisCapBody.axisx = Math.sin(_thisCapBody.rot);
-            _thisCapBody.axisy = Math.cos(_thisCapBody.rot);
-          }
-          _thisCap.worldCOMx =
-            _thisCap.body.posx +
-            (_thisCap.body.axisy * _thisCap.localCOMx - _thisCap.body.axisx * _thisCap.localCOMy);
-          _thisCap.worldCOMy =
-            _thisCap.body.posy +
-            (_thisCap.localCOMx * _thisCap.body.axisx + _thisCap.localCOMy * _thisCap.body.axisy);
-        }
-      }
     } else {
       const _this3 = s.polygon;
       if (_this3.zip_gaxi) {
@@ -2615,33 +2561,6 @@ export class ZPP_Space {
           _this.worldCOMy =
             _this.body.posy +
             (_this.localCOMx * _this.body.axisx + _this.localCOMy * _this.body.axisy);
-        }
-      }
-    } else if (shape.type === 2) {
-      // Capsule: validate worldCOM (no polygon vertices/edges)
-      const _thisCap = shape.capsule;
-      if (_thisCap.zip_worldCOM) {
-        if (_thisCap.body != null) {
-          _thisCap.zip_worldCOM = false;
-          if (_thisCap.zip_localCOM) {
-            _thisCap.zip_localCOM = false;
-            if (_thisCap.wrap_localCOM != null) {
-              _thisCap.wrap_localCOM.zpp_inner.x = _thisCap.localCOMx;
-              _thisCap.wrap_localCOM.zpp_inner.y = _thisCap.localCOMy;
-            }
-          }
-          const _thisCapBody = _thisCap.body;
-          if (_thisCapBody.zip_axis) {
-            _thisCapBody.zip_axis = false;
-            _thisCapBody.axisx = Math.sin(_thisCapBody.rot);
-            _thisCapBody.axisy = Math.cos(_thisCapBody.rot);
-          }
-          _thisCap.worldCOMx =
-            _thisCap.body.posx +
-            (_thisCap.body.axisy * _thisCap.localCOMx - _thisCap.body.axisx * _thisCap.localCOMy);
-          _thisCap.worldCOMy =
-            _thisCap.body.posy +
-            (_thisCap.localCOMx * _thisCap.body.axisx + _thisCap.localCOMy * _thisCap.body.axisy);
         }
       }
     } else {
@@ -2852,7 +2771,7 @@ export class ZPP_Space {
           }
           const _this8 = (s.zpp_inner.body != null ? s.zpp_inner.body.outer : null).zpp_inner;
           const s1 = s.zpp_inner;
-          if (s1.type == 0 || s1.type === 2) {
+          if (s1.type == 0) {
             s1.worldCOMx =
               _this8.posx + (_this8.axisy * s1.localCOMx - _this8.axisx * s1.localCOMy);
             s1.worldCOMy =
@@ -3129,7 +3048,7 @@ export class ZPP_Space {
         }
       }
     }
-    if (shape.type == 0 || shape.type === 2) {
+    if (shape.type == 0) {
       shape.worldCOMx = body.posx + (body.axisy * shape.localCOMx - body.axisx * shape.localCOMy);
       shape.worldCOMy = body.posy + (shape.localCOMx * body.axisx + shape.localCOMy * body.axisy);
     } else {
@@ -3726,7 +3645,7 @@ export class ZPP_Space {
           }
         }
         const s = minTOI.s1;
-        if (s.type == 0 || s.type === 2) {
+        if (s.type == 0) {
           s.worldCOMx = b11.posx + (b11.axisy * s.localCOMx - b11.axisx * s.localCOMy);
           s.worldCOMy = b11.posy + (s.localCOMx * b11.axisx + s.localCOMy * b11.axisy);
         } else {
@@ -3792,7 +3711,7 @@ export class ZPP_Space {
           }
         }
         const s1 = minTOI.s2;
-        if (s1.type == 0 || s1.type === 2) {
+        if (s1.type == 0) {
           s1.worldCOMx = b21.posx + (b21.axisy * s1.localCOMx - b21.axisx * s1.localCOMy);
           s1.worldCOMy = b21.posy + (s1.localCOMx * b21.axisx + s1.localCOMy * b21.axisy);
         } else {
@@ -6335,8 +6254,6 @@ export class ZPP_Space {
                 _this.aabb.miny = _this.worldCOMy - ry;
                 _this.aabb.maxx = _this.worldCOMx + rx;
                 _this.aabb.maxy = _this.worldCOMy + ry;
-              } else if (s.type === 2) {
-                s.capsule.__validate_aabb();
               } else {
                 const _this3 = s.polygon;
                 if (_this3.zip_gverts) {
@@ -6748,8 +6665,6 @@ export class ZPP_Space {
                   _this5.aabb.miny = _this5.worldCOMy - ry;
                   _this5.aabb.maxx = _this5.worldCOMx + rx;
                   _this5.aabb.maxy = _this5.worldCOMy + ry;
-                } else if (s1.type === 2) {
-                  s1.capsule.__validate_aabb();
                 } else {
                   const _this8 = s1.polygon;
                   if (_this8.zip_gverts) {
@@ -7079,8 +6994,6 @@ export class ZPP_Space {
                   _this15.aabb.miny = _this15.worldCOMy - ry1;
                   _this15.aabb.maxx = _this15.worldCOMx + rx1;
                   _this15.aabb.maxy = _this15.worldCOMy + ry1;
-                } else if (s3.type === 2) {
-                  s3.capsule.__validate_aabb();
                 } else {
                   const _this18 = s3.polygon;
                   if (_this18.zip_gverts) {
@@ -7322,8 +7235,6 @@ export class ZPP_Space {
               _this.aabb.miny = _this.worldCOMy - _this.radius;
               _this.aabb.maxx = _this.worldCOMx + _this.radius;
               _this.aabb.maxy = _this.worldCOMy + _this.radius;
-            } else if (s.type === 2) {
-              s.capsule.__validate_aabb();
             } else {
               const _this1 = s.polygon;
               let li = _this1.lverts.next;
@@ -7417,8 +7328,6 @@ export class ZPP_Space {
                 _this2.aabb.miny = _this2.worldCOMy - _this2.radius;
                 _this2.aabb.maxx = _this2.worldCOMx + _this2.radius;
                 _this2.aabb.maxy = _this2.worldCOMy + _this2.radius;
-              } else if (s.type === 2) {
-                s.capsule.__validate_aabb();
               } else {
                 const _this3 = s.polygon;
                 let li1 = _this3.lverts.next;
@@ -7590,8 +7499,6 @@ export class ZPP_Space {
               _this4.aabb.miny = _this4.worldCOMy - _this4.radius;
               _this4.aabb.maxx = _this4.worldCOMx + _this4.radius;
               _this4.aabb.maxy = _this4.worldCOMy + _this4.radius;
-            } else if (s1.type === 2) {
-              s1.capsule.__validate_aabb();
             } else {
               const _this5 = s1.polygon;
               let li2 = _this5.lverts.next;
@@ -8953,10 +8860,6 @@ export class ZPP_Space {
                 tViscosity1 -=
                   (f * _this30.ws2.circle.radius * ZPP_Space._nape.Config.fluidLinearDrag) /
                   (2 * _this30.ws2.circle.radius * Math.PI);
-              } else if (_this30.ws2.type === 2) {
-                const capR = _this30.ws2.capsule.radius;
-                tViscosity1 -=
-                  (f * capR * ZPP_Space._nape.Config.fluidLinearDrag) / (2 * capR * Math.PI);
               } else {
                 const poly = _this30.ws2.polygon;
                 let bord = 0.0;
@@ -8983,10 +8886,6 @@ export class ZPP_Space {
                 tViscosity1 -=
                   (f1 * _this30.ws1.circle.radius * ZPP_Space._nape.Config.fluidLinearDrag) /
                   (2 * _this30.ws1.circle.radius * Math.PI);
-              } else if (_this30.ws1.type === 2) {
-                const capR1 = _this30.ws1.capsule.radius;
-                tViscosity1 -=
-                  (f1 * capR1 * ZPP_Space._nape.Config.fluidLinearDrag) / (2 * capR1 * Math.PI);
               } else {
                 const poly1 = _this30.ws1.polygon;
                 let bord1 = 0.0;
