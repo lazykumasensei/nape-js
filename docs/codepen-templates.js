@@ -38,6 +38,18 @@ function drawBody(body) {
       ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, 0);
       ctx.strokeStyle = stroke + "55"; ctx.stroke();
+    } else if (shape.isCapsule()) {
+      const cap = shape.castCapsule;
+      const hl = cap.halfLength, r = cap.radius;
+      const x0 = -hl, x1 = hl, top = -r, bot = r;
+      ctx.beginPath();
+      ctx.moveTo(x1, top);
+      ctx.arc(x1, 0, r, -Math.PI / 2, Math.PI / 2);
+      ctx.lineTo(x0, bot);
+      ctx.arc(x0, 0, r, Math.PI / 2, -Math.PI / 2);
+      ctx.closePath();
+      ctx.fillStyle = fill; ctx.fill();
+      ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke();
     } else if (shape.isPolygon()) {
       const verts = shape.castPolygon.localVerts;
       const len = verts.length; if (len < 3) continue;
