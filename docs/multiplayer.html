@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>nape-js — Multiplayer Demo</title>
-  <meta name="description" content="Real-time multiplayer physics demo powered by nape-js — server-authoritative simulation with WebSocket sync." />
+  <title>nape-js — Multiplayer Platformer</title>
+  <meta name="description" content="Multiplayer platformer demo powered by nape-js — server-authoritative character controller with WebSocket sync." />
   <meta name="theme-color" content="#0d1117" />
   <link rel="canonical" href="https://newkrok.github.io/nape-js/multiplayer.html" />
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="nape-js — Multiplayer Physics Demo" />
-  <meta property="og:description" content="Real-time server-authoritative physics — move a character, push objects, see other players live." />
+  <meta property="og:title" content="nape-js — Multiplayer Platformer" />
+  <meta property="og:description" content="Multiplayer platformer — wall-jump, ice, bounce pads, coins — server-authoritative character controller." />
   <meta property="og:url" content="https://newkrok.github.io/nape-js/multiplayer.html" />
   <meta property="og:image" content="https://newkrok.github.io/nape-js/assets/social-card.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="nape-js — Multiplayer Physics Demo" />
-  <meta name="twitter:description" content="Real-time server-authoritative physics — move a character, push objects, see other players live." />
+  <meta name="twitter:title" content="nape-js — Multiplayer Platformer" />
+  <meta name="twitter:description" content="Multiplayer platformer — wall-jump, ice, bounce pads, coins — server-authoritative character controller." />
   <meta name="twitter:image" content="https://newkrok.github.io/nape-js/assets/social-card.png" />
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-TF84DLZ4X8"></script>
   <script>
@@ -198,7 +198,7 @@
 
   <header class="mp-header">
     <a href="examples.html">&larr; Examples</a>
-    <h1>Multiplayer Demo</h1>
+    <h1>Multiplayer Platformer</h1>
     <a href="https://github.com/NewKrok/nape-js/tree/master/server" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:6px;font-size:13px;">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       View source
@@ -214,6 +214,8 @@
       <span id="playerCountText">0 / 8 players</span>
       <div class="sep"></div>
       <span id="pingText">ping: —</span>
+      <div class="sep"></div>
+      <span id="coinText" style="color:#d29922">&#9679; 0</span>
       <div class="sep" style="margin-left:auto; display:none"></div>
       <div class="player-list" id="playerList"></div>
     </div>
@@ -229,6 +231,7 @@
     <div class="mp-controls">
       <span><span class="key">←</span><span class="key">→</span> or <span class="key">A</span><span class="key">D</span> Move</span>
       <span><span class="key">↑</span> or <span class="key">W</span> or <span class="key">Space</span> Jump</span>
+      <span>Wall-slide: hold into wall &middot; Wall-jump: jump off wall</span>
     </div>
 
   </main>
@@ -236,14 +239,16 @@
 
 <script>
 // ─── Config ───────────────────────────────────────────────────────────────────
-// SERVER_URL is replaced at build/deploy time, or falls back to localhost for dev.
-const SERVER_URL = window.NAPE_MP_SERVER_URL || "wss://nape-js-production.up.railway.app";
+const SERVER_URL = window.NAPE_MP_SERVER_URL
+  || (location.hostname === "localhost" || location.hostname === "127.0.0.1"
+    ? `ws://${location.hostname}:3001`
+    : "wss://nape-js-production.up.railway.app");
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────────
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-const W = canvas.width;
-const H = canvas.height;
+const VW = canvas.width;   // viewport width
+const VH = canvas.height;  // viewport height
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let myPlayerId = null;
@@ -251,39 +256,53 @@ let myBodyId = null;
 let myColorIdx = 0;
 let isSpectator = false;
 let playerColors = [];
-let playerMeta = []; // [{id, colorIdx, bodyId}]
+let playerMeta = [];
 
-// Scene descriptors (received once on init)
-let staticBodies = [];
+// World
+let worldW = 4000, worldH = 600;
+let level = [];
+let coinDefs = [];       // [{id, x, y, alive}]
 let sceneObjects = [];
+let movingPlatforms = [];
 
-// Interpolated positions: bodyId → {x, y, rot, px, py, prot}
+// Camera
+let camX = 0, camY = 0;
+const CAM_LERP = 0.12;
+
+// Interpolated positions: bodyId → {x, y, rot, px, py, prot, ts, pts}
 const bodyState = new Map();
 
-let lastFrameTime = 0;
-let frameCount = 0;
+let lastServerFrame = 0;
 let lastPingTime = 0;
 let ping = 0;
-let lastServerFrame = 0;
+
+// Coin counter (local)
+let myScore = 0;
+let coinPopups = []; // {x, y, timer}
 
 // ─── Input ────────────────────────────────────────────────────────────────────
 const keys = { left: false, right: false, jump: false };
+let pendingEvents = [];
+let prevJump = false;
 
 window.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft"  || e.key === "a" || e.key === "A") keys.left  = true;
   if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") keys.right = true;
-  if (e.key === "ArrowUp"    || e.key === "w" || e.key === "W" || e.key === " ") keys.jump = true;
+  if (e.key === "ArrowUp"    || e.key === "w" || e.key === "W" || e.key === " ") {
+    if (!keys.jump) pendingEvents.push("jumpPressed");
+    keys.jump = true;
+  }
   if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
 });
 
 window.addEventListener("keyup", (e) => {
   if (e.key === "ArrowLeft"  || e.key === "a" || e.key === "A") keys.left  = false;
   if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") keys.right = false;
-  if (e.key === "ArrowUp"    || e.key === "w" || e.key === "W" || e.key === " ") keys.jump = false;
+  if (e.key === "ArrowUp"    || e.key === "w" || e.key === "W" || e.key === " ") {
+    if (keys.jump) pendingEvents.push("jumpReleased");
+    keys.jump = false;
+  }
 });
-
-// Mobile touch controls
-let touchLeft = false, touchRight = false, touchJump = false;
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 let ws = null;
@@ -300,13 +319,16 @@ function connect() {
   ws.onopen = () => {
     setStatus(true, "Connected");
     setOverlay(false);
-    // Send input at 20 Hz
     inputInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "input", keys }));
+        const msg = { type: "input", keys };
+        if (pendingEvents.length > 0) {
+          msg.events = pendingEvents;
+          pendingEvents = [];
+        }
+        ws.send(JSON.stringify(msg));
       }
     }, 50);
-    // Ping every 2s
     setInterval(() => {
       lastPingTime = performance.now();
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
@@ -328,9 +350,7 @@ function connect() {
     reconnectTimeout = setTimeout(connect, 3000);
   };
 
-  ws.onerror = () => {
-    ws.close();
-  };
+  ws.onerror = () => { ws.close(); };
 }
 
 // ─── Message handlers ─────────────────────────────────────────────────────────
@@ -342,19 +362,20 @@ function handleJsonMessage(msg) {
     myBodyId = msg.bodyId ?? null;
     myColorIdx = msg.colorIdx ?? 0;
     playerColors = msg.playerColors;
-    staticBodies = msg.staticBodies;
-    sceneObjects = msg.sceneObjects;
+    worldW = msg.worldW || 4000;
+    worldH = msg.worldH || 600;
+    level = msg.level || [];
+    coinDefs = msg.coins || [];
+    sceneObjects = msg.sceneObjects || [];
+    movingPlatforms = msg.movingPlatforms || [];
     playerMeta = msg.players;
+    myScore = 0;
+    coinPopups = [];
 
     if (isSpectator) {
       setStatus(true, "Spectating");
-      document.getElementById("playerCountText").textContent = `${playerMeta.length} / 8 players`;
     }
-
-    // Pre-populate body state for scene objects
-    for (const obj of sceneObjects) {
-      bodyState.set(obj.id, { x: obj.x, y: obj.y, rot: 0, px: obj.x, py: obj.y, prot: 0 });
-    }
+    document.getElementById("playerCountText").textContent = `${playerMeta.length} / 8 players`;
     updatePlayerListUI();
   }
 
@@ -367,6 +388,25 @@ function handleJsonMessage(msg) {
   if (msg.type === "pong") {
     ping = Math.round(performance.now() - lastPingTime);
     document.getElementById("pingText").textContent = `ping: ${ping}ms`;
+  }
+
+  if (msg.type === "coin_pickup") {
+    const coin = coinDefs.find(c => c.id === msg.coinId);
+    if (coin) {
+      coin.alive = false;
+      coinPopups.push({ x: coin.x, y: coin.y - 10, timer: 1.0 });
+      if (msg.playerId === myPlayerId) {
+        myScore++;
+        document.getElementById("coinText").innerHTML = `&#9679; ${myScore}`;
+      }
+    }
+  }
+
+  if (msg.type === "coin_respawn") {
+    for (const id of msg.coinIds) {
+      const coin = coinDefs.find(c => c.id === id);
+      if (coin) coin.alive = true;
+    }
   }
 
   if (msg.type === "error") {
@@ -386,9 +426,6 @@ function handleBinaryFrame(buf) {
     const rot = view.getFloat32(offset, true);    offset += 4;
 
     const prev = bodyState.get(id);
-    // If the previous update was too long ago (>500ms), snap directly to the
-    // new position instead of interpolating — this prevents visual "jumps"
-    // when a body receives a resync after being idle.
     const stale = prev && (now - prev.ts) > 500;
     bodyState.set(id, {
       x, y, rot,
@@ -402,24 +439,63 @@ function handleBinaryFrame(buf) {
   lastServerFrame = now;
 }
 
+// ─── Camera ───────────────────────────────────────────────────────────────────
+
+function updateCamera() {
+  if (!myBodyId && !isSpectator) return;
+
+  let targetId = myBodyId;
+  // Spectator: follow first player
+  if (isSpectator && playerMeta.length > 0) {
+    targetId = playerMeta[0].bodyId;
+  }
+  if (!targetId) return;
+
+  const state = bodyState.get(targetId);
+  if (!state) return;
+
+  const now = performance.now();
+  let a = 1;
+  if (state.ts && state.pts && state.ts > state.pts) {
+    const renderTime = now - TICK_MS * 1.5;
+    a = Math.max(0, Math.min(1, (renderTime - state.pts) / (state.ts - state.pts)));
+  }
+  const px = state.px + (state.x - state.px) * a;
+  const py = state.py + (state.y - state.py) * a;
+
+  let goalX = px - VW / 2;
+  let goalY = py - 30 - VH / 2;
+
+  goalX = Math.max(0, Math.min(goalX, worldW - VW));
+  goalY = Math.max(0, Math.min(goalY, worldH + 120 - VH));
+
+  camX += (goalX - camX) * CAM_LERP;
+  camY += (goalY - camY) * CAM_LERP;
+}
+
 // ─── Rendering ────────────────────────────────────────────────────────────────
+
+const TICK_MS = 1000 / 60;
+const DT = 1 / 60;
+
+const STATIC_COLOR   = { fill: "rgba(120,160,200,0.12)", stroke: "#4a6070" };
+const ONEWAY_COLOR   = { fill: "rgba(163,113,247,0.15)", stroke: "#a371f7" };
+const BOUNCE_COLOR   = { fill: "rgba(248,81,73,0.3)",    stroke: "#f85149" };
+const ICE_COLOR      = { fill: "rgba(140,210,255,0.25)", stroke: "#8cd2ff" };
+const WATER_COLOR    = { fill: "rgba(50,120,220,0.15)",  stroke: "rgba(80,160,255,0.3)" };
 
 const OBJECT_COLORS = [
   { fill: "rgba(88,166,255,0.18)",  stroke: "#58a6ff" },
   { fill: "rgba(210,153,34,0.18)",  stroke: "#d29922" },
   { fill: "rgba(63,185,80,0.18)",   stroke: "#3fb950" },
 ];
-const STATIC_COLOR = { fill: "rgba(120,160,200,0.12)", stroke: "#4a6070" };
-const PLATFORM_COLOR = { fill: "rgba(88,166,255,0.10)", stroke: "#58a6ff" };
 
 function getBodyColor(id) {
-  // Is it a player body?
   const pm = playerMeta.find(p => p.bodyId === id);
   if (pm && playerColors.length) {
     const c = playerColors[pm.colorIdx % playerColors.length];
     return { fill: c.fill, stroke: c.stroke };
   }
-  // Scene object — stable color by id
   return OBJECT_COLORS[id % OBJECT_COLORS.length];
 }
 
@@ -439,129 +515,231 @@ function drawRoundRect(x, y, w, h, r = 4) {
   ctx.closePath();
 }
 
-function render(alpha) {
-  ctx.clearRect(0, 0, W, H);
+function drawCapsule(x, y, w, h) {
+  // Vertical capsule (w=width, h=total height)
+  const r = w / 2;
+  const bodyH = h - w; // straight section height
+  const l = x - r;
+  const t = y - h / 2;
+  ctx.beginPath();
+  // Top semicircle
+  ctx.arc(x, t + r, r, Math.PI, 0);
+  // Right side
+  ctx.lineTo(x + r, t + r + bodyH);
+  // Bottom semicircle
+  ctx.arc(x, t + r + bodyH, r, 0, Math.PI);
+  ctx.closePath();
+}
 
-  // Grid
+function render() {
+  ctx.clearRect(0, 0, VW, VH);
+  const now = performance.now();
+
+  // Update coin popups
+  for (let i = coinPopups.length - 1; i >= 0; i--) {
+    coinPopups[i].timer -= DT;
+    coinPopups[i].y -= 30 * DT;
+    if (coinPopups[i].timer <= 0) coinPopups.splice(i, 1);
+  }
+
+  updateCamera();
+
+  ctx.save();
+  ctx.translate(-camX, -camY);
+
+  // ── Grid ──
+  const gridSize = 50;
   ctx.strokeStyle = "rgba(255,255,255,0.03)";
   ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  const gx0 = Math.floor(camX / gridSize) * gridSize;
+  const gy0 = Math.floor(camY / gridSize) * gridSize;
+  for (let x = gx0; x < camX + VW + gridSize; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, camY); ctx.lineTo(x, camY + VH); ctx.stroke();
+  }
+  for (let y = gy0; y < camY + VH + gridSize; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(camX, y); ctx.lineTo(camX + VW, y); ctx.stroke();
+  }
 
-  // Static bodies
-  for (const s of staticBodies) {
-    const c = s.oneWay ? PLATFORM_COLOR : STATIC_COLOR;
+  // ── Level geometry ──
+  for (const part of level) {
+    // Culling
+    const px = part.x, py = part.y, pw = (part.w || 0), ph = (part.h || 0);
+    if (px + pw / 2 < camX - 50 || px - pw / 2 > camX + VW + 50) continue;
+    if (py + ph / 2 < camY - 50 || py - ph / 2 > camY + VH + 50) continue;
+
+    let c;
+    switch (part.type) {
+      case "oneWay": c = ONEWAY_COLOR; break;
+      case "bounce": c = BOUNCE_COLOR; break;
+      case "ice":    c = ICE_COLOR;    break;
+      case "water":  c = WATER_COLOR;  break;
+      default:       c = STATIC_COLOR; break;
+    }
+
     ctx.save();
-    ctx.translate(s.x, s.y);
-    drawRoundRect(0, 0, s.w, s.h, 3);
-    ctx.fillStyle = c.fill; ctx.fill();
-    ctx.strokeStyle = c.stroke; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.translate(px, py);
+    if (part.angle) ctx.rotate(part.angle);
+
+    if (part.type === "water") {
+      // Water fill
+      ctx.fillStyle = c.fill;
+      ctx.fillRect(-pw / 2, -ph / 2, pw, ph);
+      // Animated wave
+      ctx.strokeStyle = c.stroke;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const waveY = -ph / 2;
+      for (let wx = -pw / 2; wx <= pw / 2; wx += 4) {
+        const wy = waveY + Math.sin((px + wx + now * 0.003) * 0.05) * 3;
+        wx === -pw / 2 ? ctx.moveTo(wx, wy) : ctx.lineTo(wx, wy);
+      }
+      ctx.stroke();
+    } else {
+      drawRoundRect(0, 0, pw, ph, 3);
+      ctx.fillStyle = c.fill; ctx.fill();
+      ctx.strokeStyle = c.stroke; ctx.lineWidth = 1.5; ctx.stroke();
+    }
     ctx.restore();
   }
 
-  // Dynamic bodies (interpolated)
-  const now = performance.now();
+  // ── Coins ──
+  for (const coin of coinDefs) {
+    if (!coin.alive) continue;
+    if (coin.x < camX - 20 || coin.x > camX + VW + 20) continue;
+    if (coin.y < camY - 20 || coin.y > camY + VH + 20) continue;
+    ctx.save();
+    ctx.translate(coin.x, coin.y);
+    // Pulsing glow
+    const pulse = 0.6 + 0.4 * Math.sin(now * 0.004 + coin.id);
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(210,153,34,${0.3 * pulse})`;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#d29922";
+    ctx.fill();
+    ctx.strokeStyle = "#ffcc00";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Dynamic bodies (interpolated) ──
   for (const [id, state] of bodyState) {
-    // Per-body alpha based on actual snapshot timestamps for smoother interpolation
-    let a = alpha;
+    // Per-body interpolation
+    let a = 1;
     if (state.ts && state.pts && state.ts > state.pts) {
-      const INTERP_DELAY = TICK_MS * 1.5;
-      const renderTime = now - INTERP_DELAY;
+      const renderTime = now - TICK_MS * 1.5;
       a = Math.max(0, Math.min(1, (renderTime - state.pts) / (state.ts - state.pts)));
     }
     const ix = state.px + (state.x - state.px) * a;
     const iy = state.py + (state.y - state.py) * a;
     const irot = state.prot + (state.rot - state.prot) * a;
 
+    // Culling
+    if (ix < camX - 60 || ix > camX + VW + 60) continue;
+    if (iy < camY - 60 || iy > camY + VH + 60) continue;
+
     const c = getBodyColor(id);
+    const pm = playerMeta.find(p => p.bodyId === id);
     const isMe = id === myBodyId;
+
+    // Moving platform?
+    const mp = movingPlatforms.find(m => m.bodyId === id);
+    if (mp) {
+      ctx.save();
+      ctx.translate(ix, iy);
+      ctx.rotate(irot);
+      drawRoundRect(0, 0, mp.w, mp.h, 3);
+      ctx.fillStyle = ONEWAY_COLOR.fill; ctx.fill();
+      ctx.strokeStyle = ONEWAY_COLOR.stroke; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.restore();
+      continue;
+    }
 
     ctx.save();
     ctx.translate(ix, iy);
     ctx.rotate(irot);
 
-    // Find shape info
-    const obj = sceneObjects.find(o => o.id === id);
-    const pm = playerMeta.find(p => p.bodyId === id);
-
     if (pm) {
-      // Player: circle
-      const pr = 16;
-      ctx.beginPath();
-      ctx.arc(0, 0, pr, 0, Math.PI * 2);
+      // Player: capsule shape
+      ctx.save();
+      ctx.rotate(-irot); // undo body rotation for upright capsule
+      drawCapsule(0, 0, 20, 36);
       ctx.fillStyle = c.fill; ctx.fill();
       ctx.strokeStyle = c.stroke; ctx.lineWidth = isMe ? 2.5 : 1.5; ctx.stroke();
+
+      // Eye indicator
+      const eyeX = keys.right ? 3 : keys.left ? -3 : 3;
+      ctx.beginPath();
+      ctx.arc(eyeX, -10, 2, 0, Math.PI * 2);
+      ctx.fillStyle = c.stroke;
+      ctx.fill();
+
       // "Me" indicator
       if (isMe) {
         ctx.beginPath();
-        ctx.arc(0, -pr - 6, 4, 0, Math.PI * 2);
+        ctx.arc(0, -22, 4, 0, Math.PI * 2);
         ctx.fillStyle = c.stroke; ctx.fill();
       }
-    } else if (obj) {
-      if (obj.moving) {
-        // Moving platform — render as a static-style platform
-        drawRoundRect(0, 0, obj.w, obj.h, 3);
-        ctx.fillStyle = PLATFORM_COLOR.fill; ctx.fill();
-        ctx.strokeStyle = PLATFORM_COLOR.stroke; ctx.lineWidth = 1.5; ctx.stroke();
-      } else if (obj.shape === "circle") {
-        ctx.beginPath();
-        ctx.arc(0, 0, obj.size, 0, Math.PI * 2);
-        ctx.fillStyle = c.fill; ctx.fill();
-        ctx.strokeStyle = c.stroke; ctx.lineWidth = 1.2; ctx.stroke();
-      } else {
-        drawRoundRect(0, 0, obj.size, obj.size, 3);
-        ctx.fillStyle = c.fill; ctx.fill();
-        ctx.strokeStyle = c.stroke; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.restore();
+    } else {
+      // Scene object
+      const obj = sceneObjects.find(o => o.id === id);
+      if (obj) {
+        if (obj.shape === "circle") {
+          ctx.beginPath();
+          ctx.arc(0, 0, obj.size, 0, Math.PI * 2);
+          ctx.fillStyle = c.fill; ctx.fill();
+          ctx.strokeStyle = c.stroke; ctx.lineWidth = 1.2; ctx.stroke();
+        } else {
+          drawRoundRect(0, 0, obj.size, obj.size, 3);
+          ctx.fillStyle = c.fill; ctx.fill();
+          ctx.strokeStyle = c.stroke; ctx.lineWidth = 1.2; ctx.stroke();
+        }
       }
     }
 
     ctx.restore();
-
-    // Kötél kirajzolása (rope) — ha lelógó elem, anchor fix pozíció
-    if (obj && obj.anchorX != null) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(obj.anchorX, obj.anchorY);
-      ctx.lineTo(ix, iy);
-      ctx.strokeStyle = "rgba(120,160,200,0.5)";
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 4]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // Anchor pont
-      ctx.beginPath();
-      ctx.arc(obj.anchorX, obj.anchorY, 3, 0, Math.PI * 2);
-      ctx.fillStyle = "#4a6070";
-      ctx.fill();
-      ctx.restore();
-    }
   }
+
+  // ── Coin pickup popups (world space) ──
+  for (const p of coinPopups) {
+    const alpha = Math.min(1, p.timer * 2);
+    ctx.fillStyle = `rgba(210,153,34,${alpha})`;
+    ctx.font = "bold 14px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("+1", p.x, p.y);
+  }
+  ctx.textAlign = "left";
+
+  ctx.restore();
+
+  // ── HUD (screen space) ──
+  // Legend
+  const ly = VH - 12;
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#a371f7";
+  ctx.fillText("\u25AC one-way", 10, ly);
+  ctx.fillStyle = "#607888";
+  ctx.fillText("\u25AC solid", 100, ly);
+  ctx.fillStyle = "#f85149";
+  ctx.fillText("\u25AC bounce", 170, ly);
+  ctx.fillStyle = "#8cd2ff";
+  ctx.fillText("\u25AC ice", 250, ly);
+  ctx.fillStyle = "rgba(50,120,220,0.6)";
+  ctx.fillText("\u25AC water", 300, ly);
+  ctx.fillStyle = "#d29922";
+  ctx.fillText("\u25CF coin", 370, ly);
 }
 
 // ─── Game loop ────────────────────────────────────────────────────────────────
-const TICK_MS = 1000 / 60;
 
-function loop(now) {
+function loop() {
   requestAnimationFrame(loop);
-
-  // Interpolation alpha: how far we are between the last two server snapshots.
-  // We add a small buffer (half a tick) so we always have two frames to interpolate between.
-  const INTERP_DELAY = TICK_MS * 1.5;
-  const renderTime = now - INTERP_DELAY;
-
-  let alpha = 1;
-  if (lastServerFrame > 0) {
-    // Oldest snapshot arrival time across all bodies (approximate as lastServerFrame - TICK_MS)
-    const frameStart = lastServerFrame - TICK_MS;
-    const frameEnd   = lastServerFrame;
-    if (frameEnd > frameStart) {
-      alpha = Math.max(0, Math.min(1, (renderTime - frameStart) / (frameEnd - frameStart)));
-    }
-  }
-
-  render(alpha);
+  render();
 }
-
 requestAnimationFrame(loop);
 
 // ─── UI helpers ───────────────────────────────────────────────────────────────
