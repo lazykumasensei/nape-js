@@ -440,8 +440,8 @@ all physics.
 - **Source code:** [`server/index.js`](../../server/index.js) — production multiplayer server (~460 lines)
 - **Client:** [`docs/multiplayer.html`](../multiplayer.html) — WebSocket client with interpolation (~570 lines)
 - **Serialization API:** [`src/serialization/`](../../src/serialization/) — JSON + binary snapshot/restore
-- **Roadmap P48:** [Deterministic mode](./roadmap.md) — planned soft determinism for prediction
-- **Roadmap P42:** [Web Worker helper](./roadmap.md) — planned off-main-thread physics
+- **Roadmap P48:** [Deterministic mode](../../ROADMAP.md) — planned soft determinism for prediction
+- **Roadmap P42:** [Web Worker helper](../../ROADMAP.md) — planned off-main-thread physics
 
 ### External References
 

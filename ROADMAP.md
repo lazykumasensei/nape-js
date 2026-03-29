@@ -234,7 +234,7 @@ New opt-in camera for demos whose physics world exceeds the 900×500 canvas view
 8. Coyote time / helper properties
 9. Interactive platformer demo (wide level, keyboard controls)
 10. Unit + integration tests
-11. Docs update (API reference, guide, CLAUDE.md, README)
+11. Docs update (API reference, guide, `CLAUDE.md`, README)
 
 ### Competitive Analysis
 
