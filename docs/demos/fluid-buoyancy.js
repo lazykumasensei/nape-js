@@ -3,6 +3,11 @@ import {
 } from "../nape-js.esm.js";
 import { drawBody, drawGrid, drawConstraints } from "../renderer.js";
 import { loadThree } from "../renderers/threejs-adapter.js";
+import {
+  waveY, drawWaveSurface2D,
+  createWater3D, updateWater3D,
+  drawWaterPixi,
+} from "../renderers/water-renderer.js";
 
 // ---------------------------------------------------------------------------
 // State
@@ -127,62 +132,8 @@ function spawnBoat(space, x, y) {
   return body;
 }
 
-// ---------------------------------------------------------------------------
-// Wave surface helper — purely cosmetic sine wave
-// ---------------------------------------------------------------------------
-
-function waveY(x, time) {
-  return Math.sin(x * 0.02 + time * 2.0) * 3
-       + Math.sin(x * 0.035 - time * 1.5) * 2
-       + Math.sin(x * 0.07 + time * 3.0) * 1;
-}
-
-function drawWaveSurface(ctx, W, H, surfaceY, time) {
-  // Water fill with wave top
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(20, H - 10);
-  for (let x = 20; x <= W - 20; x += 3) {
-    ctx.lineTo(x, surfaceY + waveY(x, time));
-  }
-  ctx.lineTo(W - 20, H - 10);
-  ctx.closePath();
-
-  // Gradient fill
-  const grad = ctx.createLinearGradient(0, surfaceY - 10, 0, H);
-  grad.addColorStop(0, "rgba(30,144,255,0.28)");
-  grad.addColorStop(0.3, "rgba(20,100,200,0.35)");
-  grad.addColorStop(1, "rgba(10,50,120,0.45)");
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // Wave surface line with glow
-  ctx.beginPath();
-  for (let x = 20; x <= W - 20; x += 2) {
-    const wy = surfaceY + waveY(x, time);
-    if (x === 20) ctx.moveTo(x, wy);
-    else ctx.lineTo(x, wy);
-  }
-  ctx.strokeStyle = "rgba(100,200,255,0.9)";
-  ctx.lineWidth = 2.5;
-  ctx.shadowColor = "rgba(80,180,255,0.6)";
-  ctx.shadowBlur = 10;
-  ctx.stroke();
-
-  // Secondary highlight line
-  ctx.beginPath();
-  for (let x = 20; x <= W - 20; x += 2) {
-    const wy = surfaceY + waveY(x + 40, time * 0.8) + 4;
-    if (x === 20) ctx.moveTo(x, wy);
-    else ctx.lineTo(x, wy);
-  }
-  ctx.strokeStyle = "rgba(150,220,255,0.3)";
-  ctx.lineWidth = 1;
-  ctx.shadowBlur = 0;
-  ctx.stroke();
-
-  ctx.restore();
-}
+// waveY, drawWaveSurface2D, createWater3D, updateWater3D, drawWaterPixi
+// are now imported from ../renderers/water-renderer.js
 
 // ---------------------------------------------------------------------------
 // Custom 2D renderer
@@ -211,7 +162,7 @@ function renderFluid(ctx, space, W, H, showOutlines) {
   for (const body of below) drawBody(ctx, body, showOutlines);
 
   // Draw water with animated waves
-  drawWaveSurface(ctx, W, H, _waterY, _time);
+  drawWaveSurface2D(ctx, W, H, _waterY, _time);
 
   // Draw above-water bodies
   for (const body of above) drawBody(ctx, body, showOutlines);
@@ -250,69 +201,8 @@ function renderFluid(ctx, space, W, H, showOutlines) {
 
 }
 
-// ---------------------------------------------------------------------------
-// 3D wave geometry helper
-// ---------------------------------------------------------------------------
-
-function buildWaveGeometry(THREE, W, H, waterY, time) {
-  const xMin = 20, xMax = W - 20;
-  const zMin = -30, zMax = 30;
-  const xSegs = 80, zSegs = 8;
-  const geom = new THREE.BufferGeometry();
-
-  const verts = [];
-  const indices = [];
-  const normals = [];
-
-  for (let zi = 0; zi <= zSegs; zi++) {
-    const z = zMin + (zi / zSegs) * (zMax - zMin);
-    const zFactor = 1.0 - 0.3 * Math.abs(z / zMax); // slight wave damping at edges
-    for (let xi = 0; xi <= xSegs; xi++) {
-      const x = xMin + (xi / xSegs) * (xMax - xMin);
-      const wy = waveY(x + z * 0.3, time) * zFactor;
-      verts.push(x, -(waterY + wy), z);
-      normals.push(0, 1, 0); // approximate — will be recalculated
-    }
-  }
-
-  for (let zi = 0; zi < zSegs; zi++) {
-    for (let xi = 0; xi < xSegs; xi++) {
-      const a = zi * (xSegs + 1) + xi;
-      const b = a + 1;
-      const c = a + (xSegs + 1);
-      const d = c + 1;
-      indices.push(a, b, c);
-      indices.push(b, d, c);
-    }
-  }
-
-  geom.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-  geom.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-  geom.setIndex(indices);
-  geom.computeVertexNormals();
-  return geom;
-}
-
-function updateWaveGeometry(geom, W, H, waterY, time) {
-  const pos = geom.attributes.position;
-  const xMin = 20, xMax = W - 20;
-  const zMin = -30, zMax = 30;
-  const xSegs = 80, zSegs = 8;
-
-  let idx = 0;
-  for (let zi = 0; zi <= zSegs; zi++) {
-    const z = zMin + (zi / zSegs) * (zMax - zMin);
-    const zFactor = 1.0 - 0.3 * Math.abs(z / zMax);
-    for (let xi = 0; xi <= xSegs; xi++) {
-      const x = xMin + (xi / xSegs) * (xMax - xMin);
-      const wy = waveY(x + z * 0.3, time) * zFactor;
-      pos.setY(idx, -(waterY + wy));
-      idx++;
-    }
-  }
-  pos.needsUpdate = true;
-  geom.computeVertexNormals();
-}
+// buildWaveGeometry3D / updateWaveGeometry3D are now in water-renderer.js
+// createWater3D / updateWater3D wrap them for easy use.
 
 // ---------------------------------------------------------------------------
 // 3D boat flag helper
@@ -439,41 +329,10 @@ export default {
 
     // Create/update animated wave water surface
     if (!_waterMesh3d) {
-      const geom = buildWaveGeometry(_THREE, W, H, _waterY, _time);
-      const mat = new _THREE.MeshPhongMaterial({
-        color: 0x1e90ff,
-        transparent: true,
-        opacity: 0.45,
-        shininess: 100,
-        specular: 0x66aaff,
-        emissive: 0x1e6abf,
-        emissiveIntensity: 0.7,
-        side: _THREE.DoubleSide,
-        depthWrite: false,
-      });
-      _waterMesh3d = new _THREE.Mesh(geom, mat);
-      _waterMesh3d.renderOrder = 999;
-      scene.add(_waterMesh3d);
-
-      // Also add a deeper water volume below the surface
-      const waterH = H - _waterY;
-      const volGeom = new _THREE.BoxGeometry(W - 40, waterH - 6, 60);
-      const volMat = new _THREE.MeshPhongMaterial({
-        color: 0x1464aa,
-        transparent: true,
-        opacity: 0.35,
-        emissive: 0x0e4478,
-        emissiveIntensity: 0.6,
-        side: _THREE.DoubleSide,
-        depthWrite: false,
-      });
-      const volMesh = new _THREE.Mesh(volGeom, volMat);
-      volMesh.position.set(W / 2, -(_waterY + waterH / 2 + 3), 0);
-      volMesh.renderOrder = 998;
-      scene.add(volMesh);
-      _waterMesh3d.userData._volume = volMesh;
+      _waterMesh3d = createWater3D(_THREE, W, H, _waterY, _time);
+      scene.add(_waterMesh3d.group);
     } else {
-      updateWaveGeometry(_waterMesh3d.geometry, W, H, _waterY, _time);
+      updateWater3D(_waterMesh3d, W, _waterY, _time);
     }
 
     // Sync body meshes — replicate DemoRunner's default logic
@@ -595,22 +454,8 @@ export default {
     // Keep water overlay on top of body sprites
     app.stage.setChildIndex(gfx, app.stage.children.length - 1);
 
-    // Animated wave water surface
     gfx.clear();
-    const pts = [20, H - 10];
-    for (let x = 20; x <= W - 20; x += 3) {
-      pts.push(x, _waterY + waveY(x, _time));
-    }
-    pts.push(W - 20, H - 10);
-    gfx.poly(pts, true);
-    gfx.fill({ color: 0x1e90ff, alpha: 0.3 });
-
-    // Wave surface line
-    gfx.moveTo(20, _waterY + waveY(20, _time));
-    for (let x = 22; x <= W - 20; x += 2) {
-      gfx.lineTo(x, _waterY + waveY(x, _time));
-    }
-    gfx.stroke({ color: 0x64c8ff, width: 2.5, alpha: 0.9 });
+    drawWaterPixi(gfx, W, H, _waterY, _time);
 
     // Boat mast + flag
     if (!app.stage._boatGfx) {
