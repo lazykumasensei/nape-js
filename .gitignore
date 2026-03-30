@@ -8,3 +8,7 @@ coverage-native/
 docs/nape-js.esm.js
 docs/chunk-*.js
 docs/api/
+
+# Tool configs
+.claude/
+.serena/
