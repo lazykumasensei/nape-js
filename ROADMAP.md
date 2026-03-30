@@ -77,14 +77,14 @@ Potential future priorities identified via competitive analysis and market gaps:
 
 ### Completed & Cancelled
 
-Done: P21–P28, P30–P33, P35, P37–P43, P46, P48, P50, P52, P53.
+Done: P21–P28, P30–P33, P35, P37–P43, P46, P48, P50, P52, P53, P57.
 Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — superseded by P52), P49 (ECS adapter — trivial pattern).
 
 ### Active & Planned
 
 | Priority                                  | Effort | Impact    | Risk   | Status         |
 | ----------------------------------------- | ------ | --------- | ------ | -------------- |
-| P29 — Test coverage ≥80%                  | L      | safety    | none   | 🔶 ~54% (3251 tests) |
+| P29 — Test coverage ≥80%                  | L      | safety    | none   | 🔶 ~57% (4773 tests) |
 | P44 — PixiJS integration package          | M      | adoption  | low    | 🔶 Phase 1 done |
 | P45 — Character controller                | M      | DX        | medium | ✅ Done |
 | P47 — CJS bundle dedup (serialization)    | S      | bundle    | low    | ✅ Done |
@@ -92,7 +92,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | P54 — Performance benchmark page          | S      | adoption  | low    | ✅ Done |
 | P55 — npm/SEO optimization                | XS     | adoption  | low    | ✅ Done |
 | P56 — Interactive playground              | S-M    | adoption  | low    | ⬜ Not started |
-| P57 — Polygon + Material tunneling bug    | M      | stability | medium | ⬜ Not started |
+| P57 — Polygon + Material tunneling bug    | M      | stability | medium | ✅ Done |
 
 ---
 
@@ -331,36 +331,24 @@ Browser-based sandbox for instant try-out without local setup:
 
 ---
 
-## Bug: P57 — Polygon + Material Tunneling
+## Done: P57 — Polygon + Material Tunneling
 
-**Effort: M | Impact: stability | Risk: medium**
+**Effort: M | Impact: stability | Risk: medium | Status: ✅ Done**
 
-Dynamic `Polygon` shapes with an explicit `Material` parameter tunnel through static `Polygon` floors (fall through without collision). Discovered 2026-03-28 during multiplayer platformer development.
+Dynamic `Polygon` shapes with an explicit `Material` parameter tunneled through static `Polygon` floors (fall through without collision). Discovered 2026-03-28 during multiplayer platformer development. Fixed 2026-03-30.
 
-**Reproduction:**
+**Root cause:** The `Polygon` constructor signature was `(localVerts, material?, filter?)` while `Circle` was `(radius, localCOM?, material?, filter?)` and `Capsule` was `(width, height, localCOM?, material?, filter?)`. Users naturally wrote `new Polygon(verts, undefined, material)` following the Circle/Capsule pattern, but this silently passed `Material` into the `filter` parameter slot, breaking collision detection.
+
+**Fix:** Added `localCOM` parameter to `Polygon` constructor with smart overload detection. The 2nd parameter now accepts `Vec2 | Material` — if `Material` is detected, parameters shift automatically. `InteractionFilter` in the 3rd position is also detected for full backward compatibility.
+
+**Supported call patterns (all work correctly):**
 ```js
-const floor = new Body(BodyType.STATIC, new Vec2(200, 290));
-floor.shapes.add(new Polygon(Polygon.box(400, 20)));
-floor.space = space;
-
-// This tunnels through the floor:
-const box = new Body(BodyType.DYNAMIC, new Vec2(200, 100));
-box.shapes.add(new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1)));
-box.space = space;
-
-// This works fine (no Material):
-const box2 = new Body(BodyType.DYNAMIC, new Vec2(300, 100));
-box2.shapes.add(new Polygon(Polygon.box(28, 28)));
-box2.space = space;
+new Polygon(verts)                              // no material
+new Polygon(verts, material)                    // legacy — still works
+new Polygon(verts, undefined, material)         // P57 pattern — now works
+new Polygon(verts, localCOM, material, filter)  // new consistent API
+new Polygon(verts, undefined, filter)           // legacy — still works
+new Polygon(verts, material, filter)            // legacy — still works
 ```
 
-**Findings:**
-- Only affects `Polygon` shapes — `Circle` and `Capsule` with explicit `Material` work correctly
-- Even a single dynamic Polygon + Material tunnels (no multi-body requirement)
-- `isBullet = true` does NOT prevent the tunneling
-- Velocity/position iterations do NOT help
-- Default material (omitting the parameter) works fine
-
-**Workaround:** Omit the `Material` parameter for `Polygon` shapes — use engine defaults. If custom material properties are needed for Polygon bodies, set them on the shape after creation (untested — needs verification).
-
-**Likely cause:** Material constructor or assignment path corrupts narrowphase state for Polygon-Polygon contact generation. Investigation needed in `ZPP_CollidePoly` or `ZPP_ProcessBody` material handling.
+**Tests:** 107 new tests covering: P57 regression (23), Shape × Material collision matrix (52), Material assignment timing (13), ZPP_Polygon native layer (19).

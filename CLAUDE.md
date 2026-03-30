@@ -14,7 +14,7 @@ A fully typed TypeScript 2D physics engine — modernized rewrite of the origina
 - **Serialization** — JSON + binary for save/load/multiplayer rollback
 - **Debug draw** — abstract `DebugDraw` interface, reference impls for Canvas/Three.js/PixiJS/p5.js
 - **Character controller** — geometric collide-and-slide (`CharacterController` class)
-- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 4666 tests
+- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 4773 tests
 
 ## Build & Test
 
