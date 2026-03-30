@@ -18,40 +18,61 @@ export default {
     floor.shapes.add(new Polygon(Polygon.box(W, 20)));
     floor.space = space;
 
-    // Funnel walls (angled)
-    const lFunnel = new Body(BodyType.STATIC, new Vec2(W / 2 - 80, H / 2 - 20));
-    lFunnel.shapes.add(new Polygon(Polygon.box(120, 8)));
-    lFunnel.rotation = -0.5;
-    lFunnel.space = space;
+    // Funnel — two angled walls that meet the channel seamlessly.
+    // Each wall is a trapezoid built from explicit vertices so there
+    // are no gaps at the junction with the vertical channel.
+    const gap = 25;   // half-width of the channel opening
+    const t = 8;      // wall thickness
+    const funnelTop = H * 0.3;
+    const funnelBot = H * 0.55;
+    const funnelSpread = 160; // how far out the top of the funnel reaches
 
-    const rFunnel = new Body(BodyType.STATIC, new Vec2(W / 2 + 80, H / 2 - 20));
-    rFunnel.shapes.add(new Polygon(Polygon.box(120, 8)));
-    rFunnel.rotation = 0.5;
-    rFunnel.space = space;
+    const lWall = new Body(BodyType.STATIC);
+    lWall.shapes.add(new Polygon([
+      new Vec2(W / 2 - gap, funnelBot),
+      new Vec2(W / 2 - gap - t, funnelBot),
+      new Vec2(W / 2 - funnelSpread - t, funnelTop),
+      new Vec2(W / 2 - funnelSpread, funnelTop),
+    ]));
+    lWall.space = space;
 
-    // Narrow channel walls
-    const lChannel = new Body(BodyType.STATIC, new Vec2(W / 2 - 20, H / 2 + 40));
-    lChannel.shapes.add(new Polygon(Polygon.box(8, 60)));
+    const rWall = new Body(BodyType.STATIC);
+    rWall.shapes.add(new Polygon([
+      new Vec2(W / 2 + gap + t, funnelBot),
+      new Vec2(W / 2 + gap, funnelBot),
+      new Vec2(W / 2 + funnelSpread, funnelTop),
+      new Vec2(W / 2 + funnelSpread + t, funnelTop),
+    ]));
+    rWall.space = space;
+
+    // Vertical channel below the funnel
+    const channelH = 80;
+    const lChannel = new Body(BodyType.STATIC, new Vec2(W / 2 - gap - t / 2, funnelBot + channelH / 2));
+    lChannel.shapes.add(new Polygon(Polygon.box(t, channelH)));
     lChannel.space = space;
 
-    const rChannel = new Body(BodyType.STATIC, new Vec2(W / 2 + 20, H / 2 + 40));
-    rChannel.shapes.add(new Polygon(Polygon.box(8, 60)));
+    const rChannel = new Body(BodyType.STATIC, new Vec2(W / 2 + gap + t / 2, funnelBot + channelH / 2));
+    rChannel.shapes.add(new Polygon(Polygon.box(t, channelH)));
     rChannel.space = space;
 
-    // Shapes above funnel
+    // Small shapes above funnel
+    const shapeOpts = { minR: 3, maxR: 10, minW: 6, maxW: 18 };
     for (let i = 0; i < 40; i++) {
       spawnRandomShape(space,
         W / 2 + (Math.random() - 0.5) * 200,
         30 + Math.random() * 80,
+        shapeOpts,
       );
     }
   },
 
   click(x, y, space, W, H) {
+    const shapeOpts = { minR: 3, maxR: 10, minW: 6, maxW: 18 };
     for (let i = 0; i < 8; i++) {
       spawnRandomShape(space,
         x + (Math.random() - 0.5) * 40,
         y + (Math.random() - 0.5) * 40,
+        shapeOpts,
       );
     }
   },
@@ -68,12 +89,12 @@ floor.space = space;
 // Funnel walls (angled)
 const lFunnel = new Body(BodyType.STATIC, new Vec2(W / 2 - 80, H / 2 - 20));
 lFunnel.shapes.add(new Polygon(Polygon.box(120, 8)));
-lFunnel.rotation = -0.5;
+lFunnel.rotation = 0.5;
 lFunnel.space = space;
 
 const rFunnel = new Body(BodyType.STATIC, new Vec2(W / 2 + 80, H / 2 - 20));
 rFunnel.shapes.add(new Polygon(Polygon.box(120, 8)));
-rFunnel.rotation = 0.5;
+rFunnel.rotation = -0.5;
 rFunnel.space = space;
 
 // Narrow channel
@@ -120,12 +141,12 @@ floor.space = space;
 // Funnel walls (angled)
 const lFunnel = new Body(BodyType.STATIC, new Vec2(W / 2 - 80, H / 2 - 20));
 lFunnel.shapes.add(new Polygon(Polygon.box(120, 8)));
-lFunnel.rotation = -0.5;
+lFunnel.rotation = 0.5;
 lFunnel.space = space;
 
 const rFunnel = new Body(BodyType.STATIC, new Vec2(W / 2 + 80, H / 2 - 20));
 rFunnel.shapes.add(new Polygon(Polygon.box(120, 8)));
-rFunnel.rotation = 0.5;
+rFunnel.rotation = -0.5;
 rFunnel.space = space;
 
 // Narrow channel
