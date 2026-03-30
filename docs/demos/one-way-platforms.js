@@ -1,12 +1,19 @@
-import { Body, BodyType, Vec2, Polygon, CbType, InteractionType, PreListener, PreFlag } from "../nape-js.esm.js";
+import { Body, BodyType, Vec2, Polygon, CbType, InteractionType, PreListener, PreFlag, PivotJoint } from "../nape-js.esm.js";
 import { spawnRandomShape } from "../demo-runner.js";
+
+// ── Module-level state for drag ──────────────────────────────────────────────
+let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0, _dragY = 0;
 
 export default {
   id: "one-way-platforms",
   label: "One-Way Platforms",
   featured: false,
   tags: ["PreListener", "CbType", "Kinematic"],
-  desc: "Bodies pass through platforms from below but rest on them from above using PreListener. Conveyors push shapes sideways.",
+  desc: "Bodies pass through platforms from below but rest on them from above. Click &amp; drag a body to pull it through a platform — release to watch it land. Click empty space to spawn a new shape. The bottom conveyor belt pushes shapes sideways.",
   walls: true,
 
   setup(space, W, H) {
@@ -15,24 +22,25 @@ export default {
     const platformType = new CbType();
     const objectType = new CbType();
 
+    // Normal points from body1 → body2 (by shape-id order).
+    // We need the component pointing from the platform toward the object:
+    // if the platform is body1 we use normal as-is, otherwise flip it.
+    // When that adjusted ny < 0 the object is above → ACCEPT; otherwise IGNORE.
     const preListener = new PreListener(
       InteractionType.COLLISION,
       platformType,
       objectType,
       (cb) => {
-        const arbiter = cb.get_arbiter();
-        if (!arbiter) return PreFlag.ACCEPT;
-        try {
-          const colArb = arbiter.get_collisionArbiter();
-          if (!colArb) return PreFlag.ACCEPT;
-          const ny = colArb.get_normal().get_y();
-          return ny < 0 ? PreFlag.ACCEPT : PreFlag.IGNORE;
-        } catch (_) {
-          return PreFlag.ACCEPT;
-        }
+        const colArb = cb.arbiter.collisionArbiter;
+        if (!colArb) return PreFlag.ACCEPT;
+        const platBody = cb.swapped ? cb.int2 : cb.int1;
+        const ny = colArb.normal.y;
+        const platformIsBody1 = cb.arbiter.body1 === platBody;
+        const platToObj = platformIsBody1 ? ny : -ny;
+        return platToObj > 0 ? PreFlag.ACCEPT : PreFlag.IGNORE;
       },
     );
-    preListener.space = space;
+    space.listeners.add(preListener);
 
     const platformPositions = [
       { x: W * 0.35, y: H * 0.7, w: W * 0.35 },
@@ -62,16 +70,77 @@ export default {
       }
     }
 
+    _mouseBody = new Body(BodyType.KINEMATIC, new Vec2(-1000, -1000));
+    _mouseBody.space = space;
+    _grabJoint = null;
+    _pendingGrab = null;
+    _pendingRelease = false;
+
     space._objectType = objectType;
   },
 
-  click(x, y, space, W, H) {
-    const b = spawnRandomShape(space, x, y);
-    if (space._objectType) {
-      for (const s of b.shapes) {
-        s.cbTypes.add(space._objectType);
+  step(space) {
+    if (_pendingRelease) {
+      _pendingRelease = false;
+      if (_grabJoint) { _grabJoint.space = null; _grabJoint = null; }
+      _mouseBody.position.setxy(-1000, -1000);
+      _mouseBody.velocity.setxy(0, 0);
+    }
+    if (_pendingGrab) {
+      const { body, localPt } = _pendingGrab;
+      _pendingGrab = null;
+      if (_grabJoint) { _grabJoint.space = null; _grabJoint = null; }
+      _mouseBody.position.setxy(_dragX, _dragY);
+      _grabJoint = new PivotJoint(_mouseBody, body, new Vec2(0, 0), localPt);
+      _grabJoint.stiff = false;
+      _grabJoint.frequency = 8;
+      _grabJoint.damping = 0.9;
+      _grabJoint.space = space;
+    }
+    if (_grabJoint) {
+      const dx = _dragX - _mouseBody.position.x;
+      const dy = _dragY - _mouseBody.position.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const maxSpeed = 600;
+      if (dist > 1) {
+        const speed = Math.min(dist * 60, maxSpeed);
+        _mouseBody.velocity.setxy(dx / dist * speed, dy / dist * speed);
+      } else {
+        _mouseBody.velocity.setxy(0, 0);
       }
     }
+  },
+
+  click(x, y, space) {
+    _dragX = x;
+    _dragY = y;
+    let best = null, bestDist = 50;
+    for (const body of space.bodies) {
+      if (!body.isDynamic()) continue;
+      const dx = body.position.x - x;
+      const dy = body.position.y - y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bestDist) { bestDist = d; best = body; }
+    }
+    if (!best) {
+      // No body nearby — spawn a new one
+      const b = spawnRandomShape(space, x, y);
+      if (space._objectType) {
+        for (const s of b.shapes) s.cbTypes.add(space._objectType);
+      }
+      return;
+    }
+    const localPt = best.worldPointToLocal(new Vec2(x, y));
+    _pendingGrab = { body: best, localPt };
+  },
+
+  drag(x, y) {
+    _dragX = x;
+    _dragY = y;
+  },
+
+  release() {
+    _pendingRelease = true;
   },
 
   code2d: `// One-Way Platforms — PreListener pass-through logic + conveyors
@@ -83,19 +152,21 @@ addWalls();
 const platformType = new CbType();
 const objectType = new CbType();
 
-// Accept collision only when normal points upward (object lands on top)
+// Accept collision only when the object is above the platform.
+// Normal points body1→body2 (by shape-id); flip if platform is body2.
 const preListener = new PreListener(
   InteractionType.COLLISION,
   platformType, objectType,
   (cb) => {
-    try {
-      const colArb = cb.get_arbiter().get_collisionArbiter();
-      if (!colArb) return PreFlag.ACCEPT;
-      return colArb.get_normal().get_y() < 0 ? PreFlag.ACCEPT : PreFlag.IGNORE;
-    } catch (_) { return PreFlag.ACCEPT; }
+    const colArb = cb.arbiter.collisionArbiter;
+    if (!colArb) return PreFlag.ACCEPT;
+    const platBody = cb.swapped ? cb.int2 : cb.int1;
+    const ny = colArb.normal.y;
+    const platToObj = (cb.arbiter.body1 === platBody) ? ny : -ny;
+    return platToObj > 0 ? PreFlag.ACCEPT : PreFlag.IGNORE;
   },
 );
-preListener.space = space;
+space.listeners.add(preListener);
 
 // Platforms at different heights
 const platPositions = [
@@ -148,19 +219,21 @@ addWalls();
 const platformType = new CbType();
 const objectType = new CbType();
 
-// Accept collision only when normal points upward (object lands on top)
+// Accept collision only when the object is above the platform.
+// Normal points body1→body2 (by shape-id); flip if platform is body2.
 const preListener = new PreListener(
   InteractionType.COLLISION,
   platformType, objectType,
   (cb) => {
-    try {
-      const colArb = cb.get_arbiter().get_collisionArbiter();
-      if (!colArb) return PreFlag.ACCEPT;
-      return colArb.get_normal().get_y() < 0 ? PreFlag.ACCEPT : PreFlag.IGNORE;
-    } catch (_) { return PreFlag.ACCEPT; }
+    const colArb = cb.arbiter.collisionArbiter;
+    if (!colArb) return PreFlag.ACCEPT;
+    const platBody = cb.swapped ? cb.int2 : cb.int1;
+    const ny = colArb.normal.y;
+    const platToObj = (cb.arbiter.body1 === platBody) ? ny : -ny;
+    return platToObj > 0 ? PreFlag.ACCEPT : PreFlag.IGNORE;
   },
 );
-preListener.space = space;
+space.listeners.add(preListener);
 
 // Platforms at different heights
 const platPositions = [
