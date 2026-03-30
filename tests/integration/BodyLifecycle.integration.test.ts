@@ -7,7 +7,6 @@ import { Circle } from "../../src/shape/Circle";
 import { Polygon } from "../../src/shape/Polygon";
 import { Compound } from "../../src/phys/Compound";
 import { DistanceJoint } from "../../src/constraint/DistanceJoint";
-import { PivotJoint } from "../../src/constraint/PivotJoint";
 import { Material } from "../../src/phys/Material";
 
 // ---------------------------------------------------------------------------
@@ -311,22 +310,14 @@ describe("Body lifecycle — compounds", () => {
     b1.compound = compound;
     b2.compound = compound;
 
-    const joint = new DistanceJoint(
-      b1,
-      b2,
-      new Vec2(0, 0),
-      new Vec2(0, 0),
-      30,
-      50,
-    );
+    const joint = new DistanceJoint(b1, b2, new Vec2(0, 0), new Vec2(0, 0), 30, 50);
     joint.compound = compound;
     compound.space = space;
 
     step(space, 60);
     // Bodies should stay connected
     const dist = Math.sqrt(
-      (b1.position.x - b2.position.x) ** 2 +
-        (b1.position.y - b2.position.y) ** 2,
+      (b1.position.x - b2.position.x) ** 2 + (b1.position.y - b2.position.y) ** 2,
     );
     expect(dist).toBeLessThanOrEqual(55);
   });

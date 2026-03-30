@@ -67,7 +67,9 @@ describe("Shape interactions — circle-circle", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { collided = true; },
+      () => {
+        collided = true;
+      },
     );
     listener.space = space;
 
@@ -121,7 +123,9 @@ describe("Shape interactions — box-box", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { collided = true; },
+      () => {
+        collided = true;
+      },
     );
     listener.space = space;
 
@@ -173,7 +177,9 @@ describe("Shape interactions — circle-box", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { collided = true; },
+      () => {
+        collided = true;
+      },
     );
     listener.space = space;
 
@@ -220,7 +226,9 @@ describe("Shape interactions — capsule", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { collided = true; },
+      () => {
+        collided = true;
+      },
     );
     listener.space = space;
 
@@ -247,7 +255,9 @@ describe("Shape interactions — capsule", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { collided = true; },
+      () => {
+        collided = true;
+      },
     );
     listener.space = space;
 
@@ -377,14 +387,14 @@ describe("Shape interactions — InteractionFilter groups", () => {
 
     const a = new Body(BodyType.DYNAMIC, new Vec2(-50, 0));
     const shapeA = new Circle(15);
-    shapeA.filter = new InteractionFilter(1, 0xFFFFFFFF);
+    shapeA.filter = new InteractionFilter(1, 0xffffffff);
     a.shapes.add(shapeA);
     a.velocity = new Vec2(100, 0);
     a.space = space;
 
     const b = new Body(BodyType.DYNAMIC, new Vec2(50, 0));
     const shapeB = new Circle(15);
-    shapeB.filter = new InteractionFilter(1, 0xFFFFFFFF);
+    shapeB.filter = new InteractionFilter(1, 0xffffffff);
     b.shapes.add(shapeB);
     b.velocity = new Vec2(-100, 0);
     b.space = space;
@@ -395,7 +405,9 @@ describe("Shape interactions — InteractionFilter groups", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { collided = true; },
+      () => {
+        collided = true;
+      },
     );
     listener.space = space;
 

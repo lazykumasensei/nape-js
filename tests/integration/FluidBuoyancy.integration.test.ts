@@ -206,9 +206,7 @@ describe("Fluid integration — multiple regions", () => {
     step(space, 60);
 
     // Ball in heavy fluid should travel less
-    expect(Math.abs(ballRight.position.y)).toBeLessThan(
-      Math.abs(ballLeft.position.y) + 1,
-    );
+    expect(Math.abs(ballRight.position.y)).toBeLessThan(Math.abs(ballLeft.position.y) + 1);
   });
 });
 
@@ -284,14 +282,7 @@ describe("Fluid integration — with constraints", () => {
     b2.shapes.at(0).material = new Material(0, 0, 0, 0.1, 0);
     b2.space = space;
 
-    const joint = new DistanceJoint(
-      b1,
-      b2,
-      new Vec2(0, 0),
-      new Vec2(0, 0),
-      30,
-      50,
-    );
+    const joint = new DistanceJoint(b1, b2, new Vec2(0, 0), new Vec2(0, 0), 30, 50);
     joint.space = space;
 
     const startY1 = b1.position.y;

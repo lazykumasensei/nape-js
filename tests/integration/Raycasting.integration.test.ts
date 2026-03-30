@@ -6,7 +6,6 @@ import { Vec2 } from "../../src/geom/Vec2";
 import { Circle } from "../../src/shape/Circle";
 import { Polygon } from "../../src/shape/Polygon";
 import { Ray } from "../../src/geom/Ray";
-import { InteractionFilter } from "../../src/dynamics/InteractionFilter";
 
 // ---------------------------------------------------------------------------
 // Helpers

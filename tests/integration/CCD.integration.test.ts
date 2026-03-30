@@ -147,7 +147,9 @@ describe("CCD integration — different shapes", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { hit = true; },
+      () => {
+        hit = true;
+      },
     );
     listener.space = space;
 
@@ -175,7 +177,9 @@ describe("CCD integration — different shapes", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { hit = true; },
+      () => {
+        hit = true;
+      },
     );
     listener.space = space;
 
@@ -248,7 +252,9 @@ describe("CCD integration — multiple bullets", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { collided = true; },
+      () => {
+        collided = true;
+      },
     );
     listener.space = space;
 

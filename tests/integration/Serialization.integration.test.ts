@@ -7,18 +7,10 @@ import { Circle } from "../../src/shape/Circle";
 import { Polygon } from "../../src/shape/Polygon";
 import { Material } from "../../src/phys/Material";
 import { FluidProperties } from "../../src/phys/FluidProperties";
-import { InteractionFilter } from "../../src/dynamics/InteractionFilter";
 import { PivotJoint } from "../../src/constraint/PivotJoint";
 import { DistanceJoint } from "../../src/constraint/DistanceJoint";
-import { AngleJoint } from "../../src/constraint/AngleJoint";
-import { WeldJoint } from "../../src/constraint/WeldJoint";
-import { Compound } from "../../src/phys/Compound";
-import { Broadphase } from "../../src/space/Broadphase";
 import { spaceToJSON, spaceFromJSON } from "../../src/serialization/index";
-import {
-  spaceToBinary,
-  spaceFromBinary,
-} from "../../src/serialization/index";
+import { spaceToBinary, spaceFromBinary } from "../../src/serialization/index";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -132,14 +124,7 @@ describe("Serialization integration — JSON constraints", () => {
     const b2 = dynamicCircle(30, 0);
     b2.space = space;
 
-    const joint = new DistanceJoint(
-      b1,
-      b2,
-      new Vec2(0, 0),
-      new Vec2(0, 0),
-      50,
-      70,
-    );
+    const joint = new DistanceJoint(b1, b2, new Vec2(0, 0), new Vec2(0, 0), 50, 70);
     joint.space = space;
 
     const restored = roundTripJSON(space);
@@ -150,8 +135,7 @@ describe("Serialization integration — JSON constraints", () => {
     const rb1 = restored.bodies.at(0);
     const rb2 = restored.bodies.at(1);
     const dist = Math.sqrt(
-      (rb1.position.x - rb2.position.x) ** 2 +
-        (rb1.position.y - rb2.position.y) ** 2,
+      (rb1.position.x - rb2.position.x) ** 2 + (rb1.position.y - rb2.position.y) ** 2,
     );
     expect(dist).toBeLessThanOrEqual(80);
   });
@@ -165,12 +149,7 @@ describe("Serialization integration — JSON constraints", () => {
     const pendulum = dynamicCircle(50, 0);
     pendulum.space = space;
 
-    const joint = new PivotJoint(
-      anchor,
-      pendulum,
-      new Vec2(0, 0),
-      new Vec2(-50, 0),
-    );
+    const joint = new PivotJoint(anchor, pendulum, new Vec2(0, 0), new Vec2(-50, 0));
     joint.space = space;
 
     step(space, 30);
@@ -219,14 +198,7 @@ describe("Serialization integration — binary round-trip simulation", () => {
     const b2 = dynamicCircle(30, 0);
     b2.space = space;
 
-    const joint = new DistanceJoint(
-      b1,
-      b2,
-      new Vec2(0, 0),
-      new Vec2(0, 0),
-      50,
-      70,
-    );
+    const joint = new DistanceJoint(b1, b2, new Vec2(0, 0), new Vec2(0, 0), 50, 70);
     joint.space = space;
 
     const restored = roundTripBinary(space);

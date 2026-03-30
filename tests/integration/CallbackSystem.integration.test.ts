@@ -52,7 +52,9 @@ describe("Callback integration — interaction listener lifecycle", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { beginFired = true; },
+      () => {
+        beginFired = true;
+      },
     );
     listener.space = space;
 
@@ -73,7 +75,9 @@ describe("Callback integration — interaction listener lifecycle", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { endFired = true; },
+      () => {
+        endFired = true;
+      },
     );
     listener.space = space;
 
@@ -99,7 +103,9 @@ describe("Callback integration — interaction listener lifecycle", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { ongoingCount++; },
+      () => {
+        ongoingCount++;
+      },
     );
     listener.space = space;
 
@@ -121,11 +127,9 @@ describe("Callback integration — BodyListener", () => {
     ball.space = space;
 
     let wakeFired = false;
-    const listener = new BodyListener(
-      CbEvent.WAKE,
-      CbType.ANY_BODY,
-      () => { wakeFired = true; },
-    );
+    const listener = new BodyListener(CbEvent.WAKE, CbType.ANY_BODY, () => {
+      wakeFired = true;
+    });
     listener.space = space;
 
     // Let ball land and settle to sleep
@@ -147,11 +151,9 @@ describe("Callback integration — BodyListener", () => {
     ball.space = space;
 
     let sleptFired = false;
-    const listener = new BodyListener(
-      CbEvent.SLEEP,
-      CbType.ANY_BODY,
-      () => { sleptFired = true; },
-    );
+    const listener = new BodyListener(CbEvent.SLEEP, CbType.ANY_BODY, () => {
+      sleptFired = true;
+    });
     listener.space = space;
 
     // Let ball land and settle
@@ -269,11 +271,9 @@ describe("Callback integration — ConstraintListener", () => {
     joint.space = space;
 
     let breakFired = false;
-    const listener = new ConstraintListener(
-      CbEvent.BREAK,
-      constraintCb,
-      () => { breakFired = true; },
-    );
+    const listener = new ConstraintListener(CbEvent.BREAK, constraintCb, () => {
+      breakFired = true;
+    });
     listener.space = space;
 
     for (let i = 0; i < 60; i++) {
@@ -294,23 +294,14 @@ describe("Callback integration — ConstraintListener", () => {
     const b2 = dynamicCircle(10, 50);
     b2.space = space;
 
-    const joint = new DistanceJoint(
-      b1,
-      b2,
-      new Vec2(0, 0),
-      new Vec2(0, 0),
-      15,
-      25,
-    );
+    const joint = new DistanceJoint(b1, b2, new Vec2(0, 0), new Vec2(0, 0), 15, 25);
     (joint.cbTypes as any).add(constraintCb);
     joint.space = space;
 
     let sleepFired = false;
-    const listener = new ConstraintListener(
-      CbEvent.SLEEP,
-      constraintCb,
-      () => { sleepFired = true; },
-    );
+    const listener = new ConstraintListener(CbEvent.SLEEP, constraintCb, () => {
+      sleepFired = true;
+    });
     listener.space = space;
 
     // Let everything settle
@@ -338,7 +329,9 @@ describe("Callback integration — multiple listeners", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { count1++; },
+      () => {
+        count1++;
+      },
     );
     l1.space = space;
 
@@ -347,7 +340,9 @@ describe("Callback integration — multiple listeners", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { count2++; },
+      () => {
+        count2++;
+      },
     );
     l2.space = space;
 
@@ -370,7 +365,9 @@ describe("Callback integration — multiple listeners", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { events.push("begin"); },
+      () => {
+        events.push("begin");
+      },
     );
     l1.space = space;
 
@@ -379,7 +376,9 @@ describe("Callback integration — multiple listeners", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { events.push("ongoing"); },
+      () => {
+        events.push("ongoing");
+      },
     );
     l2.space = space;
 
@@ -404,7 +403,9 @@ describe("Callback integration — multiple listeners", () => {
       InteractionType.COLLISION,
       CbType.ANY_BODY,
       CbType.ANY_BODY,
-      () => { count++; },
+      () => {
+        count++;
+      },
     );
     listener.space = space;
 
