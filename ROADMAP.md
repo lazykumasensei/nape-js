@@ -84,7 +84,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 
 | Priority                                  | Effort | Impact    | Risk   | Status         |
 | ----------------------------------------- | ------ | --------- | ------ | -------------- |
-| P29 — Test coverage ≥80%                  | L      | safety    | none   | 🔶 ~57% (4773 tests) |
+| P29 — Test coverage ≥80%                  | L      | safety    | none   | 🔶 ~57% (4873 tests) |
 | P44 — PixiJS integration package          | M      | adoption  | low    | 🔶 Phase 1 done |
 | P45 — Character controller                | M      | DX        | medium | ✅ Done |
 | P47 — CJS bundle dedup (serialization)    | S      | bundle    | low    | ✅ Done |
@@ -93,6 +93,46 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | P55 — npm/SEO optimization                | XS     | adoption  | low    | ✅ Done |
 | P56 — Interactive playground              | S-M    | adoption  | low    | ⬜ Not started |
 | P57 — Polygon + Material tunneling bug    | M      | stability | medium | ✅ Done |
+
+---
+
+## In Progress: P29 — Test Coverage
+
+**Effort: L | Impact: safety | Risk: none | Status: 🔶 ~57% (4873 tests)**
+
+### Integration Test Batch 1 (100 tests) — 2026-03-30
+
+Added 7 integration test files in `tests/integration/`:
+
+| File | Tests | Coverage Area |
+|------|-------|---------------|
+| `BodyLifecycle.integration.test.ts` | 24 | Add/remove bodies, type transitions (DYNAMIC↔STATIC↔KINEMATIC), compound lifecycle, mass/material, impulse, angular velocity, isBullet |
+| `FluidBuoyancy.integration.test.ts` | 10 | Buoyancy, viscosity effects, multiple fluid regions, fluid callbacks, constraints in fluid |
+| `CCD.integration.test.ts` | 12 | isBullet property, tunneling prevention, different shape types, multiple bullets, disableCCD |
+| `CallbackSystem.integration.test.ts` | 13 | BEGIN/END/ONGOING interaction lifecycle, BodyListener (WAKE/SLEEP), PreListener (IGNORE/ACCEPT), ConstraintListener (BREAK/SLEEP) |
+| `ShapeInteractions.integration.test.ts` | 16 | Circle/box/capsule collisions, friction/elasticity materials, InteractionFilter groups, multi-shape bodies |
+| `Serialization.integration.test.ts` | 17 | JSON & binary round-trip, simulation continuity after deserialize, constraints/gravity/velocity preservation, fluid properties |
+| `Raycasting.integration.test.ts` | 8 | Multi-body raycast, direction filtering, maxDistance, different shape types, post-simulation raycast |
+
+#### API Findings & Gotchas Discovered
+
+These findings should be documented in user-facing guides to prevent common mistakes:
+
+1. **No `applyForce()` on Body** — only `applyImpulse()` and `applyAngularImpulse()` exist. Force-based API is a common expectation from other engines (Matter.js, Box2D).
+2. **Compound body lifecycle** — bodies in a compound cannot have their `space` set individually; only the root `compound.space` can be assigned. Setting `body.space` on a compound member throws.
+3. **ConstraintListener requires custom CbType** — using `CbType.ANY_CONSTRAINT` does not work for BREAK/SLEEP events. A dedicated `CbType` must be created and added to the joint's `cbTypes`.
+4. **CCD is per-body, not per-space** — there is no `space.disableCCD`; use `body.isBullet` and `body.disableCCD` instead.
+5. **Material constructor order** — `Material(elasticity, dynamicFriction, staticFriction, density, rollingFriction)` — elasticity is first, not friction (differs from some engines).
+6. **Raycasting requires a step** — `space.rayCast()` on static bodies may require at least one `space.step()` call first for the broadphase to register shapes.
+
+#### Remaining Coverage Gaps (for future batches)
+
+- Character controller integration (platformer scenarios, slopes, one-way platforms)
+- Convex sweep / convexCast advanced scenarios
+- Debug draw integration with full simulation
+- Concave body creation + simulation
+- InteractionGroup hierarchy testing
+- Large-scene stress tests (100+ bodies)
 
 ---
 
