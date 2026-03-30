@@ -96,13 +96,13 @@ describe("Shape x Material collision matrix", () => {
 
   describe("Polygon + Material in wrong position (P57 bug)", () => {
     for (const preset of MATERIAL_PRESETS) {
-      it.fails(`Polygon(box, undefined, ${preset.name}) should land on floor [P57]`, () => {
+      it(`Polygon(box, undefined, ${preset.name}) should land on floor [P57 fixed]`, () => {
         const space = new Space(new Vec2(0, 400));
         space.bodies.add(staticFloor(0, 300, 500, 20));
 
         const body = new Body(BodyType.DYNAMIC, new Vec2(0, 0));
         // P57 bug: Material passed as 3rd arg (filter slot)
-        body.shapes.add(new Polygon(Polygon.box(28, 28), undefined, preset.create() as any));
+        body.shapes.add(new Polygon(Polygon.box(28, 28), undefined, preset.create()));
         space.bodies.add(body);
 
         step(space, 800);

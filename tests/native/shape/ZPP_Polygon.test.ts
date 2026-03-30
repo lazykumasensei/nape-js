@@ -71,14 +71,16 @@ describe("ZPP_Polygon — Material internal state", () => {
     expect(poly.material.density).toBeCloseTo(1.0, 5);
   });
 
-  it("Material passed as 3rd arg (filter slot) should NOT set material [P57]", () => {
-    // This documents the P57 bug: passing Material as 3rd arg goes to filter
+  it("Material passed as 3rd arg should be detected and used as material [P57 fix]", () => {
+    // P57 fix: Polygon constructor now detects Material in 3rd position
+    // (where users naturally place it following Circle/Capsule patterns)
+    // and correctly assigns it as the shape's material.
     const mat = new Material(0.5, 0.3, 0.2, 1.5, 0.01);
-    const poly = new Polygon(Polygon.box(20, 20), undefined, mat as any);
+    const poly = new Polygon(Polygon.box(20, 20), undefined, mat);
 
-    // Material should still be default (Material went to filter, not material)
-    // When P57 is fixed, this behavior should change
-    expect(poly.material.elasticity).toBeCloseTo(0.0, 5);
+    expect(poly.material.elasticity).toBeCloseTo(0.5, 5);
+    expect(poly.material.dynamicFriction).toBeCloseTo(0.3, 5);
+    expect(poly.material.density).toBeCloseTo(1.5, 5);
   });
 });
 

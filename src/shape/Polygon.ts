@@ -19,17 +19,50 @@ export class Polygon extends Shape {
   /**
    * Create a Polygon from a list of Vec2 vertices. Vertices must form a convex polygon
    * in counter-clockwise order.
+   *
+   * The second parameter can be either a `Vec2` local-COM offset or a `Material`.
+   * This allows both the legacy 2-arg form `(verts, material)` and the new 3-arg
+   * form `(verts, localCOM, material, filter)` — consistent with Circle and Capsule.
+   *
    * @param localVerts - Vertices as `Array<Vec2>`, `Vec2List`, or `GeomPoly`.
+   * @param localCOMOrMaterial - Local centre offset (`Vec2`) **or** `Material` for backward compat.
    * @param material - Material to assign (uses default if omitted).
    * @param filter - InteractionFilter to assign (uses default if omitted).
    */
-  constructor(localVerts?: Vec2[] | any, material?: Material, filter?: InteractionFilter) {
+  constructor(
+    localVerts?: Vec2[] | any,
+    localCOMOrMaterial?: Vec2 | Material,
+    material?: Material | InteractionFilter,
+    filter?: InteractionFilter,
+  ) {
     super();
 
     const nape = getNape();
 
     if (localVerts == null) {
       throw new Error("Error: localVerts cannot be null");
+    }
+
+    // --- Resolve overloaded parameters ---
+    // The 2nd arg can be Vec2 (localCOM) or Material (legacy shorthand).
+    // This keeps backward compat with `new Polygon(verts, material)` and
+    // `new Polygon(verts, undefined, filter)` while also supporting the new
+    // `new Polygon(verts, localCOM, material, filter)` form that is consistent
+    // with Circle and Capsule constructors.
+    let localCOM: Vec2 | undefined;
+    if (localCOMOrMaterial instanceof Material) {
+      // Legacy: new Polygon(verts, material) or new Polygon(verts, material, filter)
+      filter = material as unknown as InteractionFilter;
+      material = localCOMOrMaterial;
+      localCOM = undefined;
+    } else {
+      localCOM = localCOMOrMaterial as Vec2 | undefined;
+      // Detect InteractionFilter in the 3rd arg (material slot):
+      // Legacy: new Polygon(verts, undefined, filter) — shift to filter slot
+      if (material != null && (material as any) instanceof InteractionFilter) {
+        filter = material as unknown as InteractionFilter;
+        material = undefined;
+      }
     }
 
     const zpp = new ZPP_Polygon();
@@ -133,6 +166,21 @@ export class Polygon extends Shape {
       throw new Error(
         "Error: Invalid type for polygon object, should be Array<Vec2>, Vec2List, GeomPoly or for flash10+ flash.Vector<Vec2>",
       );
+    }
+
+    // --- Handle localCOM ---
+    if (localCOM != null) {
+      if ((localCOM as any).zpp_disp) {
+        throw new Error("Error: Vec2 has been disposed and cannot be used!");
+      }
+      const inner = localCOM.zpp_inner;
+      if (inner._validate != null) inner._validate();
+      zpp.localCOMx = inner.x;
+      if (inner._validate != null) inner._validate();
+      zpp.localCOMy = inner.y;
+      if (inner.weak) {
+        localCOM.dispose();
+      }
     }
 
     // --- Handle material ---

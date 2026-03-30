@@ -51,7 +51,7 @@ describe("P57 — Polygon + Material tunneling", () => {
   // Material passed as 3rd arg (filter slot) — the user-facing bug
 
   describe("Bug reproduction: Material in wrong constructor position", () => {
-    it.fails("ROADMAP repro: Polygon(box, undefined, Material) tunnels through floor", () => {
+    it("ROADMAP repro: Polygon(box, undefined, Material) should land on floor (fixed)", () => {
       const space = new Space(new Vec2(0, 400));
       const floor = new Body(BodyType.STATIC, new Vec2(200, 290));
       floor.shapes.add(new Polygon(Polygon.box(400, 20)));
@@ -59,9 +59,7 @@ describe("P57 — Polygon + Material tunneling", () => {
 
       // Exact ROADMAP pattern — Material passed as 3rd arg (filter slot)
       const box = new Body(BodyType.DYNAMIC, new Vec2(200, 100));
-      box.shapes.add(
-        new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1) as any),
-      );
+      box.shapes.add(new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1)));
       space.bodies.add(box);
 
       step(space, 600);
@@ -87,7 +85,7 @@ describe("P57 — Polygon + Material tunneling", () => {
       expect(hasSettled(box)).toBe(true);
     });
 
-    it.fails("multiple Polygon(box, undefined, Material) all tunnel", () => {
+    it("multiple Polygon(box, undefined, Material) should all land on floor (fixed)", () => {
       const space = new Space(new Vec2(0, 400));
       const floor = staticFloor(0, 300, 500, 20);
       space.bodies.add(floor);
@@ -95,9 +93,7 @@ describe("P57 — Polygon + Material tunneling", () => {
       const boxes: Body[] = [];
       for (let i = 0; i < 5; i++) {
         const box = new Body(BodyType.DYNAMIC, new Vec2(-80 + i * 40, 0));
-        box.shapes.add(
-          new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1) as any),
-        );
+        box.shapes.add(new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1)));
         space.bodies.add(box);
         boxes.push(box);
       }
@@ -109,15 +105,13 @@ describe("P57 — Polygon + Material tunneling", () => {
       }
     });
 
-    it.fails("isBullet does NOT prevent the Material tunneling bug", () => {
+    it("isBullet polygon with Material in 3rd arg should land on floor (fixed)", () => {
       const space = new Space(new Vec2(0, 400));
       const floor = staticFloor(0, 300, 500, 20);
       space.bodies.add(floor);
 
       const box = new Body(BodyType.DYNAMIC, new Vec2(0, -200));
-      box.shapes.add(
-        new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1) as any),
-      );
+      box.shapes.add(new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1)));
       box.isBullet = true;
       space.bodies.add(box);
 
@@ -364,16 +358,11 @@ describe("P57 — Polygon + Material tunneling", () => {
       expect(isAboveFloor(body, 300, 20)).toBe(true);
     });
 
-    it.fails("Polygon(verts, undefined, Material) should also land on floor (P57 fix)", () => {
-      // After P57 fix, this pattern should either:
-      // a) Work (if constructor adds localCOM param like Circle/Capsule), or
-      // b) Throw a clear error (if Material is detected in filter position)
+    it("Polygon(verts, undefined, Material) should also land on floor (fixed)", () => {
       const space = new Space(new Vec2(0, 400));
       space.bodies.add(staticFloor(0, 300));
       const body = new Body(BodyType.DYNAMIC, new Vec2(0, 0));
-      body.shapes.add(
-        new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1) as any),
-      );
+      body.shapes.add(new Polygon(Polygon.box(28, 28), undefined, new Material(0.2, 0.5, 0.4, 1)));
       space.bodies.add(body);
       step(space, 600);
       expect(isAboveFloor(body, 300, 20)).toBe(true);
