@@ -327,4 +327,147 @@ describe("TriggerZone", () => {
       zone.dispose();
     });
   });
+
+  // ---- Integration scenarios ----
+
+  describe("integration", () => {
+    it("tracks multiple bodies entering and exiting independently", () => {
+      const zoneBody = createZoneBody(space, 200, 300);
+      let totalEnters = 0;
+      let totalExits = 0;
+      const zone = new TriggerZone(space, zoneBody, {
+        onEnter: () => {
+          totalEnters++;
+        },
+        onExit: () => {
+          totalExits++;
+        },
+      });
+
+      // Drop three bodies into the zone at slightly different x positions
+      createDynamicBody(space, 180, 50);
+      createDynamicBody(space, 200, 70);
+      createDynamicBody(space, 220, 60);
+
+      // Step until all bodies have fallen through the zone and exited
+      step(space, 120);
+
+      // All three should have entered and exited
+      expect(totalEnters).toBe(3);
+      expect(totalExits).toBe(3);
+
+      zone.dispose();
+    });
+
+    it("multiple zones on the same space work independently", () => {
+      const zoneBody1 = createZoneBody(space, 150, 300);
+      const zoneBody2 = createZoneBody(space, 350, 300);
+
+      const enter1 = vi.fn();
+      const enter2 = vi.fn();
+
+      const zone1 = new TriggerZone(space, zoneBody1, { onEnter: enter1 });
+      const zone2 = new TriggerZone(space, zoneBody2, { onEnter: enter2 });
+
+      // Drop a body only into zone1's area
+      createDynamicBody(space, 150, 100);
+      step(space, 60);
+
+      expect(enter1).toHaveBeenCalled();
+      expect(enter2).not.toHaveBeenCalled();
+
+      // Now drop a body into zone2's area
+      createDynamicBody(space, 350, 100);
+      step(space, 60);
+
+      expect(enter2).toHaveBeenCalled();
+
+      zone1.dispose();
+      zone2.dispose();
+    });
+
+    it("fires onEnter again when a body re-enters after exiting", () => {
+      // Large zone so we can move a kinematic body in and out
+      const zoneBody = createZoneBody(space, 200, 200);
+      const enterCount = vi.fn();
+      const exitCount = vi.fn();
+      const zone = new TriggerZone(space, zoneBody, {
+        onEnter: enterCount,
+        onExit: exitCount,
+      });
+
+      // Use a kinematic body we can move manually
+      const mover = new Body(BodyType.KINEMATIC, new Vec2(200, 400));
+      mover.shapes.add(new Circle(10));
+      mover.space = space;
+
+      step(space, 5);
+      expect(enterCount).not.toHaveBeenCalled();
+
+      // Move into zone
+      mover.position = new Vec2(200, 200);
+      step(space, 5);
+      expect(enterCount).toHaveBeenCalledTimes(1);
+
+      // Move out of zone
+      mover.position = new Vec2(200, 500);
+      step(space, 5);
+      expect(exitCount).toHaveBeenCalledTimes(1);
+
+      // Move back in — should fire onEnter again
+      mover.position = new Vec2(200, 200);
+      step(space, 5);
+      expect(enterCount).toHaveBeenCalledTimes(2);
+
+      zone.dispose();
+    });
+
+    it("swapping handler mid-overlap fires new handler on next stay", () => {
+      const zoneBody = createZoneBody(space, 200, 300);
+      const stay1 = vi.fn();
+      const stay2 = vi.fn();
+      const zone = new TriggerZone(space, zoneBody, { onStay: stay1 });
+
+      // Place body directly inside the zone (kinematic, no gravity needed)
+      const insider = new Body(BodyType.KINEMATIC, new Vec2(200, 300));
+      insider.shapes.add(new Circle(10));
+      insider.space = space;
+
+      step(space, 5);
+      expect(stay1).toHaveBeenCalled();
+      expect(stay2).not.toHaveBeenCalled();
+
+      // Swap handler
+      stay1.mockClear();
+      zone.onStay = stay2;
+      step(space, 5);
+      expect(stay1).not.toHaveBeenCalled();
+      expect(stay2).toHaveBeenCalled();
+
+      zone.dispose();
+    });
+
+    it("kinematic body passing through zone triggers enter and exit", () => {
+      const zoneBody = createZoneBody(space, 200, 200);
+      const enter = vi.fn();
+      const exit = vi.fn();
+      const zone = new TriggerZone(space, zoneBody, {
+        onEnter: enter,
+        onExit: exit,
+      });
+
+      // Kinematic body with downward velocity passes through
+      const mover = new Body(BodyType.KINEMATIC, new Vec2(200, 50));
+      mover.shapes.add(new Circle(10));
+      mover.velocity = new Vec2(0, 200);
+      mover.space = space;
+
+      step(space, 120);
+
+      expect(enter).toHaveBeenCalled();
+      expect(exit).toHaveBeenCalled();
+
+      zone.dispose();
+    });
+  });
 });
