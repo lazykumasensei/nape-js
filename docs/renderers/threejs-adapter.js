@@ -415,15 +415,25 @@ export class ThreeJSAdapter {
       if (!geom) continue;
 
       const cIdx = (body.userData?._colorIdx ?? 0) % MESH_COLORS.length;
-      const color = body.isStatic() ? 0x455a64 : MESH_COLORS[cIdx];
+      const isZone = !!body.userData?._isZone;
+      const color = isZone
+        ? MESH_COLORS[cIdx % MESH_COLORS.length]
+        : body.isStatic() ? 0x455a64 : MESH_COLORS[cIdx];
       const mesh = new _THREE.Mesh(
         geom,
-        new _THREE.MeshPhongMaterial({
-          color,
-          shininess: 80,
-          specular: 0x444444,
-          side: _THREE.DoubleSide,
-        }),
+        isZone
+          ? new _THREE.MeshBasicMaterial({
+              color,
+              wireframe: true,
+              transparent: true,
+              opacity: 0.5,
+            })
+          : new _THREE.MeshPhongMaterial({
+              color,
+              shininess: 80,
+              specular: 0x444444,
+              side: _THREE.DoubleSide,
+            }),
       );
       this.#scene.add(mesh);
 
