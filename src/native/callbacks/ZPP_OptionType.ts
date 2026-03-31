@@ -39,7 +39,10 @@ export class ZPP_OptionType {
     const napeNs = ZPP_OptionType._nape;
     if (val == null) {
       return new napeNs.callbacks.OptionType();
-    } else if (val instanceof napeNs.callbacks.OptionType) {
+    } else if (
+      val?.zpp_inner instanceof ZPP_OptionType ||
+      val instanceof napeNs.callbacks.OptionType
+    ) {
       return val;
     } else {
       return new napeNs.callbacks.OptionType().including(val);
@@ -195,7 +198,10 @@ export class ZPP_OptionType {
     if (val == null) {
       throw new Error("Error: Cannot append null, only CbType and CbType list values");
     }
-    if (val instanceof napeNs.callbacks.CbType) {
+    // Check zpp_inner instanceof ZPP_CbType first (robust against bundler
+    // code-splitting that duplicates the public CbType class), then fall back
+    // to the namespace instanceof check for backward compatibility.
+    if (val?.zpp_inner instanceof ZPP_CbType || val instanceof napeNs.callbacks.CbType) {
       const cb = val;
       this.append_type(list, cb.zpp_inner as ZPP_CbType);
     } else if (val instanceof napeNs.callbacks.CbTypeList) {
@@ -232,7 +238,7 @@ export class ZPP_OptionType {
       while (_g1 < cbs1.length) {
         const cb2 = cbs1[_g1];
         ++_g1;
-        if (!(cb2 instanceof napeNs.callbacks.CbType)) {
+        if (!(cb2?.zpp_inner instanceof ZPP_CbType) && !(cb2 instanceof napeNs.callbacks.CbType)) {
           throw new Error("Error: Cannot append non-CbType or CbType list value");
         }
         const cbx = cb2;

@@ -323,7 +323,7 @@ export class PixiJSAdapter {
           : body.isSleeping
             ? SLEEPING_FILL
             : FILL_COLORS[colorIdx];
-        fillAlpha = body.isStatic() ? 0.15 : 0.25;
+        fillAlpha = body.userData?._isZone ? 0.05 : body.isStatic() ? 0.15 : 0.25;
       }
     }
 

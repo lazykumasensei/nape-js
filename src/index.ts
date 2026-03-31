@@ -104,6 +104,7 @@ export {
   type CharacterControllerOptions,
   type MoveResult,
 } from "./helpers/CharacterController";
+export { TriggerZone, type TriggerZoneOptions, type TriggerHandler } from "./helpers/TriggerZone";
 
 // List/Iterator registration (side-effect import — registers all typed list pairs)
 import "./util/registerLists";

@@ -2,50 +2,51 @@
  * nape-js Examples Page — grid of interactive physics demos with play overlay,
  * per-card stats, search/tag filtering, size toggle, outline toggle, and View Code.
  */
-import { VERSION } from "./nape-js.esm.js?v=3.21.2";
-import { installErrorOverlay } from "./renderer.js?v=3.21.2";
-import { DemoRunner } from "./demo-runner.js?v=3.21.2";
-import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.21.2";
-import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.21.2";
-import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.21.2";
-import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.21.2";
+import { VERSION } from "./nape-js.esm.js?v=3.21.5";
+import { installErrorOverlay } from "./renderer.js?v=3.21.5";
+import { DemoRunner } from "./demo-runner.js?v=3.21.5";
+import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.21.5";
+import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.21.5";
+import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.21.5";
+import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.21.5";
 
 // All demos
-import falling     from "./demos/falling.js?v=3.21.2";
-import pyramid     from "./demos/pyramid.js?v=3.21.2";
-import chain       from "./demos/chain.js?v=3.21.2";
-import explosion   from "./demos/explosion.js?v=3.21.2";
-import constraints from "./demos/constraints.js?v=3.21.2";
-import gravity     from "./demos/gravity.js?v=3.21.2";
-import stacking    from "./demos/stacking.js?v=3.21.2";
-import ragdoll     from "./demos/ragdoll.js?v=3.21.2";
-import strandbeast from "./demos/strandbeast.js?v=3.21.2";
-import carSideview    from "./demos/car-sideview.js?v=3.21.2";
-import carTopdown     from "./demos/car-topdown.js?v=3.21.2";
-import platformer     from "./demos/platformer.js?v=3.21.2";
-import ropeBridge     from "./demos/rope-bridge.js?v=3.21.2";
-import wreckingBall   from "./demos/wrecking-ball.js?v=3.21.2";
-import newtonsCradle  from "./demos/newtons-cradle.js?v=3.21.2";
-import dominos        from "./demos/dominos.js?v=3.21.2";
-import conveyorBelts  from "./demos/conveyor-belts.js?v=3.21.2";
-import trebuchet      from "./demos/trebuchet.js?v=3.21.2";
-import seesaw         from "./demos/seesaw.js?v=3.21.2";
-import pinball        from "./demos/pinball.js?v=3.21.2";
-import cloth          from "./demos/cloth.js?v=3.21.2";
-import funnel         from "./demos/funnel.js?v=3.21.2";
-import softBody       from "./demos/soft-body.js?v=3.21.2";
-import oneWayPlatforms from "./demos/one-way-platforms.js?v=3.21.2";
-import filteringInteractions from "./demos/filtering-interactions.js?v=3.21.2";
-import bodyFromGraphic    from "./demos/body-from-graphic.js?v=3.21.2";
-import dropImageBody     from "./demos/drop-image-body.js?v=3.21.2";
-import capsule           from "./demos/capsule.js?v=3.21.2";
-import destructibleTerrain from "./demos/destructible-terrain.js?v=3.21.2";
-import webWorker           from "./demos/web-worker.js?v=3.21.2";
-import asteroidField       from "./demos/asteroid-field.js?v=3.21.2";
-import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.21.2";
-import deterministic       from "./demos/deterministic.js?v=3.21.2";
-import subStepping         from "./demos/sub-stepping.js?v=3.21.2";
-import characterController from "./demos/character-controller.js?v=3.21.2";
+import falling     from "./demos/falling.js?v=3.21.5";
+import pyramid     from "./demos/pyramid.js?v=3.21.5";
+import chain       from "./demos/chain.js?v=3.21.5";
+import explosion   from "./demos/explosion.js?v=3.21.5";
+import constraints from "./demos/constraints.js?v=3.21.5";
+import gravity     from "./demos/gravity.js?v=3.21.5";
+import stacking    from "./demos/stacking.js?v=3.21.5";
+import ragdoll     from "./demos/ragdoll.js?v=3.21.5";
+import strandbeast from "./demos/strandbeast.js?v=3.21.5";
+import carSideview    from "./demos/car-sideview.js?v=3.21.5";
+import carTopdown     from "./demos/car-topdown.js?v=3.21.5";
+import platformer     from "./demos/platformer.js?v=3.21.5";
+import ropeBridge     from "./demos/rope-bridge.js?v=3.21.5";
+import wreckingBall   from "./demos/wrecking-ball.js?v=3.21.5";
+import newtonsCradle  from "./demos/newtons-cradle.js?v=3.21.5";
+import dominos        from "./demos/dominos.js?v=3.21.5";
+import conveyorBelts  from "./demos/conveyor-belts.js?v=3.21.5";
+import trebuchet      from "./demos/trebuchet.js?v=3.21.5";
+import seesaw         from "./demos/seesaw.js?v=3.21.5";
+import pinball        from "./demos/pinball.js?v=3.21.5";
+import cloth          from "./demos/cloth.js?v=3.21.5";
+import funnel         from "./demos/funnel.js?v=3.21.5";
+import softBody       from "./demos/soft-body.js?v=3.21.5";
+import oneWayPlatforms from "./demos/one-way-platforms.js?v=3.21.5";
+import filteringInteractions from "./demos/filtering-interactions.js?v=3.21.5";
+import bodyFromGraphic    from "./demos/body-from-graphic.js?v=3.21.5";
+import dropImageBody     from "./demos/drop-image-body.js?v=3.21.5";
+import capsule           from "./demos/capsule.js?v=3.21.5";
+import destructibleTerrain from "./demos/destructible-terrain.js?v=3.21.5";
+import webWorker           from "./demos/web-worker.js?v=3.21.5";
+import asteroidField       from "./demos/asteroid-field.js?v=3.21.5";
+import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.21.5";
+import deterministic       from "./demos/deterministic.js?v=3.21.5";
+import subStepping         from "./demos/sub-stepping.js?v=3.21.5";
+import characterController from "./demos/character-controller.js?v=3.21.5";
+import triggerZones        from "./demos/trigger-zones.js?v=3.21.5";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -59,6 +60,7 @@ const ALL_DEMOS = [
   deterministic,
   subStepping,
   characterController,
+  triggerZones,
 ];
 
 const CW = 900;
