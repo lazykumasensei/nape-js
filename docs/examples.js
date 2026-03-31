@@ -46,6 +46,7 @@ import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.21.2";
 import deterministic       from "./demos/deterministic.js?v=3.21.2";
 import subStepping         from "./demos/sub-stepping.js?v=3.21.2";
 import characterController from "./demos/character-controller.js?v=3.21.2";
+import triggerZones        from "./demos/trigger-zones.js?v=3.21.2";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -59,6 +60,7 @@ const ALL_DEMOS = [
   deterministic,
   subStepping,
   characterController,
+  triggerZones,
 ];
 
 const CW = 900;
