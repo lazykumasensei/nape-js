@@ -165,9 +165,12 @@ When a PR changes features, APIs, priorities, or versions:
 | `ROADMAP.md` | Priority table, status, competitive analysis | Priority changes |
 | `docs/guides/architecture.md` | Internal patterns, registration flow | Architecture changes |
 | `docs/guides/multiplayer-guide.md` | Server setup, protocol, prediction | Multiplayer changes |
+| `docs/guides/cookbook.md` | Add recipe for new feature, update existing recipes | New features, API changes |
+| `docs/guides/troubleshooting.md` | Add entry for new gotchas, update fixes | Bug fixes, API gotchas |
+| `docs/guides/anti-patterns.md` | Add entry for new pitfalls | Bug fixes, performance changes |
 | `README.md` | Quick start, API tables, badge versions | Public API changes, releases |
 | `llms.txt` | Class list, links, quick start | Public API additions/removals |
-| `llms-full.txt` | Complete API reference, version (line 1) | Any public API change |
+| `llms-full.txt` | Complete API reference, gotchas, version (line 1) | Any public API change |
 | `package.json` | `version` field | Releases |
 
 ---

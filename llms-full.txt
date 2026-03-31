@@ -8,6 +8,24 @@
 - **Demos**: https://newkrok.github.io/nape-js/examples.html
 - **License**: MIT
 - **Version**: 3.8.1
+- **Cookbook**: https://github.com/NewKrok/nape-js/blob/master/docs/guides/cookbook.md
+- **Troubleshooting**: https://github.com/NewKrok/nape-js/blob/master/docs/guides/troubleshooting.md
+- **Anti-Patterns**: https://github.com/NewKrok/nape-js/blob/master/docs/guides/anti-patterns.md
+
+---
+
+## Common Gotchas (Quick Reference)
+
+1. **No `applyForce()`** — use `applyImpulse()` (instantaneous) or apply impulse every frame scaled by dt
+2. **Material constructor order** — `Material(elasticity, dynamicFriction, staticFriction, density, rollingFriction)` — elasticity is first
+3. **Raycast needs a step first** — call `space.step(1/60)` before `space.rayCast()` so broadphase indexes shapes
+4. **CCD is per-body** — `body.isBullet = true`, no global space setting
+5. **ConstraintListener BREAK events** — must use custom `CbType`, not `CbType.ANY_CONSTRAINT`
+6. **Compound members** — set `compound.space = space`, not `memberBody.space = space`
+7. **Vec2.weak()** — auto-disposed after first use; use `Vec2.get()` if you need the value later
+8. **Gravity is in pixels/s²** — typical value is 600, not 9.8
+9. **Kinematic bodies** — set `velocity`, don't set `position` directly (solver needs velocity to push contacts)
+10. **Binary serialization** — does not preserve `userData`; use JSON serialization if you need it
 
 ---
 

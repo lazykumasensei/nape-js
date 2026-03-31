@@ -16,6 +16,8 @@ Fully typed, tree-shakeable 2D physics engine — a modern TypeScript rewrite of
 
 **[Homepage & Interactive Demos](https://newkrok.github.io/nape-js/)** | **[API Reference](https://newkrok.github.io/nape-js/api/)** | **[Examples](https://newkrok.github.io/nape-js/examples.html)** | **[Multiplayer Demo](https://newkrok.github.io/nape-js/multiplayer.html)**
 
+**[Cookbook](docs/guides/cookbook.md)** | **[Troubleshooting](docs/guides/troubleshooting.md)** | **[Anti-Patterns](docs/guides/anti-patterns.md)**
+
 - Originally created in Haxe by Luca Deltodesco
 - Ported to TypeScript by Istvan Krisztian Somoracz
 
