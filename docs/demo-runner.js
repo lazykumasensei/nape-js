@@ -589,11 +589,19 @@ export class DemoRunner {
       }
 
       // Profiler overlay (drawn on top of everything via adapter overlay ctx)
-      if (this.#showProfiler && this.#space && !this.#workerMode) {
+      if (this.#showProfiler) {
         const overlayCtx = this.#activeAdapter?.getOverlayCtx?.();
         if (overlayCtx) {
           if (!this.#profilerState) this.#profilerState = createProfilerState();
-          drawProfilerOverlay(overlayCtx, this.#space, this.#W, this.#profilerState);
+          if (this.#workerMode && this.#workerBridge) {
+            const ws = this.#workerBridge.getState();
+            if (ws.bodyCount > 0) drawProfilerOverlayWorker(overlayCtx, this.#W, this.#profilerState, ws.stepMs, ws.bodyCount);
+          } else if (this.#demo?.getProfilerStats) {
+            const ws = this.#demo.getProfilerStats();
+            if (ws) drawProfilerOverlayWorker(overlayCtx, this.#W, this.#profilerState, ws.stepMs, ws.bodyCount);
+          } else if (this.#space && this.#space.metrics?.bodyCount) {
+            drawProfilerOverlay(overlayCtx, this.#space, this.#W, this.#profilerState);
+          }
         }
       }
     }
@@ -745,12 +753,14 @@ function drawProfilerOverlay(ctx, space, W, st) {
     st.lastFlush = now;
   }
 
-  const ow = 260;
+  const ow = Math.min(260, W - P_PAD * 2);
+  if (ow < 100) return; // canvas too small for overlay
   const oh = P_PAD + P_LINE_H + P_GAP + P_GRAPH_H + P_GAP + P_LINE_H + 4 + P_BAR_H + 4 + P_LEG_ROW * 2 + P_GAP + P_LINE_H + 2 + P_LINE_H + P_PAD;
   const ox = P_PAD, oy = P_PAD;
   const ix = ox + P_PAD, iw = ow - P_PAD * 2;
 
   ctx.save();
+  ctx.textAlign = "left";
   _roundRect(ctx, ox, oy, ow, oh, P_RADIUS);
   ctx.fillStyle = "rgba(13,17,23,0.88)";
   ctx.fill();
@@ -834,6 +844,72 @@ function drawProfilerOverlay(ctx, space, W, st) {
   y += P_LINE_H + 2;
   ctx.font = "11px monospace"; ctx.fillStyle = "#c9d1d9";
   ctx.fillText(`Sleep: ${m.sleepingBodyCount}  Contacts: ${m.contactCount}  Constr: ${m.constraintCount}`, ix, y + 10);
+
+  ctx.restore();
+}
+
+/** Simplified overlay for worker mode — only step time graph + body count. */
+function drawProfilerOverlayWorker(ctx, W, st, stepMs, bodyCount) {
+  const now = performance.now();
+  st.history[st.histIdx % P_HIST] = stepMs;
+  st.histIdx++;
+
+  const ow = Math.min(260, W - P_PAD * 2);
+  if (ow < 100) return;
+  const oh = P_PAD + P_LINE_H + P_GAP + P_GRAPH_H + P_GAP + P_LINE_H + P_GAP + P_LINE_H + P_PAD;
+  const ox = P_PAD, oy = P_PAD;
+  const ix = ox + P_PAD, iw = ow - P_PAD * 2;
+
+  ctx.save();
+  ctx.textAlign = "left";
+  _roundRect(ctx, ox, oy, ow, oh, P_RADIUS);
+  ctx.fillStyle = "rgba(13,17,23,0.88)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  let y = oy + P_PAD;
+
+  // Step time
+  ctx.font = "bold 11px monospace";
+  ctx.fillStyle = "#00ff88";
+  ctx.fillText(`Step: ${stepMs.toFixed(2)} ms`, ix, y + 10);
+  y += P_LINE_H + P_GAP;
+
+  // Graph
+  _roundRect(ctx, ix, y, iw, P_GRAPH_H, 3);
+  ctx.fillStyle = "rgba(0,255,136,0.06)";
+  ctx.fill();
+  let max = 0;
+  for (let i = 0; i < P_HIST; i++) if (st.history[i] > max) max = st.history[i];
+  if (max < 0.5) max = 0.5;
+  const bf = 16.67 / max;
+  if (bf < 1) {
+    const ry = y + P_GRAPH_H - bf * P_GRAPH_H;
+    ctx.strokeStyle = "rgba(239,83,80,0.3)"; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(ix, ry); ctx.lineTo(ix + iw, ry); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = "rgba(239,83,80,0.5)";
+    ctx.font = "8px monospace"; ctx.fillText("16.67ms", ix + 3, ry - 2);
+  }
+  ctx.strokeStyle = "#00ff88"; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let i = 0; i < P_HIST; i++) {
+    const idx = (st.histIdx + i) % P_HIST;
+    const px = ix + (i / (P_HIST - 1)) * iw;
+    const py = y + P_GRAPH_H - Math.min(st.history[idx] / max, 1) * P_GRAPH_H;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.stroke(); ctx.lineWidth = 1;
+  y += P_GRAPH_H + P_GAP;
+
+  // Body count
+  ctx.font = "11px monospace"; ctx.fillStyle = "#c9d1d9";
+  ctx.fillText(`Bodies: ${bodyCount}`, ix, y + 10);
+  y += P_LINE_H + P_GAP;
+
+  // Worker mode label
+  ctx.font = "9px monospace"; ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.fillText("WORKER MODE", ix, y + 10);
 
   ctx.restore();
 }

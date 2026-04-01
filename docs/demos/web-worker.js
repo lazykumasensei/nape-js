@@ -307,6 +307,11 @@ export default {
   walls: false,
   noCodePen: true,
 
+  getProfilerStats() {
+    if (!workerReady || !transforms) return null;
+    return { stepMs: workerStepMs, bodyCount: transforms[0] | 0 };
+  },
+
   setup(space, W, H) {
     cleanup();
     space.gravity = new Vec2(0, 0);
