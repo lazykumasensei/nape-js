@@ -6456,23 +6456,26 @@ export class ZPP_Space {
         const s = cx_ite1.elt;
         if (s.type == 1) {
           const _this1 = s.polygon;
-          if (_this1.zip_sanitation) {
-            _this1.zip_sanitation = false;
-            _this1.splice_collinear_real();
-          }
-          const res = s.polygon.valid();
-          if (ZPP_Flags.ValidationResult_VALID == null) {
-            ZPP_Flags.internal = true;
-            ZPP_Flags.ValidationResult_VALID = new ZPP_Space._nape.shape.ValidationResult();
-            ZPP_Flags.internal = false;
-          }
-          if (res != ZPP_Flags.ValidationResult_VALID) {
-            throw new Error(
-              "Error: Cannot simulate with an invalid Polygon : " +
-                s.polygon.outer.toString() +
-                " is invalid : " +
-                res.toString(),
-            );
+          // Only re-validate polygon when geometry actually changed.
+          if (_this1.zip_valid || _this1.zip_sanitation) {
+            if (_this1.zip_sanitation) {
+              _this1.zip_sanitation = false;
+              _this1.splice_collinear_real();
+            }
+            const res = s.polygon.valid();
+            if (ZPP_Flags.ValidationResult_VALID == null) {
+              ZPP_Flags.internal = true;
+              ZPP_Flags.ValidationResult_VALID = new ZPP_Space._nape.shape.ValidationResult();
+              ZPP_Flags.internal = false;
+            }
+            if (res != ZPP_Flags.ValidationResult_VALID) {
+              throw new Error(
+                "Error: Cannot simulate with an invalid Polygon : " +
+                  s.polygon.outer.toString() +
+                  " is invalid : " +
+                  res.toString(),
+              );
+            }
           }
           const _this2 = s.polygon;
           if (_this2.zip_gaxi) {

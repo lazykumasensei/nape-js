@@ -2845,14 +2845,17 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
           continue;
         }
       }
+      const wasFirst = cur.first;
       cur.first = false;
+      // Skip AABB overlap test for first-encounter pairs: tree traversal just confirmed overlap.
       const _this46 = s11.aabb;
       const x27 = s21.aabb;
       if (
-        x27.miny <= _this46.maxy &&
-        _this46.miny <= x27.maxy &&
-        x27.minx <= _this46.maxx &&
-        _this46.minx <= x27.maxx
+        wasFirst ||
+        (x27.miny <= _this46.maxy &&
+          _this46.miny <= x27.maxy &&
+          x27.minx <= _this46.maxx &&
+          _this46.minx <= x27.maxx)
       ) {
         const oarb = cur.arb;
         if (discrete) {
