@@ -3,25 +3,25 @@
  */
 import {
   Space, Body, BodyType, Vec2, Circle, Polygon, VERSION,
-} from "./nape-js.esm.js?v=3.21.5";
-import { installErrorOverlay } from "./renderer.js?v=3.21.5";
-import { DemoRunner } from "./demo-runner.js?v=3.21.5";
-import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.21.5";
-import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.21.5";
-import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.21.5";
-import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.21.5";
+} from "./nape-js.esm.js?v=3.21.8";
+import { installErrorOverlay } from "./renderer.js?v=3.21.8";
+import { DemoRunner } from "./demo-runner.js?v=3.21.8";
+import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.21.8";
+import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.21.8";
+import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.21.8";
+import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.21.8";
 
 // Demo definitions — one file each
-import falling     from "./demos/falling.js?v=3.21.5";
-import pyramid     from "./demos/pyramid.js?v=3.21.5";
-import chain       from "./demos/chain.js?v=3.21.5";
-import explosion   from "./demos/explosion.js?v=3.21.5";
-import constraints from "./demos/constraints.js?v=3.21.5";
-import gravity     from "./demos/gravity.js?v=3.21.5";
-import stacking    from "./demos/stacking.js?v=3.21.5";
-import ragdoll     from "./demos/ragdoll.js?v=3.21.5";
-import strandbeast from "./demos/strandbeast.js?v=3.21.5";
-import softBody    from "./demos/soft-body.js?v=3.21.5";
+import falling     from "./demos/falling.js?v=3.21.8";
+import pyramid     from "./demos/pyramid.js?v=3.21.8";
+import chain       from "./demos/chain.js?v=3.21.8";
+import explosion   from "./demos/explosion.js?v=3.21.8";
+import constraints from "./demos/constraints.js?v=3.21.8";
+import gravity     from "./demos/gravity.js?v=3.21.8";
+import stacking    from "./demos/stacking.js?v=3.21.8";
+import ragdoll     from "./demos/ragdoll.js?v=3.21.8";
+import strandbeast from "./demos/strandbeast.js?v=3.21.8";
+import softBody    from "./demos/soft-body.js?v=3.21.8";
 
 // =========================================================================
 // Demo registry

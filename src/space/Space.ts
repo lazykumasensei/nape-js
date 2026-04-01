@@ -28,6 +28,7 @@ import type {
 } from "../util/listTypes";
 import type { DebugDraw } from "../util/DebugDraw";
 import { DebugDrawFlags } from "../util/DebugDrawFlags";
+import type { PhysicsMetricsData } from "../profiler/PhysicsMetrics";
 
 /**
  * The physics world. Add bodies, shapes, and constraints, then call `step()` each frame to advance the simulation.
@@ -173,6 +174,33 @@ export class Space {
     if (value) {
       this.zpp_inner.sortcontacts = true;
     }
+  }
+
+  /**
+   * Enable the built-in performance profiler. When `true`, each `step()` call
+   * measures per-phase timings (broadphase, narrowphase, velocity solver,
+   * position solver, CCD, sleep) and collects entity counters (body, contact,
+   * constraint counts). Read results via {@link metrics}.
+   *
+   * **Performance:** adds ~14 `performance.now()` calls per step (~1 microsecond
+   * total). Default: `false`.
+   */
+  get profilerEnabled(): boolean {
+    return this.zpp_inner.profilerEnabled;
+  }
+  set profilerEnabled(value: boolean) {
+    this.zpp_inner.profilerEnabled = value;
+  }
+
+  /**
+   * Read-only snapshot of the last `step()` metrics.
+   * Returns a reused object (no allocation per call). Only populated when
+   * {@link profilerEnabled} is `true`; all values are zero otherwise.
+   *
+   * Call `metrics.toJSON()` for a plain-object copy suitable for logging.
+   */
+  get metrics(): PhysicsMetricsData {
+    return this.zpp_inner._metrics;
   }
 
   /**

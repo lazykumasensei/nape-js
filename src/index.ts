@@ -97,6 +97,9 @@ export type {
   ConvexResultList,
 } from "./util/listTypes";
 
+// Profiler (type only — full profiler available via "nape-js/profiler")
+export type { PhysicsMetricsData } from "./profiler/PhysicsMetrics";
+
 // Helpers
 export { createConcaveBody, type ConcaveBodyOptions } from "./helpers/createConcaveBody";
 export {

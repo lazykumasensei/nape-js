@@ -58,6 +58,16 @@
         "types": "./dist/worker/index.d.cts",
         "default": "./dist/worker/index.cjs"
       }
+    },
+    "./profiler": {
+      "import": {
+        "types": "./dist/profiler/index.d.ts",
+        "default": "./dist/profiler/index.js"
+      },
+      "require": {
+        "types": "./dist/profiler/index.d.cts",
+        "default": "./dist/profiler/index.cjs"
+      }
     }
   },
   "llms": "https://newkrok.github.io/nape-js/llms.txt",

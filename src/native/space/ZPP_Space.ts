@@ -29,6 +29,7 @@ import { ZPP_Island } from "./ZPP_Island";
 import { ZPP_Component } from "./ZPP_Component";
 import { ZPP_CallbackSet } from "./ZPP_CallbackSet";
 import { ZPP_CbSetManager } from "./ZPP_CbSetManager";
+import { PhysicsMetrics } from "../../profiler/PhysicsMetrics";
 
 export class ZPP_Space {
   // --- Static: Haxe metadata ---
@@ -40,6 +41,8 @@ export class ZPP_Space {
   // --- Instance fields ---
   outer: any = null;
   userData: any = null;
+  profilerEnabled: boolean = false;
+  _metrics: PhysicsMetrics = new PhysicsMetrics();
   gravityx: number = 0;
   gravityy: number = 0;
   wrap_gravity: any = null;
@@ -3243,13 +3246,24 @@ export class ZPP_Space {
     this.stamp++;
     const n = this.subSteps;
     const subDt = deltaTime / n;
+    const profiling = this.profilerEnabled;
+    let t0 = 0;
+    let t1 = 0;
+    if (profiling) {
+      this._metrics.reset();
+      t0 = performance.now();
+    }
     try {
       for (let _sub = 0; _sub < n; _sub++) {
         this.pre_dt = subDt;
         this.validation();
+        if (profiling) t1 = performance.now();
         this.bphase.broadphase(this, true);
+        if (profiling) this._metrics.broadphaseTime += performance.now() - t1;
         this._ensureDeterministicOrder();
+        if (profiling) t1 = performance.now();
         this.prestep(subDt);
+        if (profiling) this._metrics.narrowphaseTime += performance.now() - t1;
         if (this.sortcontacts) {
           const xxlist = this.c_arbiters_false;
           if (xxlist.head != null && xxlist.head.next != null) {
@@ -3320,9 +3334,11 @@ export class ZPP_Space {
             xxlist.pushmod = true;
           }
         }
+        if (profiling) t1 = performance.now();
         this.updateVel(subDt);
         this.warmStart();
         this.iterateVel(velocityIterations);
+        if (profiling) this._metrics.velocitySolverTime += performance.now() - t1;
         let cx_ite = this.kinematics.head;
         while (cx_ite != null) {
           const cur = cx_ite.elt;
@@ -3332,11 +3348,17 @@ export class ZPP_Space {
           cx_ite = cx_ite.next;
         }
         // Note: pre_pos backup for live bodies is done inside updatePos() already.
+        if (profiling) t1 = performance.now();
         this.updatePos(subDt);
+        if (profiling) this._metrics.positionSolverTime += performance.now() - t1;
         this.continuous = true;
+        if (profiling) t1 = performance.now();
         this.continuousCollisions(subDt);
+        if (profiling) this._metrics.ccdTime += performance.now() - t1;
         this.continuous = false;
+        if (profiling) t1 = performance.now();
         this.iteratePos(positionIterations);
+        if (profiling) this._metrics.positionSolverTime += performance.now() - t1;
         this._invalidateBodyList(this.kinematics);
         this._invalidateBodyList(this.live);
         let pre = null;
@@ -3381,11 +3403,17 @@ export class ZPP_Space {
           pre = cx_ite8;
           cx_ite8 = cx_ite8.next;
         }
+        if (profiling) t1 = performance.now();
         this.doForests(subDt);
         this.sleepArbiters();
+        if (profiling) this._metrics.sleepTime += performance.now() - t1;
       } // end sub-step loop
     } finally {
       this.midstep = false;
+    }
+    if (profiling) {
+      this._metrics.totalStepTime = performance.now() - t0;
+      this._collectCounters();
     }
     let pre1 = null;
     let cx_ite9 = this.callbackset_list.next;
@@ -3541,6 +3569,35 @@ export class ZPP_Space {
       o6.next = ZPP_Callback.zpp_pool;
       ZPP_Callback.zpp_pool = o6;
     }
+  }
+
+  /** Collect entity counters into _metrics. O(N) body scan for type breakdown. */
+  _collectCounters(): void {
+    const m = this._metrics;
+    m.bodyCount = this.bodies.length;
+    m.dynamicBodyCount = this.live.length;
+    m.kinematicBodyCount = this.kinematics.length;
+    m.contactCount = this.c_arbiters_false.length + this.c_arbiters_true.length;
+    m.constraintCount = this.constraints.length;
+
+    // Count sleeping dynamic bodies by iterating body list
+    let sleeping = 0;
+    let staticCount = 0;
+    let node = this.bodies.head;
+    while (node != null) {
+      const b = node.elt;
+      if (b.type === 1) {
+        // static body (type enum: 1 = static)
+        staticCount++;
+      } else if (b.type === 2 && b.component != null && b.component.sleeping) {
+        // dynamic sleeping body (type enum: 2 = dynamic)
+        sleeping++;
+      }
+      node = node.next;
+    }
+    m.staticBodyCount = staticCount;
+    m.sleepingBodyCount = sleeping;
+    m.broadphasePairCount = m.contactCount;
   }
 
   continuousCollisions(deltaTime: number) {
