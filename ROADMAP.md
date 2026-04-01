@@ -2,7 +2,7 @@
 
 ## Completed Items
 
-Done: P21-P28, P30-P33, P35, P37-P43, P45-P48, P50-P55, P57.
+Done: P21-P28, P30-P33, P35, P37-P43, P45-P48, P50-P55, P57, P63.
 Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — superseded by P52), P49 (ECS adapter — trivial pattern).
 
 ---
@@ -11,7 +11,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 
 | #   | Priority                         | Effort | Impact   | Status                                                         |
 | --- | -------------------------------- | ------ | -------- | -------------------------------------------------------------- |
-| P29 | Test coverage >= 80%             | L      | safety   | :diamonds: ~57% (4873 tests)                                   |
+| P29 | Test coverage >= 80%             | L      | safety   | :diamonds: ~55% (4895 tests)                                   |
 | P44 | PixiJS integration — npm package | M      | adoption | :diamonds: Phase 1 done (demos), Phase 2 pending (npm package) |
 | P56 | Interactive playground           | S-M    | adoption | :white_square_button: Not started                              |
 
@@ -29,27 +29,26 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 
 ### Developer Experience & Onboarding
 
-| #   | Priority                            | Effort | Impact          | Why                                                                                                                                                                                                                                    |
-| --- | ----------------------------------- | ------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P63 | **AI/LLM-friendly docs + Cookbook** | S      | :fire: adoption | AI-korszakban a legjobb marketing ha az AI jo kodot general. Strukturalt prompt-peldak, 20-30 copy-paste recipe (platformer, ragdoll, fluid pool, pinball stb.), troubleshooting guide az API gotchakkal. A meglevo `llms.txt` jo alap |
-| P65 | **One-click game templates**        | M      | :fire: adoption | `npm create nape-game@latest` vagy StackBlitz template-ek: platformer starter (CharacterController + tilemap + camera), top-down car, ragdoll fighter, pinball. 5 perc alatt futo elso jatek = legfontosabb onboarding elem            |
-| P66 | **Trigger zone API**                | S      | DX              | Magas szintu Unity-stílusu `onEnter/onStay/onExit` wrapper a callback rendszer folott. A jelenlegi CbType-alapu API mukodik de nem intuitiv. Egyszerusitett API csökkenti a belépési küszöböt                                          |
+| #   | Priority                            | Effort | Impact          | Why                                                                                                                                                                                                                                                  |
+| --- | ----------------------------------- | ------ | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P65 | **One-click game templates**        | M      | :fire: adoption | `npm create nape-game@latest` or StackBlitz templates: platformer starter (CharacterController + tilemap + camera), top-down car, ragdoll fighter, pinball. A running first game in 5 minutes = the most important onboarding element                 |
+| P66 | **Trigger zone API**                | S      | DX              | High-level Unity-style `onEnter/onStay/onExit` wrapper over the callback system. The current CbType-based API works but is not intuitive. A simplified API lowers the barrier to entry                                                                |
 
 ### Physics Features
 
-| #   | Priority                        | Effort | Impact            | Why                                                                                                                                                                                                                 |
-| --- | ------------------------------- | ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P62 | **Particle system**             | S-M    | features          | Fizika-tudatos particle emitter — gamedevek altal gyakran kert feature                                                                                                                                              |
-| P64 | **Spring/Damper joint**         | S      | features          | Hianyzó alap constraint. Soft-body, vehicle suspension, ragdoll hair, UI animaciok mind rugot akarnak. Most csak UserConstraint-tel oldhato meg                                                                     |
-| P67 | **Destruction/Fracture system** | M      | :fire: wow-factor | Voronoi-alapu toredezes — `Body.fracture(impactPoint, energy)` API. Egyetlen mas JS engine sem csinalja. Mar van `createConcaveBody` es `destructible-terrain` demo mint alap. Vizualisan latvanjos, marketing gold |
+| #   | Priority                        | Effort | Impact            | Why                                                                                                                                                                                                                                               |
+| --- | ------------------------------- | ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P62 | **Particle system**             | S-M    | features          | Physics-aware particle emitter — a frequently requested feature by gamedevs                                                                                                                                                                       |
+| P64 | **Spring/Damper joint**         | S      | features          | Missing basic constraint. Soft-body, vehicle suspension, ragdoll hair, UI animations all want springs. Currently only solvable via UserConstraint                                                                                                  |
+| P67 | **Destruction/Fracture system** | M      | :fire: wow-factor | Voronoi-based fracturing — `Body.fracture(impactPoint, energy)` API. No other JS engine does this. Already have `createConcaveBody` and `destructible-terrain` demo as a foundation. Visually impressive, great for marketing                      |
 
 ### Tooling & Infrastructure
 
-| #   | Priority                                 | Effort | Impact          | Why                                                                                                                                                                                                                            |
-| --- | ---------------------------------------- | ------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P61 | **Bundle size reduction**                | S-M    | competitiveness | 87 KB vs Phaser Box2D 65 KB gap csökkentese. Dead code audit, hot path optimalizalas                                                                                                                                           |
-| P68 | **Performance profiler / debug overlay** | S      | DX              | Runtime profiler: broadphase/narrowphase/solver ido, body/contact/constraint szam, sleep statisztikak, bottleneck highlight. Rapier-nek van, nekünk nincs. Bizalomépiítés profi fejlesztoknel                                  |
-| P69 | **Deterministic replay system**          | M      | features        | Input-rogzites + visszajátszas a meglevo serializacio + determinisztikus mod felett. Debug bug-reprodukcio, multiplayer rollback alap, megosztható replay, determinisztikus regression teszt — egy feature ami osszekot tobbet |
+| #   | Priority                                 | Effort | Impact          | Why                                                                                                                                                                                                                              |
+| --- | ---------------------------------------- | ------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P61 | **Bundle size reduction**                | S-M    | competitiveness | Close the 87 KB vs Phaser Box2D 65 KB gap. Dead code audit, hot path optimization                                                                                                                                                |
+| P68 | **Performance profiler / debug overlay** | S      | DX              | Runtime profiler: broadphase/narrowphase/solver time, body/contact/constraint count, sleep statistics, bottleneck highlighting. Rapier has one, we don't. Builds trust with professional developers                                |
+| P69 | **Deterministic replay system**          | M      | features        | Input recording + playback on top of existing serialization + deterministic mode. Debug bug reproduction, multiplayer rollback foundation, shareable replays, deterministic regression tests — one feature that connects many others |
 
 ---
 
@@ -58,26 +57,25 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 ### Phase 1 — Finish what's started + onboarding (next)
 
 1. **P44 Phase 2** — Ship `@newkrok/nape-pixi` npm package (auto-sync transforms, typed API, TSDoc)
-2. **P63** — AI/LLM docs + Cookbook (legkisebb effort, legnagyobb hatás az AI-korszakban)
-3. **P56** — Interactive playground (StackBlitz/CodeSandbox template, editable examples)
+2. **P56** — Interactive playground (StackBlitz/CodeSandbox template, editable examples)
 
 ### Phase 2 — Wow-factor + ecosystem
 
-4. **P67** — Destruction/Fracture system (egyedülálló feature, marketing érték)
-5. **P58** — Phaser plugin/adapter (biggest community reach opportunity)
-6. **P65** — One-click game templates (5 perc elso jatekk)
-7. **P66** — Trigger zone API (kicsi effort, nagy DX javulas)
+3. **P67** — Destruction/Fracture system (unique feature, marketing value)
+4. **P58** — Phaser plugin/adapter (biggest community reach opportunity)
+5. **P65** — One-click game templates (first game in 5 minutes)
+6. **P66** — Trigger zone API (small effort, big DX improvement)
 
 ### Phase 3 — Ecosystem expand
 
-8. **P60** — Tilemap collision helper (low effort, high gamedev utility)
-9. **P59** — React/R3F integration (growing market)
-10. **P64** — Spring/Damper joint (alapveto fizika feature)
+7. **P60** — Tilemap collision helper (low effort, high gamedev utility)
+8. **P59** — React/R3F integration (growing market)
+9. **P64** — Spring/Damper joint (fundamental physics feature)
 
 ### Phase 4 — Polish & tooling
 
-11. **P62** — Particle system
-12. **P68** — Performance profiler
-13. **P69** — Deterministic replay system
-14. **P61** — Bundle size reduction
-15. **P29** — Continue test coverage push toward 80%
+10. **P62** — Particle system
+11. **P68** — Performance profiler
+12. **P69** — Deterministic replay system
+13. **P61** — Bundle size reduction
+14. **P29** — Continue test coverage push toward 80%
