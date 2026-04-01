@@ -30,6 +30,8 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
   stree: ZPP_AABBTree;
   dtree: ZPP_AABBTree;
   pairs: ZPP_AABBPair | null = null;
+  /** HashMap for O(1) pair lookups by canonical shape ID pair. */
+  pairMap: Map<number, ZPP_AABBPair> = new Map();
   syncs: ZPP_AABBNode | null = null;
   moves: ZPP_AABBNode | null = null;
   treeStack: any = null;
@@ -52,6 +54,14 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
     p.next = this.pairs;
     if (this.pairs != null) this.pairs.gprev = p;
     this.pairs = p;
+  }
+
+  /**
+   * Compute a unique numeric key for a canonical (id, di) pair where id < di.
+   * Uses Szudzik's pairing function: since id < di always, key = di * di + id.
+   */
+  private static _pairKey(id: number, di: number): number {
+    return di * di + id;
   }
 
   /** Unlink a pair from the global doubly-linked pairs list. */
@@ -165,6 +175,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
       } else {
         pair.n1.shape.pairs.remove(pair);
       }
+      this.pairMap.delete(ZPP_DynAABBPhase._pairKey(pair.id, pair.di));
       if (pair.arb != null) {
         pair.arb.pair = null;
       }
@@ -2377,17 +2388,8 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
                 id = shape1.id;
                 di = lshape.id;
               }
-              const s = lshape.pairs.length < shape1.pairs.length ? lshape : shape1;
-              let p1 = null;
-              let cx_ite3 = s.pairs.head;
-              while (cx_ite3 != null) {
-                const px = cx_ite3.elt;
-                if (px.id == id && px.di == di) {
-                  p1 = px;
-                  break;
-                }
-                cx_ite3 = cx_ite3.next;
-              }
+              const pairKey = ZPP_DynAABBPhase._pairKey(id, di);
+              let p1 = this.pairMap.get(pairKey) ?? null;
               if (p1 != null) {
                 if (p1.sleeping) {
                   p1.sleeping = false;
@@ -2407,6 +2409,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               p1.n2 = node3;
               p1.id = id;
               p1.di = di;
+              this.pairMap.set(pairKey, p1);
               this._linkPair(p1);
               p1.first = true;
               const _this35 = lshape.pairs;
@@ -2491,17 +2494,8 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
                 id1 = shape2.id;
                 di1 = lshape.id;
               }
-              const s1 = lshape.pairs.length < shape2.pairs.length ? lshape : shape2;
-              let p2 = null;
-              let cx_ite4 = s1.pairs.head;
-              while (cx_ite4 != null) {
-                const px1 = cx_ite4.elt;
-                if (px1.id == id1 && px1.di == di1) {
-                  p2 = px1;
-                  break;
-                }
-                cx_ite4 = cx_ite4.next;
-              }
+              const pairKey1 = ZPP_DynAABBPhase._pairKey(id1, di1);
+              let p2 = this.pairMap.get(pairKey1) ?? null;
               if (p2 != null) {
                 if (p2.sleeping) {
                   p2.sleeping = false;
@@ -2521,6 +2515,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               p2.n2 = node4;
               p2.id = id1;
               p2.di = di1;
+              this.pairMap.set(pairKey1, p2);
               this._linkPair(p2);
               p2.first = true;
               const _this37 = lshape.pairs;
@@ -2619,17 +2614,8 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
                 id2 = shape3.id;
                 di2 = lshape1.id;
               }
-              const s2 = lshape1.pairs.length < shape3.pairs.length ? lshape1 : shape3;
-              let p3 = null;
-              let cx_ite5 = s2.pairs.head;
-              while (cx_ite5 != null) {
-                const px2 = cx_ite5.elt;
-                if (px2.id == id2 && px2.di == di2) {
-                  p3 = px2;
-                  break;
-                }
-                cx_ite5 = cx_ite5.next;
-              }
+              const pairKey2 = ZPP_DynAABBPhase._pairKey(id2, di2);
+              let p3 = this.pairMap.get(pairKey2) ?? null;
               if (p3 != null) {
                 if (p3.sleeping) {
                   p3.sleeping = false;
@@ -2649,6 +2635,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               p3.n2 = node5;
               p3.id = id2;
               p3.di = di2;
+              this.pairMap.set(pairKey2, p3);
               this._linkPair(p3);
               p3.first = true;
               const _this39 = lshape1.pairs;
@@ -2733,17 +2720,8 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
                 id3 = shape4.id;
                 di3 = lshape1.id;
               }
-              const s3 = lshape1.pairs.length < shape4.pairs.length ? lshape1 : shape4;
-              let p4 = null;
-              let cx_ite6 = s3.pairs.head;
-              while (cx_ite6 != null) {
-                const px3 = cx_ite6.elt;
-                if (px3.id == id3 && px3.di == di3) {
-                  p4 = px3;
-                  break;
-                }
-                cx_ite6 = cx_ite6.next;
-              }
+              const pairKey3 = ZPP_DynAABBPhase._pairKey(id3, di3);
+              let p4 = this.pairMap.get(pairKey3) ?? null;
               if (p4 != null) {
                 if (p4.sleeping) {
                   p4.sleeping = false;
@@ -2763,6 +2741,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
               p4.n2 = node6;
               p4.id = id3;
               p4.di = di3;
+              this.pairMap.set(pairKey3, p4);
               this._linkPair(p4);
               p4.first = true;
               const _this41 = lshape1.pairs;
@@ -2837,6 +2816,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
         this._unlinkPair(cur);
         cur.n1.shape.pairs.remove(cur);
         cur.n2.shape.pairs.remove(cur);
+        this.pairMap.delete(ZPP_DynAABBPhase._pairKey(cur.id, cur.di));
         if (cur.arb != null) {
           cur.arb.pair = null;
         }
@@ -2865,14 +2845,17 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
           continue;
         }
       }
+      const wasFirst = cur.first;
       cur.first = false;
+      // Skip AABB overlap test for first-encounter pairs: tree traversal just confirmed overlap.
       const _this46 = s11.aabb;
       const x27 = s21.aabb;
       if (
-        x27.miny <= _this46.maxy &&
-        _this46.miny <= x27.maxy &&
-        x27.minx <= _this46.maxx &&
-        _this46.minx <= x27.maxx
+        wasFirst ||
+        (x27.miny <= _this46.maxy &&
+          _this46.miny <= x27.maxy &&
+          x27.minx <= _this46.maxx &&
+          _this46.minx <= x27.maxx)
       ) {
         const oarb = cur.arb;
         if (discrete) {
@@ -2937,6 +2920,7 @@ export class ZPP_DynAABBPhase extends ZPP_Broadphase {
       ZPP_AABBPair.zpp_pool = p;
       this.pairs = nxt;
     }
+    this.pairMap.clear();
     this.dtree.clear();
     this.stree.clear();
   }

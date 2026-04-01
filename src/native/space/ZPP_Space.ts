@@ -3214,18 +3214,22 @@ export class ZPP_Space {
   private _ensureDeterministicOrder(): void {
     if (!this.deterministic) return;
 
-    // Sort live bodies by body ID
-    this._sortLinkedList(this.live, (b: any) => b.id);
-
-    // Sort live constraints by constraint ID
-    this._sortLinkedList(this.live_constraints, (c: any) => c.id);
-
-    // Sort collision arbiter lists by canonical shape ID pair
-    this._sortLinkedList(this.c_arbiters_false, (a: any) => this._arbiterSortKey(a));
-    this._sortLinkedList(this.c_arbiters_true, (a: any) => this._arbiterSortKey(a));
-
-    // Sort fluid arbiter lists by canonical shape ID pair
-    this._sortLinkedList(this.f_arbiters, (a: any) => this._arbiterSortKey(a));
+    // Only sort lists that have been modified since last sort.
+    if (this.live.modified) {
+      this._sortLinkedList(this.live, (b: any) => b.id);
+    }
+    if (this.live_constraints.modified) {
+      this._sortLinkedList(this.live_constraints, (c: any) => c.id);
+    }
+    if (this.c_arbiters_false.modified) {
+      this._sortLinkedList(this.c_arbiters_false, (a: any) => this._arbiterSortKey(a));
+    }
+    if (this.c_arbiters_true.modified) {
+      this._sortLinkedList(this.c_arbiters_true, (a: any) => this._arbiterSortKey(a));
+    }
+    if (this.f_arbiters.modified) {
+      this._sortLinkedList(this.f_arbiters, (a: any) => this._arbiterSortKey(a));
+    }
   }
 
   step(deltaTime: number, velocityIterations: number, positionIterations: number) {
@@ -3327,14 +3331,7 @@ export class ZPP_Space {
           cur.pre_rot = cur.rot;
           cx_ite = cx_ite.next;
         }
-        let cx_ite1 = this.live.head;
-        while (cx_ite1 != null) {
-          const cur1 = cx_ite1.elt;
-          cur1.pre_posx = cur1.posx;
-          cur1.pre_posy = cur1.posy;
-          cur1.pre_rot = cur1.rot;
-          cx_ite1 = cx_ite1.next;
-        }
+        // Note: pre_pos backup for live bodies is done inside updatePos() already.
         this.updatePos(subDt);
         this.continuous = true;
         this.continuousCollisions(subDt);
@@ -6459,23 +6456,26 @@ export class ZPP_Space {
         const s = cx_ite1.elt;
         if (s.type == 1) {
           const _this1 = s.polygon;
-          if (_this1.zip_sanitation) {
-            _this1.zip_sanitation = false;
-            _this1.splice_collinear_real();
-          }
-          const res = s.polygon.valid();
-          if (ZPP_Flags.ValidationResult_VALID == null) {
-            ZPP_Flags.internal = true;
-            ZPP_Flags.ValidationResult_VALID = new ZPP_Space._nape.shape.ValidationResult();
-            ZPP_Flags.internal = false;
-          }
-          if (res != ZPP_Flags.ValidationResult_VALID) {
-            throw new Error(
-              "Error: Cannot simulate with an invalid Polygon : " +
-                s.polygon.outer.toString() +
-                " is invalid : " +
-                res.toString(),
-            );
+          // Only re-validate polygon when geometry actually changed.
+          if (_this1.zip_valid || _this1.zip_sanitation) {
+            if (_this1.zip_sanitation) {
+              _this1.zip_sanitation = false;
+              _this1.splice_collinear_real();
+            }
+            const res = s.polygon.valid();
+            if (ZPP_Flags.ValidationResult_VALID == null) {
+              ZPP_Flags.internal = true;
+              ZPP_Flags.ValidationResult_VALID = new ZPP_Space._nape.shape.ValidationResult();
+              ZPP_Flags.internal = false;
+            }
+            if (res != ZPP_Flags.ValidationResult_VALID) {
+              throw new Error(
+                "Error: Cannot simulate with an invalid Polygon : " +
+                  s.polygon.outer.toString() +
+                  " is invalid : " +
+                  res.toString(),
+              );
+            }
           }
           const _this2 = s.polygon;
           if (_this2.zip_gaxi) {
