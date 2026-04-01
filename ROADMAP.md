@@ -2,7 +2,7 @@
 
 ## Completed Items
 
-Done: P21-P28, P30-P33, P35, P37-P43, P45-P48, P50-P55, P57, P63.
+Done: P21-P28, P30-P33, P35, P37-P43, P45-P48, P50-P55, P57, P63, P66.
 Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — superseded by P52), P49 (ECS adapter — trivial pattern).
 
 ---
@@ -32,7 +32,6 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | #   | Priority                            | Effort | Impact          | Why                                                                                                                                                                                                                                                  |
 | --- | ----------------------------------- | ------ | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P65 | **One-click game templates**        | M      | :fire: adoption | `npm create nape-game@latest` or StackBlitz templates: platformer starter (CharacterController + tilemap + camera), top-down car, ragdoll fighter, pinball. A running first game in 5 minutes = the most important onboarding element                 |
-| P66 | **Trigger zone API**                | S      | DX              | High-level Unity-style `onEnter/onStay/onExit` wrapper over the callback system. The current CbType-based API works but is not intuitive. A simplified API lowers the barrier to entry                                                                |
 
 ### Physics Features
 
@@ -64,7 +63,6 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 3. **P67** — Destruction/Fracture system (unique feature, marketing value)
 4. **P58** — Phaser plugin/adapter (biggest community reach opportunity)
 5. **P65** — One-click game templates (first game in 5 minutes)
-6. **P66** — Trigger zone API (small effort, big DX improvement)
 
 ### Phase 3 — Ecosystem expand
 
