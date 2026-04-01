@@ -47,7 +47,6 @@ import deterministic       from "./demos/deterministic.js?v=3.21.8";
 import subStepping         from "./demos/sub-stepping.js?v=3.21.8";
 import characterController from "./demos/character-controller.js?v=3.21.8";
 import triggerZones        from "./demos/trigger-zones.js?v=3.21.8";
-import perfProfiler        from "./demos/performance-profiler.js?v=3.21.8";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -62,7 +61,6 @@ const ALL_DEMOS = [
   subStepping,
   characterController,
   triggerZones,
-  perfProfiler,
 ];
 
 const CW = 900;
@@ -196,6 +194,20 @@ function createCard(demo, { onTagClick } = {}) {
     updateUrlForCard(demo.id, { mode: cardMode, outline: runner.debugDraw });
   });
 
+  // Profiler toggle
+  const profilerBtn = document.createElement("button");
+  profilerBtn.className = "canvas-fs-btn canvas-profiler-btn";
+  profilerBtn.title = "Toggle profiler overlay";
+  profilerBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="1,12 4,5 7,9 10,2 14,7"/>
+    <line x1="1" y1="14" x2="14" y2="14"/>
+  </svg>`;
+  profilerBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    runner.showProfiler = !runner.showProfiler;
+    profilerBtn.classList.toggle("active", runner.showProfiler);
+  });
+
   // Reset button
   const resetBtn = document.createElement("button");
   resetBtn.className = "canvas-fs-btn canvas-reset-btn";
@@ -262,7 +274,7 @@ function createCard(demo, { onTagClick } = {}) {
     workerBtn.title = runner.workerMode ? "Worker ON — click to disable" : "Toggle Web Worker physics";
   });
 
-  canvasControls.append(renderToggle, outlineToggleBtn, workerBtn, resetBtn, fsBtn);
+  canvasControls.append(renderToggle, outlineToggleBtn, profilerBtn, workerBtn, resetBtn, fsBtn);
   renderWrap.appendChild(canvasControls);
 
   runner.wireStats({ fps: fpsEl, step: stepEl, bodies: bodiesEl });

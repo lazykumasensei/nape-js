@@ -657,6 +657,9 @@ a:hover { text-decoration: underline; }
 .canvas-outline-btn:hover { color: #fff; background: rgba(31,111,235,0.6); }
 .canvas-outline-btn.active { color: var(--accent); }
 
+/* Profiler toggle button */
+.canvas-profiler-btn.active { color: #00ff88; }
+
 /* Worker toggle button */
 .canvas-worker-btn.active { color: var(--accent); }
 

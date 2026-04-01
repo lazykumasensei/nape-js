@@ -79,6 +79,15 @@ outlineBtn.addEventListener("click", () => {
   outlineBtn.classList.toggle("active", runner.debugDraw);
 });
 
+// --- Profiler toggle ---
+const profilerBtn = document.getElementById("profilerBtn");
+if (profilerBtn) {
+  profilerBtn.addEventListener("click", () => {
+    runner.showProfiler = !runner.showProfiler;
+    profilerBtn.classList.toggle("active", runner.showProfiler);
+  });
+}
+
 // --- Worker toggle ---
 const workerBtn = document.getElementById("workerBtn");
 if (workerBtn) {

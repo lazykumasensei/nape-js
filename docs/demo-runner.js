@@ -110,6 +110,8 @@ export class DemoRunner {
   #demo    = null;
   #animId  = null;
   #debugDraw = true;
+  #showProfiler = false;
+  #profilerState = null;  // lazy-init on first toggle
 
   // Camera state (opt-in per demo via demo.camera config)
   #camX = 0;
@@ -160,6 +162,18 @@ export class DemoRunner {
   set debugDraw(val) {
     this.#debugDraw = val;
     this.#activeAdapter?.setOutlines(val);
+  }
+
+  get showProfiler() { return this.#showProfiler; }
+  set showProfiler(val) {
+    this.#showProfiler = val;
+    if (val && this.#space) {
+      this.#space.profilerEnabled = true;
+      if (!this.#profilerState) this.#profilerState = createProfilerState();
+    }
+    if (!val && this.#space) {
+      this.#space.profilerEnabled = false;
+    }
   }
 
   get workerMode() { return this.#workerMode; }
@@ -317,6 +331,9 @@ export class DemoRunner {
     if (demoDef.walls !== undefined) {
       createWalls(space, this.#W, this.#H, demoDef.walls);
     }
+
+    // Enable profiler if toggle is on
+    if (this.#showProfiler) space.profilerEnabled = true;
 
     // Run demo setup
     demoDef.setup(space, this.#W, this.#H);
@@ -570,6 +587,15 @@ export class DemoRunner {
         if (this.#statsStep)   this.#statsStep.textContent   = `Step: ${stepMs.toFixed(2)}ms | Render: ${renderMs.toFixed(2)}ms`;
         if (this.#statsBodies) this.#statsBodies.textContent = `Bodies: ${this.#space.bodies.length}`;
       }
+
+      // Profiler overlay (drawn on top of everything via adapter overlay ctx)
+      if (this.#showProfiler && this.#space && !this.#workerMode) {
+        const overlayCtx = this.#activeAdapter?.getOverlayCtx?.();
+        if (overlayCtx) {
+          if (!this.#profilerState) this.#profilerState = createProfilerState();
+          drawProfilerOverlay(overlayCtx, this.#space, this.#W, this.#profilerState);
+        }
+      }
     }
 
     this.#animId = requestAnimationFrame(() => this.#tick());
@@ -660,4 +686,154 @@ export class DemoRunner {
     this.#updateCamera();
     if (this.#cameraConfig) this.#cameraConfig.lerp = lerp;
   }
+}
+
+// =========================================================================
+// Profiler overlay — drawn by DemoRunner when showProfiler is true
+// =========================================================================
+
+const PROFILER_PHASES = [
+  { field: "broadphaseTime",     color: "#4fc3f7", label: "Broad" },
+  { field: "narrowphaseTime",    color: "#ffb74d", label: "Narrow" },
+  { field: "velocitySolverTime", color: "#81c784", label: "VelSolve" },
+  { field: "positionSolverTime", color: "#ce93d8", label: "PosSolve" },
+  { field: "ccdTime",            color: "#ef5350", label: "CCD" },
+  { field: "sleepTime",          color: "#90a4ae", label: "Sleep" },
+];
+
+const P_HIST = 120, P_PAD = 12, P_GAP = 10, P_GRAPH_H = 34, P_BAR_H = 8;
+const P_LEG_ROW = 12, P_LINE_H = 14, P_RADIUS = 6;
+
+function createProfilerState() {
+  return {
+    history: new Float64Array(P_HIST),
+    histIdx: 0,
+    accum: new Float64Array(6),
+    display: new Float64Array(6),
+    accumFrames: 0,
+    lastFlush: 0,
+  };
+}
+
+function _roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawProfilerOverlay(ctx, space, W, st) {
+  const m = space.metrics;
+  if (!m) return;
+
+  const now = performance.now();
+  st.history[st.histIdx % P_HIST] = m.totalStepTime;
+  st.histIdx++;
+
+  for (let i = 0; i < 6; i++) st.accum[i] += m[PROFILER_PHASES[i].field];
+  st.accumFrames++;
+  if (now - st.lastFlush >= 1000 && st.accumFrames > 0) {
+    for (let i = 0; i < 6; i++) { st.display[i] = st.accum[i] / st.accumFrames; st.accum[i] = 0; }
+    st.accumFrames = 0;
+    st.lastFlush = now;
+  }
+
+  const ow = 260;
+  const oh = P_PAD + P_LINE_H + P_GAP + P_GRAPH_H + P_GAP + P_LINE_H + 4 + P_BAR_H + 4 + P_LEG_ROW * 2 + P_GAP + P_LINE_H + 2 + P_LINE_H + P_PAD;
+  const ox = P_PAD, oy = P_PAD;
+  const ix = ox + P_PAD, iw = ow - P_PAD * 2;
+
+  ctx.save();
+  _roundRect(ctx, ox, oy, ow, oh, P_RADIUS);
+  ctx.fillStyle = "rgba(13,17,23,0.88)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  let y = oy + P_PAD;
+
+  // Step time
+  ctx.font = "bold 11px monospace";
+  ctx.fillStyle = "#00ff88";
+  ctx.fillText(`Step: ${m.totalStepTime.toFixed(2)} ms`, ix, y + 10);
+  y += P_LINE_H + P_GAP;
+
+  // Graph
+  _roundRect(ctx, ix, y, iw, P_GRAPH_H, 3);
+  ctx.fillStyle = "rgba(0,255,136,0.06)";
+  ctx.fill();
+  let max = 0;
+  for (let i = 0; i < P_HIST; i++) if (st.history[i] > max) max = st.history[i];
+  if (max < 0.5) max = 0.5;
+  const bf = 16.67 / max;
+  if (bf < 1) {
+    const ry = y + P_GRAPH_H - bf * P_GRAPH_H;
+    ctx.strokeStyle = "rgba(239,83,80,0.3)"; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(ix, ry); ctx.lineTo(ix + iw, ry); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = "rgba(239,83,80,0.5)";
+    ctx.font = "8px monospace"; ctx.fillText("16.67ms", ix + 3, ry - 2);
+  }
+  ctx.strokeStyle = "#00ff88"; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let i = 0; i < P_HIST; i++) {
+    const idx = (st.histIdx + i) % P_HIST;
+    const px = ix + (i / (P_HIST - 1)) * iw;
+    const py = y + P_GRAPH_H - Math.min(st.history[idx] / max, 1) * P_GRAPH_H;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.stroke(); ctx.lineWidth = 1;
+  y += P_GRAPH_H + P_GAP;
+
+  // Phase breakdown
+  ctx.font = "10px monospace"; ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.fillText("PHASE BREAKDOWN", ix, y + 10);
+  y += P_LINE_H + 4;
+  let ds = 0;
+  for (let i = 0; i < 6; i++) ds += st.display[i];
+  if (ds < 0.0001) ds = 1;
+  _roundRect(ctx, ix, y, iw, P_BAR_H, 3);
+  ctx.save(); ctx.clip();
+  let bx = ix;
+  for (let i = 0; i < 6; i++) {
+    const w = (st.display[i] / ds) * iw;
+    if (w > 0.3) { ctx.fillStyle = PROFILER_PHASES[i].color; ctx.fillRect(bx, y, w, P_BAR_H); }
+    bx += w;
+  }
+  ctx.restore();
+  y += P_BAR_H + 4;
+  ctx.font = "9px monospace";
+  const cw = Math.floor(iw / 3);
+  for (let row = 0; row < 2; row++) {
+    let lx = ix;
+    for (let col = 0; col < 3; col++) {
+      const i = row * 3 + col, pct = Math.round((st.display[i] / ds) * 100);
+      ctx.fillStyle = PROFILER_PHASES[i].color;
+      ctx.beginPath(); ctx.arc(lx + 3, y + 3, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.fillText(`${PROFILER_PHASES[i].label} ${pct}%`, lx + 9, y + 7);
+      lx += cw;
+    }
+    y += P_LEG_ROW;
+  }
+  y += P_GAP;
+
+  // Counters
+  ctx.font = "11px monospace"; ctx.fillStyle = "#c9d1d9";
+  const bl = `Bodies: ${m.bodyCount}  `;
+  ctx.fillText(bl, ix, y + 10);
+  const bw = ctx.measureText(bl).width;
+  ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.font = "10px monospace";
+  ctx.fillText(`D:${m.dynamicBodyCount} S:${m.staticBodyCount} K:${m.kinematicBodyCount}`, ix + bw, y + 10);
+  y += P_LINE_H + 2;
+  ctx.font = "11px monospace"; ctx.fillStyle = "#c9d1d9";
+  ctx.fillText(`Sleep: ${m.sleepingBodyCount}  Contacts: ${m.contactCount}  Constr: ${m.constraintCount}`, ix, y + 10);
+
+  ctx.restore();
 }
