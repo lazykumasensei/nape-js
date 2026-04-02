@@ -47,6 +47,7 @@ import deterministic       from "./demos/deterministic.js?v=3.21.8";
 import subStepping         from "./demos/sub-stepping.js?v=3.21.8";
 import characterController from "./demos/character-controller.js?v=3.21.8";
 import triggerZones        from "./demos/trigger-zones.js?v=3.21.8";
+import fracture            from "./demos/fracture.js?v=3.21.8";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -61,6 +62,7 @@ const ALL_DEMOS = [
   subStepping,
   characterController,
   triggerZones,
+  fracture,
 ];
 
 const CW = 900;

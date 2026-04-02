@@ -8,3 +8,10 @@ export { MarchingSquares } from "./MarchingSquares";
 export { Ray } from "./Ray";
 export { Winding } from "./Winding";
 export { Geom } from "./Geom";
+export {
+  computeVoronoi,
+  generateFractureSites,
+  type VoronoiPoint,
+  type VoronoiCell,
+  type VoronoiResult,
+} from "./Voronoi";
