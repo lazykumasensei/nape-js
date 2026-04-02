@@ -30,6 +30,7 @@ Each recipe shows the minimal working code and explains the "why" behind key dec
 - [Sub-Stepping for Stability](#sub-stepping-for-stability)
 - [Kinematic Moving Platform](#kinematic-moving-platform)
 - [Custom Material Presets](#custom-material-presets)
+- [Performance Profiling](#performance-profiling)
 
 ---
 
@@ -681,3 +682,59 @@ for (const s of body.shapes) {
 ```
 
 **Gotcha:** The constructor order is `(elasticity, dynamicFriction, staticFriction, density, rollingFriction)` — elasticity comes **first**, not friction. This differs from some other engines.
+
+---
+
+## Performance Profiling
+
+Visualise per-step timing and entity counts with the built-in performance overlay.
+
+### Quick overlay (Canvas)
+
+```typescript
+import { PerformanceOverlay } from "nape-js/profiler";
+
+// Attaches a canvas overlay to the page (auto-creates canvas if omitted)
+const overlay = new PerformanceOverlay(space, {
+  position: "top-right", // "top-left" | "top-right" | "bottom-left" | "bottom-right"
+  width: 260,
+  showGraph: true,       // rolling step-time graph (120 frames)
+  showBreakdown: true,   // broadphase / narrowphase / solver / CCD / sleep bar
+  showCounters: true,    // body / contact / constraint counts
+});
+
+// In your game loop, after space.step():
+function update() {
+  space.step(1 / 60);
+  overlay.update();
+}
+```
+
+### Headless / custom metrics (no DOM)
+
+```typescript
+// Enable profiling without the overlay
+space.profilerEnabled = true;
+
+function update() {
+  space.step(1 / 60);
+
+  const m = space.metrics;
+  console.log(
+    `step ${m.totalStepTime.toFixed(2)}ms ` +
+    `(broad ${m.broadphaseTime.toFixed(2)} / narrow ${m.narrowphaseTime.toFixed(2)} / ` +
+    `velSolve ${m.velocitySolverTime.toFixed(2)} / posSolve ${m.positionSolverTime.toFixed(2)} / ` +
+    `ccd ${m.ccdTime.toFixed(2)} / sleep ${m.sleepTime.toFixed(2)})`,
+  );
+  console.log(
+    `bodies ${m.bodyCount} (dyn ${m.dynamicBodyCount}, sleep ${m.sleepingBodyCount}) ` +
+    `contacts ${m.contactCount} constraints ${m.constraintCount}`,
+  );
+}
+```
+
+**Key points:**
+- `PerformanceOverlay` auto-enables `space.profilerEnabled` — no extra setup needed
+- Metrics are **zero-allocation** (reused object, no GC pressure)
+- The overlay respects HiDPI (`devicePixelRatio`) automatically
+- When `profilerEnabled = false` (default), timing instrumentation is skipped — zero overhead in production
