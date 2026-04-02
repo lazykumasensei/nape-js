@@ -20,6 +20,7 @@ Each recipe shows the minimal working code and explains the "why" behind key dec
 - [Sensor / Trigger Zone](#sensor--trigger-zone)
 - [Collision Filtering](#collision-filtering)
 - [Explosion Impulse](#explosion-impulse)
+- [Voronoi Fracture (Destruction)](#voronoi-fracture-destruction)
 - [Conveyor Belt](#conveyor-belt)
 - [Breakable Constraint](#breakable-constraint)
 - [Soft Constraint (Spring-Like)](#soft-constraint-spring-like)
@@ -440,6 +441,66 @@ explode(space, new Vec2(400, 300), 200, 5000);
 ```
 
 **Gotcha:** nape-js has `applyImpulse()`, not `applyForce()`. Impulse is instantaneous (velocity change), force is continuous (applied per step).
+
+---
+
+## Voronoi Fracture (Destruction)
+
+Shatter a body into Voronoi fragments on impact. Works with any convex polygon shape.
+
+```typescript
+import { fractureBody } from "@newkrok/nape-js";
+
+// Fracture a body at the impact point
+const result = fractureBody(body, impactPoint, {
+  fragmentCount: 6,       // number of pieces (default: 8)
+  explosionImpulse: 30,   // radial blast force in px/s (default: 0)
+});
+
+// result.fragments — array of new Body instances (already in space)
+// result.originalBody — the original body (removed from space)
+result.fragments.forEach((f) => {
+  f.userData._breakable = f.shapes.at(0).area >= 300; // re-fracture only large pieces
+});
+```
+
+**Collision-triggered fracture** — use an `InteractionListener` to fracture on impact:
+
+```typescript
+import { CbType, CbEvent, InteractionType, InteractionListener } from "@newkrok/nape-js";
+
+const cbProjectile = new CbType();
+const cbBreakable = new CbType();
+
+// Tag bodies
+projectile.cbTypes.add(cbProjectile);
+wall.cbTypes.add(cbBreakable);
+
+space.listeners.add(new InteractionListener(
+  CbEvent.BEGIN,
+  InteractionType.COLLISION,
+  cbProjectile,
+  cbBreakable,
+  (cb) => {
+    const b1 = cb.int1.castBody ?? cb.int1.castShape?.body;
+    const b2 = cb.int2.castBody ?? cb.int2.castShape?.body;
+    if (!b1 || !b2) return;
+    const target = b1.userData._breakable ? b1 : b2;
+    const mx = (b1.position.x + b2.position.x) / 2;
+    const my = (b1.position.y + b2.position.y) / 2;
+    // Defer to avoid modifying space during callback
+    setTimeout(() => {
+      if (target.space) fractureBody(target, Vec2.get(mx, my), { fragmentCount: 4 });
+    }, 0);
+  },
+));
+```
+
+**Gotchas:**
+- `fractureBody` only works on **polygon** shapes (not circles/capsules).
+- Always `setTimeout` the fracture call inside listeners — modifying the space during a collision callback throws.
+- Fragments inherit the original body's velocity and rotation. Set `explosionImpulse` > 0 for a blast effect.
+- For deterministic results (multiplayer), pass a seeded `random: () => number` function in options.
 
 ---
 

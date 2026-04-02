@@ -88,6 +88,12 @@ function update() {
 - [Geom](https://newkrok.github.io/nape-js/api/classes/Geom.html): Static utilities — distance queries, ray tests, polygon operations
 - [MarchingSquares](https://newkrok.github.io/nape-js/api/classes/MarchingSquares.html): Contour extraction from scalar fields
 
+## Destruction / Fracture
+
+- [fractureBody](https://newkrok.github.io/nape-js/api/functions/fractureBody.html): Shatter a polygon body into Voronoi fragments — `fractureBody(body, impactPoint, { fragmentCount?, explosionImpulse?, random? })`
+- [computeVoronoi](https://newkrok.github.io/nape-js/api/functions/computeVoronoi.html): Raw Voronoi diagram computation from point set
+- [generateFractureSites](https://newkrok.github.io/nape-js/api/functions/generateFractureSites.html): Generate random fracture site points within a polygon
+
 ## Enums
 
 - [BodyType](https://newkrok.github.io/nape-js/api/classes/BodyType.html): STATIC, DYNAMIC, KINEMATIC
