@@ -265,6 +265,37 @@ v.dispose(); // return to pool when done
 
 ---
 
+## Simulation is slow / how to find the bottleneck
+
+Use the built-in performance profiler to identify which phase is eating time.
+
+```typescript
+import { PerformanceOverlay } from "nape-js/profiler";
+
+// Quick visual overlay
+const overlay = new PerformanceOverlay(space, { position: "top-right" });
+
+// Or headless: enable metrics and read them programmatically
+space.profilerEnabled = true;
+space.step(1 / 60);
+const m = space.metrics;
+console.log(`broadphase: ${m.broadphaseTime}ms, narrowphase: ${m.narrowphaseTime}ms`);
+```
+
+**Common bottlenecks and fixes:**
+
+| Bottleneck | Symptom | Fix |
+|---|---|---|
+| Broadphase | `broadphaseTime` high, many bodies | Switch broadphase strategy (`SweepAndPrune` → `DynamicAABBTree` or `SpatialHashGrid`) |
+| Narrowphase | `narrowphaseTime` high | Too many overlapping shapes — simplify geometry, use collision filtering |
+| Velocity solver | `velocitySolverTime` high | Reduce solver iterations: `space.step(dt, 8, 8)` instead of default 10 |
+| Sleeping bodies low | `sleepingBodyCount` near 0 | Ensure sleep is enabled — resting bodies should auto-sleep to save CPU |
+| Too many contacts | `contactCount` very high | Use `InteractionFilter` bit masks to skip unnecessary collisions |
+
+See the [Cookbook — Performance Profiling](./cookbook.md#performance-profiling) recipe for full setup.
+
+---
+
 ## Deterministic mode doesn't produce identical results across browsers
 
 **This is expected.** nape-js provides "soft" determinism — identical results

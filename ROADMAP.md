@@ -2,7 +2,7 @@
 
 ## Completed Items
 
-Done: P21-P28, P30-P33, P35, P37-P43, P45-P48, P50-P55, P57, P63, P66.
+Done: P21-P28, P30-P33, P35, P37-P43, P45-P48, P50-P55, P57, P63, P66, P68.
 Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — superseded by P52), P49 (ECS adapter — trivial pattern).
 
 ---
@@ -46,7 +46,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | #   | Priority                                 | Effort | Impact          | Why                                                                                                                                                                                                                              |
 | --- | ---------------------------------------- | ------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P61 | **Bundle size reduction**                | S-M    | competitiveness | Close the 87 KB vs Phaser Box2D 65 KB gap. Dead code audit, hot path optimization                                                                                                                                                |
-| P68 | **Performance profiler / debug overlay** | S      | DX              | Runtime profiler: broadphase/narrowphase/solver time, body/contact/constraint count, sleep statistics, bottleneck highlighting. Rapier has one, we don't. Builds trust with professional developers                                |
+| P68 | ~~Performance profiler / debug overlay~~ | S      | DX              | :white_check_mark: **Done.** `PerformanceOverlay` + `PhysicsMetrics` in `nape-js/profiler`. Canvas overlay with rolling graph, phase breakdown bar, entity counters. `space.profilerEnabled` + `space.metrics` API.               |
 | P69 | **Deterministic replay system**          | M      | features        | Input recording + playback on top of existing serialization + deterministic mode. Debug bug reproduction, multiplayer rollback foundation, shareable replays, deterministic regression tests — one feature that connects many others |
 
 ---
@@ -73,7 +73,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 ### Phase 4 — Polish & tooling
 
 10. **P62** — Particle system
-11. **P68** — Performance profiler
+11. ~~**P68** — Performance profiler~~ :white_check_mark: Done
 12. **P69** — Deterministic replay system
 13. **P61** — Bundle size reduction
 14. **P29** — Continue test coverage push toward 80%
