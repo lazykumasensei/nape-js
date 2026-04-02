@@ -9,8 +9,8 @@ const FRAG_COLORS = [
   "#ff7b72", "#ffa657", "#79c0ff", "#d2a8ff", "#7ee787", "#f0883e",
 ];
 
-let blastRadius = 300;
-let fragmentCount = 10;
+let blastRadius = 90;
+let fragmentCount = 3;
 
 function createBreakableBox(space, x, y, w, h, colorIdx) {
   const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
@@ -62,10 +62,11 @@ function doFracture(clickX, clickY, space) {
         explosionImpulse: 150,
       });
 
-      // Color the fragments
+      // Color the fragments — only allow re-fracture above a minimum size
+      const MIN_BREAKABLE_AREA = 350;
       result.fragments.forEach((f, i) => {
         f.userData._colorIdx = (baseColor + i) % FRAG_COLORS.length;
-        f.userData._breakable = true; // fragments can be re-fractured!
+        f.userData._breakable = f.shapes.at(0).area >= MIN_BREAKABLE_AREA;
         f.userData._fragment = true;
       });
     } catch {
@@ -119,11 +120,11 @@ export default {
 
   wheel(deltaY) {
     blastRadius = Math.max(50, Math.min(500, blastRadius + deltaY * 0.5));
-    fragmentCount = Math.max(4, Math.min(20, Math.round(blastRadius / 30)));
+    fragmentCount = Math.max(3, Math.min(20, Math.round(blastRadius / 30)));
   },
 
-  // Custom render: show blast radius circle and fragment outlines
-  render(ctx, space, W, H, showOutlines, camX, camY) {
+  // Overlay: show blast radius circle (bodies are drawn by the default renderer)
+  render3dOverlay(ctx, space, W, H) {
     // Blast radius indicator follows the mouse — stored via hover
     if (this._mouseX != null) {
       ctx.beginPath();
@@ -147,7 +148,8 @@ const space = new Space(new Vec2(0, 600));
 
 addWalls();
 
-let blastRadius = 300, fragmentCount = 10;
+let blastRadius = 90, fragmentCount = 3;
+const MIN_BREAKABLE_AREA = 350;
 
 // Build a wall of breakable boxes
 const bw = 70, bh = 50;
@@ -191,7 +193,7 @@ canvasWrap.addEventListener("click", (e) => {
         explosionImpulse: 150,
       });
       result.fragments.forEach((f) => {
-        f.userData._breakable = true;
+        f.userData._breakable = f.shapes.at(0).area >= MIN_BREAKABLE_AREA;
       });
     } catch {}
   }
@@ -211,7 +213,8 @@ const space = new Space(new Vec2(0, 600));
 
 addWalls();
 
-let blastRadius = 300, fragmentCount = 10;
+let blastRadius = 90, fragmentCount = 3;
+const MIN_BREAKABLE_AREA = 350;
 
 const bw = 70, bh = 50;
 const cols = 7, rows = 5;
@@ -253,7 +256,7 @@ app.canvas.addEventListener("click", (e) => {
         explosionImpulse: 150,
       });
       result.fragments.forEach((f) => {
-        f.userData._breakable = true;
+        f.userData._breakable = f.shapes.at(0).area >= MIN_BREAKABLE_AREA;
       });
     } catch {}
   }
