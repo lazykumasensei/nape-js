@@ -334,7 +334,8 @@ export function generateCodePen(demo, adapterId) {
 
   return {
     title: `nape-js — ${demo.label ?? demo.id}${suffix}`,
-    description: `Interactive physics demo using nape-js TypeScript wrapper.\nhttps://github.com/NewKrok/nape-js`,
+    description: `Interactive physics demo powered by nape-js, a fully typed TypeScript 2D physics engine.\nhttps://github.com/NewKrok/nape-js`,
+    tags: ["nape-js", "physics", "2d-physics", "typescript", "gamedev"],
     html: template.html,
     css: CODEPEN_CSS,
     js: template.buildJS(code),
