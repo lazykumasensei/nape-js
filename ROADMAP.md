@@ -39,7 +39,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | --- | ------------------------------- | ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P62 | **Particle system**             | S-M    | features          | Physics-aware particle emitter — a frequently requested feature by gamedevs                                                                                                                                                                       |
 | P64 | **Spring/Damper joint**         | S      | features          | Missing basic constraint. Soft-body, vehicle suspension, ragdoll hair, UI animations all want springs. Currently only solvable via UserConstraint                                                                                                  |
-| P67 | **Destruction/Fracture system** | M      | :fire: wow-factor | Voronoi-based fracturing — `Body.fracture(impactPoint, energy)` API. No other JS engine does this. Already have `createConcaveBody` and `destructible-terrain` demo as a foundation. Visually impressive, great for marketing                      |
+| P67 | **Destruction/Fracture system** | M      | :fire: wow-factor | Voronoi-based fracturing — `fractureBody(body, point, opts)` API. No other JS engine does this. Demos: **Voronoi Fracture** (click-to-shatter) and **Slingshot Siege** (slingshot + breakable castle with chain-reaction fracture). Visually impressive, great for marketing |
 
 ### Tooling & Infrastructure
 

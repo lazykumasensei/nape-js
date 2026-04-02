@@ -1476,6 +1476,47 @@ const bodyArray = space.bodies.toArray();
 
 ---
 
+## Destruction / Fracture
+
+Voronoi-based body fracture system — unique among JS physics engines.
+
+### fractureBody(body, impactPoint, options?)
+
+Shatters a polygon body into Voronoi-generated fragments.
+
+```typescript
+import { fractureBody } from "@newkrok/nape-js";
+
+const result = fractureBody(body, impactPoint, {
+  fragmentCount: 6,        // number of Voronoi fragments (default: 8)
+  explosionImpulse: 30,    // radial blast impulse in px/s (default: 0)
+  material: myMaterial,    // override fragment material (default: original body's)
+  filter: myFilter,        // collision filter for fragments
+  addToSpace: true,        // auto-add fragments to space (default: true)
+  random: Math.random,     // custom RNG for deterministic fracture
+  sites: customPoints,     // pre-computed Voronoi sites (body-local coords)
+});
+
+result.fragments;     // Body[] — new fragment bodies
+result.originalBody;  // Body — original (removed from space when addToSpace=true)
+```
+
+### computeVoronoi(points, bounds)
+
+Raw Voronoi diagram computation. Returns `VoronoiResult` with `cells` array.
+
+### generateFractureSites(vertices, count, random?)
+
+Generate random points inside a polygon for use as Voronoi sites.
+
+**Gotchas:**
+- Only works on **polygon** shapes (circles/capsules throw).
+- Must `setTimeout` fracture calls inside collision listeners — modifying the space during a callback throws.
+- Fragments inherit the original body's velocity. Use `explosionImpulse > 0` for blast scatter.
+- Pass a seeded `random` for deterministic multiplayer.
+
+---
+
 ## Common Patterns
 
 ### Adding Bodies to Space
@@ -1632,6 +1673,9 @@ import {
   Constraint, PivotJoint, DistanceJoint,
   AngleJoint, WeldJoint, MotorJoint,
   LineJoint, PulleyJoint,
+
+  // Destruction / Fracture
+  fractureBody, computeVoronoi, generateFractureSites,
 
   // Utilities
   NapeList, VERSION

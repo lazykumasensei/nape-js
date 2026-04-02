@@ -108,6 +108,14 @@ export {
   type MoveResult,
 } from "./helpers/CharacterController";
 export { TriggerZone, type TriggerZoneOptions, type TriggerHandler } from "./helpers/TriggerZone";
+export { fractureBody, type FractureOptions, type FractureResult } from "./helpers/fractureBody";
+export {
+  computeVoronoi,
+  generateFractureSites,
+  type VoronoiPoint,
+  type VoronoiCell,
+  type VoronoiResult,
+} from "./geom/Voronoi";
 
 // List/Iterator registration (side-effect import — registers all typed list pairs)
 import "./util/registerLists";
