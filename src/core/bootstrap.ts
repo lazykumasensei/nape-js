@@ -113,6 +113,8 @@ import { PulleyJoint } from "../constraint/PulleyJoint";
 import { ZPP_PulleyJoint } from "../native/constraint/ZPP_PulleyJoint";
 import { WeldJoint } from "../constraint/WeldJoint";
 import { ZPP_WeldJoint } from "../native/constraint/ZPP_WeldJoint";
+import { SpringJoint } from "../constraint/SpringJoint";
+import { ZPP_SpringJoint } from "../native/constraint/ZPP_SpringJoint";
 import { UserConstraint } from "../constraint/UserConstraint";
 
 // --- Lists / iterators ---
@@ -217,6 +219,7 @@ ZPP_MotorJoint._createFn = (...args: any[]) => new (MotorJoint as any)(...args);
 ZPP_PivotJoint._createFn = (...args: any[]) => new (PivotJoint as any)(...args);
 ZPP_PulleyJoint._createFn = (...args: any[]) => new (PulleyJoint as any)(...args);
 ZPP_WeldJoint._createFn = (...args: any[]) => new (WeldJoint as any)(...args);
+ZPP_SpringJoint._createFn = (...args: any[]) => new (SpringJoint as any)(...args);
 nape.constraint.UserConstraint = UserConstraint;
 
 // (ZPP list backing classes register themselves via the side-effect imports above)

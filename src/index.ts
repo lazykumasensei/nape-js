@@ -79,6 +79,7 @@ export { WeldJoint } from "./constraint/WeldJoint";
 export { MotorJoint } from "./constraint/MotorJoint";
 export { LineJoint } from "./constraint/LineJoint";
 export { PulleyJoint } from "./constraint/PulleyJoint";
+export { SpringJoint } from "./constraint/SpringJoint";
 export { UserConstraint } from "./constraint/UserConstraint";
 
 // Utilities

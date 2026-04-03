@@ -49,6 +49,7 @@ import characterController from "./demos/character-controller.js?v=3.22.1";
 import triggerZones        from "./demos/trigger-zones.js?v=3.22.1";
 import fracture            from "./demos/fracture.js?v=3.22.1";
 import slingshot           from "./demos/slingshot.js?v=3.22.1";
+import springJoint         from "./demos/spring-joint.js?v=3.22.1";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -65,6 +66,7 @@ const ALL_DEMOS = [
   triggerZones,
   fracture,
   slingshot,
+  springJoint,
 ];
 
 const CW = 900;
