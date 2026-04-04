@@ -28,7 +28,7 @@ function drawSpring(ctx, x1, y1, x2, y2, color = '#d29922', coils = 8, amp = 5) 
 // ── Constants ──────────────────────────────────────────────────────────────
 const WHEEL_OFFSET_X = 38;
 const CHASSIS_H = 16;
-const MOTOR_RATE = 10;
+const MOTOR_RATE = 13;
 const WORLD_W = 4000;
 
 // ── Module-level refs ──────────────────────────────────────────────────────
@@ -102,9 +102,18 @@ export default {
     // Car spawn
     const cx = 200, cy = groundY - 80;
 
-    // Car body (chassis)
+    // Car body (chassis) — pickup truck silhouette
     const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-    chassis.shapes.add(new Polygon(Polygon.box(80, CHASSIS_H)));
+    // Flatbed (full width, lower)
+    chassis.shapes.add(new Polygon(Polygon.box(90, 10)));
+    // Cabin (front half, taller)
+    chassis.shapes.add(new Polygon(
+      [new Vec2(5, -18), new Vec2(45, -18), new Vec2(45, -5), new Vec2(5, -5)],
+    ));
+    // Hood (sloped front)
+    chassis.shapes.add(new Polygon(
+      [new Vec2(35, -10), new Vec2(48, -5), new Vec2(35, -5)],
+    ));
     try { chassis.userData._colorIdx = 0; } catch(_) {}
     chassis.space = space;
 
@@ -275,9 +284,11 @@ for (let i = 0; i < Math.ceil(W / segW); i++) {
 const cx = W / 2 - 60, cy = groundY - 80;
 const offX = 38, chassisH = 16;
 
-// Car body
+// Car body — pickup truck
 const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-chassis.shapes.add(new Polygon(Polygon.box(80, chassisH)));
+chassis.shapes.add(new Polygon(Polygon.box(90, 10)));
+chassis.shapes.add(new Polygon([new Vec2(5,-18), new Vec2(45,-18), new Vec2(45,-5), new Vec2(5,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(35,-10), new Vec2(48,-5), new Vec2(35,-5)]));
 chassis.space = space;
 
 // Wheels
@@ -301,7 +312,7 @@ new LineJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), new V
 // Motor (rate controlled by keyboard)
 const motor = new MotorJoint(chassis, rWheel, 0);
 motor.space = space;
-const RATE = 10;
+const RATE = 13;
 
 // Keyboard controls
 const keys = {};
@@ -352,9 +363,11 @@ for (let i = 0; i < Math.ceil(W / segW); i++) {
 const cx = W / 2 - 60, cy = groundY - 80;
 const offX = 38, chassisH = 16;
 
-// Car body
+// Car body — pickup truck
 const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-chassis.shapes.add(new Polygon(Polygon.box(80, chassisH)));
+chassis.shapes.add(new Polygon(Polygon.box(90, 10)));
+chassis.shapes.add(new Polygon([new Vec2(5,-18), new Vec2(45,-18), new Vec2(45,-5), new Vec2(5,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(35,-10), new Vec2(48,-5), new Vec2(35,-5)]));
 chassis.space = space;
 
 // Wheels
@@ -378,7 +391,7 @@ new LineJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), new V
 // Motor (rate controlled by keyboard)
 const motor = new MotorJoint(chassis, rWheel, 0);
 motor.space = space;
-const RATE = 10;
+const RATE = 13;
 
 const keys = {};
 window.addEventListener("keydown", (e) => {
