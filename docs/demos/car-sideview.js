@@ -70,24 +70,6 @@ function buildTerrain(space, worldW, groundY) {
     seg.space = space;
   }
 
-  // Ramps / obstacles scattered along the terrain
-  const obstacles = [
-    { x: 600, w: 50, h: 14 },
-    { x: 1100, w: 30, h: 20 },
-    { x: 1700, w: 60, h: 10 },
-    { x: 2300, w: 40, h: 18 },
-    { x: 2900, w: 50, h: 12 },
-    { x: 3500, w: 35, h: 22 },
-  ];
-  for (const { x, w, h } of obstacles) {
-    const surfY = groundY
-      + Math.sin(x * 0.008) * 30
-      + Math.sin(x * 0.02) * 12
-      + Math.sin(x * 0.05) * 5;
-    const ob = new Body(BodyType.STATIC, new Vec2(x, surfY - h / 2));
-    ob.shapes.add(new Polygon(Polygon.box(w, h)));
-    ob.space = space;
-  }
 }
 
 export default {
@@ -144,8 +126,8 @@ export default {
       new Vec2(WHEEL_OFFSET_X, CHASSIS_H / 2), new Vec2(0, 0),
       30,
     );
-    fSusp.frequency = 4;
-    fSusp.damping = 0.6;
+    fSusp.frequency = 2.5;
+    fSusp.damping = 0.4;
     fSusp.space = space;
 
     const rSusp = new SpringJoint(
@@ -153,8 +135,8 @@ export default {
       new Vec2(-WHEEL_OFFSET_X, CHASSIS_H / 2), new Vec2(0, 0),
       30,
     );
-    rSusp.frequency = 4;
-    rSusp.damping = 0.6;
+    rSusp.frequency = 2.5;
+    rSusp.damping = 0.4;
     rSusp.space = space;
 
     // LineJoints to constrain wheels to vertical travel
@@ -305,9 +287,9 @@ rWheel.space = space;
 
 // SpringJoint suspension
 const fSusp = new SpringJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), 30);
-fSusp.frequency = 4; fSusp.damping = 0.6; fSusp.space = space;
+fSusp.frequency = 2.5; fSusp.damping = 0.4; fSusp.space = space;
 const rSusp = new SpringJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), 30);
-rSusp.frequency = 4; rSusp.damping = 0.6; rSusp.space = space;
+rSusp.frequency = 2.5; rSusp.damping = 0.4; rSusp.space = space;
 
 // LineJoints — constrain wheels to vertical travel
 new LineJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
@@ -382,9 +364,9 @@ rWheel.space = space;
 
 // SpringJoint suspension
 const fSusp = new SpringJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), 30);
-fSusp.frequency = 4; fSusp.damping = 0.6; fSusp.space = space;
+fSusp.frequency = 2.5; fSusp.damping = 0.4; fSusp.space = space;
 const rSusp = new SpringJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), 30);
-rSusp.frequency = 4; rSusp.damping = 0.6; rSusp.space = space;
+rSusp.frequency = 2.5; rSusp.damping = 0.4; rSusp.space = space;
 
 // LineJoints — constrain wheels to vertical travel
 new LineJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
