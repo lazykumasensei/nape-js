@@ -25,19 +25,22 @@ function drawSpring(ctx, x1, y1, x2, y2, color = '#d29922', coils = 8, amp = 5) 
   ctx.stroke();
 }
 
-// Module-level refs for rendering
+// Module-level refs
 let _chassis = null;
 let _fWheel = null;
 let _rWheel = null;
+let _rMotor = null;
 const WHEEL_OFFSET_X = 38;
 const CHASSIS_H = 16;
+const MOTOR_RATE = 8;
+const keys = {};
 
 export default {
   id: "car-sideview",
   label: "2D Car — Side View",
   featured: false,
   tags: ["SpringJoint", "LineJoint", "MotorJoint"],
-  desc: "A car with SpringJoint suspension and LineJoint-constrained wheels. Click to spawn obstacles.",
+  desc: "A car with SpringJoint suspension and LineJoint-constrained wheels. Use <b>← →</b> arrow keys or tap left/right to drive.",
   walls: false,
 
   setup(space, W, H) {
@@ -107,20 +110,47 @@ export default {
       new Vec2(0, 1), -5, 40,
     ).space = space;
 
-    // Motor on rear wheel
-    new MotorJoint(chassis, rWheel, -6).space = space;
+    // Motor on rear wheel (rate controlled in step)
+    _rMotor = new MotorJoint(chassis, rWheel, 0);
+    _rMotor.space = space;
 
     _chassis = chassis;
     _fWheel = fWheel;
     _rWheel = rWheel;
+
+    // Keyboard controls
+    window.addEventListener("keydown", (e) => {
+      keys[e.code] = true;
+      if (e.code === "ArrowLeft" || e.code === "ArrowRight") e.preventDefault();
+    });
+    window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+  },
+
+  step(space, W, H) {
+    if (!_rMotor) return;
+    const left = keys["ArrowLeft"] || keys["KeyA"] || keys._touchLeft;
+    const right = keys["ArrowRight"] || keys["KeyD"] || keys._touchRight;
+    if (right) {
+      _rMotor.rate = -MOTOR_RATE;
+    } else if (left) {
+      _rMotor.rate = MOTOR_RATE;
+    } else {
+      _rMotor.rate = 0;
+    }
   },
 
   click(x, y, space, W, H) {
-    const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-    const sz = 10 + Math.random() * 20;
-    b.shapes.add(new Polygon(Polygon.box(sz, sz)));
-    try { b.userData._colorIdx = Math.floor(Math.random() * 6); } catch(_) {}
-    b.space = space;
+    // Touch: left half = drive left, right half = drive right
+    if (x < W / 2) {
+      keys._touchLeft = true;
+    } else {
+      keys._touchRight = true;
+    }
+  },
+
+  release() {
+    keys._touchLeft = false;
+    keys._touchRight = false;
   },
 
   render(ctx, space, W, H, debugDraw) {
@@ -213,20 +243,30 @@ rSusp.frequency = 4; rSusp.damping = 0.6; rSusp.space = space;
 new LineJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
 new LineJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
 
-// Motor
-new MotorJoint(chassis, rWheel, -6).space = space;
+// Motor (rate controlled by keyboard)
+const motor = new MotorJoint(chassis, rWheel, 0);
+motor.space = space;
+const RATE = 8;
 
-// Click to spawn obstacles
-canvasWrap.addEventListener("click", (e) => {
-  const r = canvas.getBoundingClientRect();
-  const x = e.clientX - r.left, y = e.clientY - r.top;
-  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-  const sz = 10 + Math.random() * 20;
-  b.shapes.add(new Polygon(Polygon.box(sz, sz)));
-  b.space = space;
+// Keyboard + touch controls
+const keys = {};
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (e.code === "ArrowLeft" || e.code === "ArrowRight") e.preventDefault();
 });
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+canvas.addEventListener("pointerdown", (e) => {
+  const r = canvas.getBoundingClientRect();
+  if ((e.clientX - r.left) < r.width / 2) keys._touchLeft = true;
+  else keys._touchRight = true;
+});
+canvas.addEventListener("pointerup", () => { keys._touchLeft = false; keys._touchRight = false; });
 
 function loop() {
+  const left = keys["ArrowLeft"] || keys["KeyA"] || keys._touchLeft;
+  const right = keys["ArrowRight"] || keys["KeyD"] || keys._touchRight;
+  motor.rate = right ? -RATE : left ? RATE : 0;
+
   space.step(1 / 60, 8, 3);
   ctx.clearRect(0, 0, W, H);
   drawGrid();
@@ -285,10 +325,23 @@ rSusp.frequency = 4; rSusp.damping = 0.6; rSusp.space = space;
 new LineJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
 new LineJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
 
-// Motor
-new MotorJoint(chassis, rWheel, -6).space = space;
+// Motor (rate controlled by keyboard)
+const motor = new MotorJoint(chassis, rWheel, 0);
+motor.space = space;
+const RATE = 8;
+
+const keys = {};
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (e.code === "ArrowLeft" || e.code === "ArrowRight") e.preventDefault();
+});
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
 function loop() {
+  const left = keys["ArrowLeft"] || keys["KeyA"];
+  const right = keys["ArrowRight"] || keys["KeyD"];
+  motor.rate = right ? -RATE : left ? RATE : 0;
+
   space.step(1 / 60, 8, 3);
   drawGrid();
   drawConstraintLines();
