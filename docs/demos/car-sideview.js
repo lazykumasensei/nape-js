@@ -102,17 +102,23 @@ export default {
     // Car spawn
     const cx = 200, cy = groundY - 80;
 
-    // Car body (chassis) — pickup truck silhouette
+    // Car body (chassis) — pickup truck silhouette (facing right)
     const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-    // Flatbed (full width, lower)
-    chassis.shapes.add(new Polygon(Polygon.box(90, 10)));
-    // Cabin (front half, taller)
+    // Undercarriage (full-width base)
     chassis.shapes.add(new Polygon(
-      [new Vec2(5, -18), new Vec2(45, -18), new Vec2(45, -5), new Vec2(5, -5)],
+      [new Vec2(-48, 0), new Vec2(48, 0), new Vec2(48, 7), new Vec2(-48, 7)],
     ));
-    // Hood (sloped front)
+    // Hood / engine bay (front-right, low)
     chassis.shapes.add(new Polygon(
-      [new Vec2(35, -10), new Vec2(48, -5), new Vec2(35, -5)],
+      [new Vec2(12, -10), new Vec2(46, -8), new Vec2(46, 0), new Vec2(12, 0)],
+    ));
+    // Cabin (tall box with sloped windshield)
+    chassis.shapes.add(new Polygon(
+      [new Vec2(-10, -26), new Vec2(14, -26), new Vec2(18, -10), new Vec2(-10, -10)],
+    ));
+    // Bed / cargo area (rear-left, low)
+    chassis.shapes.add(new Polygon(
+      [new Vec2(-46, -12), new Vec2(-10, -12), new Vec2(-10, 0), new Vec2(-46, 0)],
     ));
     try { chassis.userData._colorIdx = 0; } catch(_) {}
     chassis.space = space;
@@ -284,11 +290,12 @@ for (let i = 0; i < Math.ceil(W / segW); i++) {
 const cx = W / 2 - 60, cy = groundY - 80;
 const offX = 38, chassisH = 16;
 
-// Car body — pickup truck
+// Car body — pickup truck (facing right)
 const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-chassis.shapes.add(new Polygon(Polygon.box(90, 10)));
-chassis.shapes.add(new Polygon([new Vec2(5,-18), new Vec2(45,-18), new Vec2(45,-5), new Vec2(5,-5)]));
-chassis.shapes.add(new Polygon([new Vec2(35,-10), new Vec2(48,-5), new Vec2(35,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(-48,0), new Vec2(48,0), new Vec2(48,7), new Vec2(-48,7)]));
+chassis.shapes.add(new Polygon([new Vec2(12,-10), new Vec2(46,-8), new Vec2(46,0), new Vec2(12,0)]));
+chassis.shapes.add(new Polygon([new Vec2(-10,-26), new Vec2(14,-26), new Vec2(18,-10), new Vec2(-10,-10)]));
+chassis.shapes.add(new Polygon([new Vec2(-46,-12), new Vec2(-10,-12), new Vec2(-10,0), new Vec2(-46,0)]));
 chassis.space = space;
 
 // Wheels
@@ -363,11 +370,12 @@ for (let i = 0; i < Math.ceil(W / segW); i++) {
 const cx = W / 2 - 60, cy = groundY - 80;
 const offX = 38, chassisH = 16;
 
-// Car body — pickup truck
+// Car body — pickup truck (facing right)
 const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-chassis.shapes.add(new Polygon(Polygon.box(90, 10)));
-chassis.shapes.add(new Polygon([new Vec2(5,-18), new Vec2(45,-18), new Vec2(45,-5), new Vec2(5,-5)]));
-chassis.shapes.add(new Polygon([new Vec2(35,-10), new Vec2(48,-5), new Vec2(35,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(-48,0), new Vec2(48,0), new Vec2(48,7), new Vec2(-48,7)]));
+chassis.shapes.add(new Polygon([new Vec2(12,-10), new Vec2(46,-8), new Vec2(46,0), new Vec2(12,0)]));
+chassis.shapes.add(new Polygon([new Vec2(-10,-26), new Vec2(14,-26), new Vec2(18,-10), new Vec2(-10,-10)]));
+chassis.shapes.add(new Polygon([new Vec2(-46,-12), new Vec2(-10,-12), new Vec2(-10,0), new Vec2(-46,0)]));
 chassis.space = space;
 
 // Wheels
