@@ -205,6 +205,9 @@ export default {
   },
 
   render(ctx, space, W, H, debugDraw, camX, camY) {
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
     drawGrid(ctx, W, H, camX, camY);
 
     // Draw all bodies
@@ -217,16 +220,16 @@ export default {
       const cos = Math.cos(ca), sin = Math.sin(ca);
       const offY = CHASSIS_H / 2;
 
-      // Front suspension spring visual
       const fax = cp.x + (WHEEL_OFFSET_X * cos - offY * sin);
       const fay = cp.y + (WHEEL_OFFSET_X * sin + offY * cos);
       drawSpring(ctx, fax, fay, _fWheel.position.x, _fWheel.position.y, '#d2992288', 5, 6);
 
-      // Rear suspension spring visual
       const rax = cp.x + (-WHEEL_OFFSET_X * cos - offY * sin);
       const ray = cp.y + (-WHEEL_OFFSET_X * sin + offY * cos);
       drawSpring(ctx, rax, ray, _rWheel.position.x, _rWheel.position.y, '#d2992288', 5, 6);
     }
+
+    ctx.restore();
   },
 
   code2d: `// 2D Car — side view with SpringJoint suspension
