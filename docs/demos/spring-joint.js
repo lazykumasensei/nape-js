@@ -1,5 +1,5 @@
 import {
-  Body, BodyType, Vec2, Circle, Polygon, PivotJoint, SpringJoint, LineJoint,
+  Body, BodyType, Vec2, Circle, Polygon, PivotJoint, SpringJoint,
 } from '../nape-js.esm.js';
 
 import { drawBody, drawGrid } from '../renderer.js';
@@ -56,7 +56,7 @@ export default {
   tags: ['SpringJoint', 'Spring', 'Damper', 'Soft-body'],
   featured: true,
   featuredOrder: 5,
-  desc: 'SpringJoint demo — spring chain, vehicle suspension, and soft-body blob. <b>Drag</b> any body to interact.',
+  desc: 'SpringJoint demo — spring chain and soft-body blob. <b>Drag</b> any body to interact.',
   walls: true,
 
   setup(space, W, H) {
@@ -72,16 +72,15 @@ export default {
 
     const T = 20; // wall thickness
 
-    // Divider line (vertical at 1/3 and 2/3)
+    // Divider line (vertical at 1/2)
     const div = new Body(BodyType.STATIC);
-    const third = (W - 2 * T) / 3;
-    div.shapes.add(new Polygon(Polygon.rect(T + third - 0.5, T, 1, H - 2 * T)));
-    div.shapes.add(new Polygon(Polygon.rect(T + 2 * third - 0.5, T, 1, H - 2 * T)));
+    const half = (W - 2 * T) / 2;
+    div.shapes.add(new Polygon(Polygon.rect(T + half - 0.5, T, 1, H - 2 * T)));
     div.space = space;
 
-    // ── Section 1: Spring Chain (left third) ──────────────────────────────
+    // ── Section 1: Spring Chain (left half) ──────────────────────────────
     {
-      const cx = T + third / 2;
+      const cx = T + half / 2;
       const startY = 60;
       const links = 8;
       const linkDist = 30;
@@ -131,92 +130,9 @@ export default {
       _sections.chain = { bodies, anchor };
     }
 
-    // ── Section 2: Vehicle Suspension (middle third) ──────────────────────
+    // ── Section 2: Soft-body Blob (right half) ──────────────────────────
     {
-      const cx = T + third + third / 2;
-      const groundY = H - T - 40;
-
-      // Bumpy ground
-      const bumps = new Body(BodyType.STATIC);
-      for (let i = 0; i < 6; i++) {
-        const bx = T + third + 20 + i * (third - 40) / 6;
-        const bh = 8 + Math.sin(i * 1.3) * 10;
-        bumps.shapes.add(new Polygon(Polygon.rect(bx, groundY - bh, (third - 40) / 6 - 4, bh + 40)));
-      }
-      bumps.space = space;
-
-      // Car body (chassis)
-      const chassisW = 100;
-      const chassisH = 20;
-      const chassisY = groundY - 80;
-      const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, chassisY));
-      chassis.shapes.add(new Polygon(Polygon.box(chassisW, chassisH)));
-      try { chassis.userData._colorIdx = 4; } catch(_) {}
-      chassis.space = space;
-
-      // Two wheels
-      const wheelR = 14;
-      const wheelOffsetX = 38;
-      const wheelY = chassisY + 45;
-
-      const leftWheel = new Body(BodyType.DYNAMIC, new Vec2(cx - wheelOffsetX, wheelY));
-      leftWheel.shapes.add(new Circle(wheelR));
-      try { leftWheel.userData._colorIdx = 2; } catch(_) {}
-      leftWheel.space = space;
-
-      const rightWheel = new Body(BodyType.DYNAMIC, new Vec2(cx + wheelOffsetX, wheelY));
-      rightWheel.shapes.add(new Circle(wheelR));
-      try { rightWheel.userData._colorIdx = 2; } catch(_) {}
-      rightWheel.space = space;
-
-      // Suspension springs
-      const leftSuspension = new SpringJoint(
-        chassis, leftWheel,
-        new Vec2(-wheelOffsetX, chassisH / 2), new Vec2(0, 0),
-        30,
-      );
-      leftSuspension.frequency = 4;
-      leftSuspension.damping = 0.6;
-      leftSuspension.space = space;
-
-      const rightSuspension = new SpringJoint(
-        chassis, rightWheel,
-        new Vec2(wheelOffsetX, chassisH / 2), new Vec2(0, 0),
-        30,
-      );
-      rightSuspension.frequency = 4;
-      rightSuspension.damping = 0.6;
-      rightSuspension.space = space;
-
-      // Line joints to constrain wheels to vertical travel only
-      const leftLine = new LineJoint(
-        chassis, leftWheel,
-        new Vec2(-wheelOffsetX, chassisH / 2), new Vec2(0, 0),
-        new Vec2(0, 1),  // vertical axis
-        -5, 40,
-      );
-      leftLine.space = space;
-
-      const rightLine = new LineJoint(
-        chassis, rightWheel,
-        new Vec2(wheelOffsetX, chassisH / 2), new Vec2(0, 0),
-        new Vec2(0, 1),  // vertical axis
-        -5, 40,
-      );
-      rightLine.space = space;
-
-      _sections.vehicle = {
-        chassis,
-        leftWheel,
-        rightWheel,
-        leftSuspension,
-        rightSuspension,
-      };
-    }
-
-    // ── Section 3: Soft-body Blob (right third) ──────────────────────────
-    {
-      const cx = T + 2 * third + third / 2;
+      const cx = T + half + half / 2;
       const cy = H / 2 - 20;
       const numPoints = 10;
       const radius = 50;
@@ -383,27 +299,6 @@ export default {
       drawPin(ctx, bodies[0].position.x, bodies[0].position.y);
     }
 
-    // Draw springs for vehicle suspension
-    if (_sections.vehicle) {
-      const { chassis, leftWheel, rightWheel } = _sections.vehicle;
-      const cp = chassis.position;
-      const ca = chassis.rotation;
-      const cos = Math.cos(ca), sin = Math.sin(ca);
-      const offX = 38, offY = 10;
-
-      // Left suspension spring visual
-      const lax = cp.x + (-offX * cos - offY * sin);
-      const lay = cp.y + (-offX * sin + offY * cos);
-      const lw = leftWheel.position;
-      drawSpring(ctx, lax, lay, lw.x, lw.y, '#d2992288', 5, 6);
-
-      // Right suspension spring visual
-      const rax = cp.x + (offX * cos - offY * sin);
-      const ray = cp.y + (offX * sin + offY * cos);
-      const rw = rightWheel.position;
-      drawSpring(ctx, rax, ray, rw.x, rw.y, '#d2992288', 5, 6);
-    }
-
     // Draw springs for soft-body blob
     if (_sections.blob) {
       const { center, bodies } = _sections.blob;
@@ -435,13 +330,12 @@ export default {
 
     // Section labels
     const T = 20;
-    const third = (W - 2 * T) / 3;
-    drawLabel(ctx, T + third / 2, 30, 'Spring Chain', '#ffffff88', 12);
-    drawLabel(ctx, T + third + third / 2, 30, 'Vehicle Suspension', '#ffffff88', 12);
-    drawLabel(ctx, T + 2 * third + third / 2, 30, 'Soft-body Blob', '#ffffff88', 12);
+    const half = (W - 2 * T) / 2;
+    drawLabel(ctx, T + half / 2, 30, 'Spring Chain', '#ffffff88', 12);
+    drawLabel(ctx, T + half + half / 2, 30, 'Soft-body Blob', '#ffffff88', 12);
   },
 
-  code2d: `// SpringJoint demo — chain, suspension, soft-body blob
+  code2d: `// SpringJoint demo — chain and soft-body blob
 const W = canvas.width, H = canvas.height;
 const space = new Space(new Vec2(0, 600));
 addWalls(space, W, H);
@@ -470,7 +364,7 @@ function drawSpring(x1, y1, x2, y2, color = '#58a6ff', coils = 10, amp = 5) {
 }
 
 // ── Section 1: Spring Chain (left) ──────────────────────────────────────
-const cx1 = W / 3 / 2;
+const cx1 = W / 4;
 const chainBodies = [];
 const anchor = new Body(BodyType.STATIC, new Vec2(cx1, 60));
 anchor.shapes.add(new Circle(5));
@@ -494,48 +388,17 @@ const bobS = new SpringJoint(prev, bob, new Vec2(0,0), new Vec2(0,0), 30);
 bobS.frequency = 6; bobS.damping = 0.4; bobS.space = space;
 chainBodies.push(bob);
 
-// ── Section 2: Vehicle Suspension (middle) ──────────────────────────────
-const cx2 = W / 2;
-const groundY = H - 60;
-
-const bumps = new Body(BodyType.STATIC);
-for (let i = 0; i < 6; i++) {
-  const bx = W / 3 + 20 + i * (W / 3 - 40) / 6;
-  const bh = 8 + Math.sin(i * 1.3) * 10;
-  bumps.shapes.add(new Polygon(Polygon.rect(bx, groundY - bh, (W/3-40)/6 - 4, bh + 40)));
-}
-bumps.space = space;
-
-const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx2, groundY - 80));
-chassis.shapes.add(new Polygon(Polygon.box(100, 20)));
-chassis.space = space;
-
-const lWheel = new Body(BodyType.DYNAMIC, new Vec2(cx2 - 38, groundY - 35));
-lWheel.shapes.add(new Circle(14));
-lWheel.space = space;
-const rWheel = new Body(BodyType.DYNAMIC, new Vec2(cx2 + 38, groundY - 35));
-rWheel.shapes.add(new Circle(14));
-rWheel.space = space;
-
-const lSusp = new SpringJoint(chassis, lWheel, new Vec2(-38, 10), new Vec2(0,0), 30);
-lSusp.frequency = 4; lSusp.damping = 0.6; lSusp.space = space;
-const rSusp = new SpringJoint(chassis, rWheel, new Vec2(38, 10), new Vec2(0,0), 30);
-rSusp.frequency = 4; rSusp.damping = 0.6; rSusp.space = space;
-
-new LineJoint(chassis, lWheel, new Vec2(-38,10), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
-new LineJoint(chassis, rWheel, new Vec2(38,10), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
-
-// ── Section 3: Soft-body Blob (right) ───────────────────────────────────
-const cx3 = W * 2 / 3 + W / 3 / 2;
-const cy3 = H / 2 - 20;
+// ── Section 2: Soft-body Blob (right) ───────────────────────────────────
+const cx2 = W * 3 / 4;
+const cy2 = H / 2 - 20;
 const blobBodies = [];
-const center = new Body(BodyType.DYNAMIC, new Vec2(cx3, cy3));
+const center = new Body(BodyType.DYNAMIC, new Vec2(cx2, cy2));
 center.shapes.add(new Circle(12));
 center.space = space;
 
 for (let i = 0; i < 10; i++) {
   const a = (i / 10) * Math.PI * 2;
-  const b = new Body(BodyType.DYNAMIC, new Vec2(cx3 + Math.cos(a)*50, cy3 + Math.sin(a)*50));
+  const b = new Body(BodyType.DYNAMIC, new Vec2(cx2 + Math.cos(a)*50, cy2 + Math.sin(a)*50));
   b.shapes.add(new Circle(8));
   b.space = space;
   blobBodies.push(b);
@@ -564,12 +427,6 @@ function loop() {
     const a = chainBodies[i].position, b = chainBodies[i+1].position;
     drawSpring(a.x, a.y, b.x, b.y, '#58a6ff88', 6, 4);
   }
-
-  // Suspension springs
-  const cp = chassis.position, ca = chassis.rotation;
-  const cos = Math.cos(ca), sin = Math.sin(ca);
-  drawSpring(cp.x+(-38*cos-10*sin), cp.y+(-38*sin+10*cos), lWheel.position.x, lWheel.position.y, '#d2992288', 5, 6);
-  drawSpring(cp.x+(38*cos-10*sin), cp.y+(38*sin+10*cos), rWheel.position.x, rWheel.position.y, '#d2992288', 5, 6);
 
   // Blob springs + membrane
   ctx.globalAlpha = 0.25;
