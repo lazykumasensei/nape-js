@@ -26,8 +26,8 @@ function drawSpring(ctx, x1, y1, x2, y2, color = '#d29922', coils = 8, amp = 5) 
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const WHEEL_OFFSET_X = 38;
-const CHASSIS_H = 16;
+const WHEEL_OFFSET_X = 44;
+const CHASSIS_H = 18;
 const MOTOR_RATE = 13;
 const WORLD_W = 4000;
 
@@ -102,29 +102,29 @@ export default {
     // Car spawn
     const cx = 200, cy = groundY - 80;
 
-    // Car body (chassis) — pickup truck, facing right
+    // Car body (chassis) — pickup truck, facing right (~1.15x)
     const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
     // Lower body — full-length base with rounded bumpers
     chassis.shapes.add(new Polygon([
-      new Vec2(-50, -4), new Vec2(50, -4),
-      new Vec2(52,  3), new Vec2(50,  8),
-      new Vec2(-50, 8), new Vec2(-52, 3),
+      new Vec2(-58, -5), new Vec2(58, -5),
+      new Vec2(60,  3),  new Vec2(58,  9),
+      new Vec2(-58, 9),  new Vec2(-60, 3),
     ]));
     // Cabin — tall section with sloped windshield and vertical rear
     chassis.shapes.add(new Polygon([
-      new Vec2(-18, -28), new Vec2(  4, -28),
-      new Vec2( 16, -12), new Vec2( 16,  -4),
-      new Vec2(-18,  -4),
+      new Vec2(-21, -32), new Vec2(  5, -32),
+      new Vec2( 18, -14), new Vec2( 18,  -5),
+      new Vec2(-21,  -5),
     ]));
     // Hood — tapers down from windshield base to front
     chassis.shapes.add(new Polygon([
-      new Vec2(16, -12), new Vec2(44, -8),
-      new Vec2(44,  -4), new Vec2(16, -4),
+      new Vec2(18, -14), new Vec2(51, -9),
+      new Vec2(51,  -5), new Vec2(18, -5),
     ]));
     // Bed — low cargo area behind cabin
     chassis.shapes.add(new Polygon([
-      new Vec2(-46, -14), new Vec2(-18, -14),
-      new Vec2(-18,  -4), new Vec2(-46,  -4),
+      new Vec2(-53, -16), new Vec2(-21, -16),
+      new Vec2(-21,  -5), new Vec2(-53,  -5),
     ]));
     try { chassis.userData._colorIdx = 0; } catch(_) {}
     chassis.space = space;
@@ -294,14 +294,14 @@ for (let i = 0; i < Math.ceil(W / segW); i++) {
 }
 
 const cx = W / 2 - 60, cy = groundY - 80;
-const offX = 38, chassisH = 16;
+const offX = 44, chassisH = 18;
 
 // Car body — pickup truck (facing right)
 const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-chassis.shapes.add(new Polygon([new Vec2(-50,-4),new Vec2(50,-4),new Vec2(52,3),new Vec2(50,8),new Vec2(-50,8),new Vec2(-52,3)]));
-chassis.shapes.add(new Polygon([new Vec2(-18,-28),new Vec2(4,-28),new Vec2(16,-12),new Vec2(16,-4),new Vec2(-18,-4)]));
-chassis.shapes.add(new Polygon([new Vec2(16,-12),new Vec2(44,-8),new Vec2(44,-4),new Vec2(16,-4)]));
-chassis.shapes.add(new Polygon([new Vec2(-46,-14),new Vec2(-18,-14),new Vec2(-18,-4),new Vec2(-46,-4)]));
+chassis.shapes.add(new Polygon([new Vec2(-58,-5),new Vec2(58,-5),new Vec2(60,3),new Vec2(58,9),new Vec2(-58,9),new Vec2(-60,3)]));
+chassis.shapes.add(new Polygon([new Vec2(-21,-32),new Vec2(5,-32),new Vec2(18,-14),new Vec2(18,-5),new Vec2(-21,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(18,-14),new Vec2(51,-9),new Vec2(51,-5),new Vec2(18,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(-53,-16),new Vec2(-21,-16),new Vec2(-21,-5),new Vec2(-53,-5)]));
 chassis.space = space;
 
 // Wheels
@@ -374,14 +374,14 @@ for (let i = 0; i < Math.ceil(W / segW); i++) {
 }
 
 const cx = W / 2 - 60, cy = groundY - 80;
-const offX = 38, chassisH = 16;
+const offX = 44, chassisH = 18;
 
 // Car body — pickup truck (facing right)
 const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-chassis.shapes.add(new Polygon([new Vec2(-50,-4),new Vec2(50,-4),new Vec2(52,3),new Vec2(50,8),new Vec2(-50,8),new Vec2(-52,3)]));
-chassis.shapes.add(new Polygon([new Vec2(-18,-28),new Vec2(4,-28),new Vec2(16,-12),new Vec2(16,-4),new Vec2(-18,-4)]));
-chassis.shapes.add(new Polygon([new Vec2(16,-12),new Vec2(44,-8),new Vec2(44,-4),new Vec2(16,-4)]));
-chassis.shapes.add(new Polygon([new Vec2(-46,-14),new Vec2(-18,-14),new Vec2(-18,-4),new Vec2(-46,-4)]));
+chassis.shapes.add(new Polygon([new Vec2(-58,-5),new Vec2(58,-5),new Vec2(60,3),new Vec2(58,9),new Vec2(-58,9),new Vec2(-60,3)]));
+chassis.shapes.add(new Polygon([new Vec2(-21,-32),new Vec2(5,-32),new Vec2(18,-14),new Vec2(18,-5),new Vec2(-21,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(18,-14),new Vec2(51,-9),new Vec2(51,-5),new Vec2(18,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(-53,-16),new Vec2(-21,-16),new Vec2(-21,-5),new Vec2(-53,-5)]));
 chassis.space = space;
 
 // Wheels
