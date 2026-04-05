@@ -24,6 +24,7 @@ Each recipe shows the minimal working code and explains the "why" behind key dec
 - [Conveyor Belt](#conveyor-belt)
 - [Breakable Constraint](#breakable-constraint)
 - [Soft Constraint (Spring-Like)](#soft-constraint-spring-like)
+- [Constraint Reference — Which Joint to Use](#constraint-reference--which-joint-to-use)
 - [Serialization (Save / Load)](#serialization-save--load)
 - [Binary Snapshot (Multiplayer)](#binary-snapshot-multiplayer)
 - [Web Worker Off-Thread Physics](#web-worker-off-thread-physics)
@@ -570,6 +571,73 @@ joint.space = space;
 ```
 
 **Key point:** This works on **any** constraint type (PivotJoint, AngleJoint, WeldJoint, etc.) — not just DistanceJoint. Set `stiff = false`, then tune `frequency` and `damping`.
+
+---
+
+## Constraint Reference — Which Joint to Use
+
+nape-js has 8 built-in constraint types. Each constrains a different degree of freedom between two bodies.
+
+### Quick reference
+
+| Constraint | What it does | Typical use |
+|---|---|---|
+| **PivotJoint** | Pins two bodies at a shared world point (removes 2 translational DOFs) | Hinges, ragdoll joints, pin-to-world anchors |
+| **WeldJoint** | Pins two bodies at a point AND locks relative rotation | Rigid attachment, gluing pieces together |
+| **DistanceJoint** | Constrains the distance between two anchor points to a `[min, max]` range | Ropes, chains, rods, tethers |
+| **SpringJoint** | Continuously pulls/pushes two anchors toward a `restLength` using Hooke's law | Suspension, soft-bodies, bouncy connections |
+| **LineJoint** | Constrains one body to slide along an axis defined on the other body | Pistons, sliders, guided rails |
+| **AngleJoint** | Constrains the relative rotation between two bodies to a `[min, max]` range | Rotation limits on ragdoll limbs, turrets |
+| **MotorJoint** | Drives relative angular velocity at a target `rate` with a gear `ratio` | Wheels, motors, conveyor rollers |
+| **PulleyJoint** | Couples the distance of two body pairs so that `d1 + ratio * d2 ≤ maxDist` | Pulleys, counterweights, elevators |
+
+### DistanceJoint vs SpringJoint
+
+These two are often confused because both relate to distance between bodies.
+
+**DistanceJoint** is a _constraint_ — it enforces a distance range `[min, max]`. If the bodies are within range, the joint does nothing. Think of it as a rope with a fixed length.
+
+**SpringJoint** is a _force generator_ — it always applies force proportional to how far the current distance is from `restLength` (Hooke's law). It oscillates and bounces. Think of it as a coil spring.
+
+```typescript
+// Rope: keeps bodies between 50–150 apart, otherwise limp
+const rope = new DistanceJoint(a, b, v0, v0, 50, 150);
+
+// Spring: always pulls toward rest length 100, oscillates
+const spring = new SpringJoint(a, b, v0, v0, 100);
+spring.frequency = 4;  // Hz — how fast it oscillates
+spring.damping = 0.3;  // 0 = bouncy forever, 1 = no overshoot
+```
+
+**When to choose which:**
+- Fixed length / slack rope → `DistanceJoint`
+- Bungee / oscillation / soft-body mesh → `SpringJoint`
+- Vehicle suspension → `SpringJoint` + `LineJoint` (spring handles vertical force, line joint prevents lateral drift)
+
+### Softening any constraint
+
+Every constraint (except SpringJoint which is always soft) has a `stiff` flag. Setting `stiff = false` with `frequency` and `damping` adds spring-like compliance:
+
+```typescript
+const pivot = new PivotJoint(bodyA, bodyB, anchorA, anchorB);
+pivot.stiff = false;
+pivot.frequency = 4;   // Hz
+pivot.damping = 0.5;
+```
+
+This is useful for soft ragdolls, squishy hinges, or damped connections — but it's a different mechanism than `SpringJoint`. Soft constraints still enforce their geometric rule (e.g. shared point for PivotJoint), just with spring-like error correction. `SpringJoint` applies Hooke's law force with no geometric constraint at all.
+
+### Common patterns
+
+| Pattern | Constraints used |
+|---|---|
+| Ragdoll limbs | `PivotJoint` + `AngleJoint` (limit rotation range) |
+| Rope / chain | `PivotJoint` per link, or `DistanceJoint` between nodes |
+| Vehicle suspension | `SpringJoint` + `LineJoint` per wheel |
+| Driven wheel | `MotorJoint` (set `rate` to control speed) |
+| Elevator / counterweight | `PulleyJoint` with ratio |
+| Breakable connection | Any joint + check `isActive` / force magnitude, then remove |
+| Soft-body blob | Ring of `SpringJoint`s + cross-bracing `SpringJoint`s |
 
 ---
 

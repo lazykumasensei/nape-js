@@ -1,195 +1,433 @@
-import { Body, BodyType, Vec2, Circle, Polygon, Material, DistanceJoint, MotorJoint } from "../nape-js.esm.js";
+import { Body, BodyType, Vec2, Circle, Polygon, Material, SpringJoint, LineJoint, MotorJoint } from "../nape-js.esm.js";
+
+import { drawBody, drawGrid } from "../renderer.js";
+
+// ── Drawing helpers ────────────────────────────────────────────────────────
+function drawSpring(ctx, x1, y1, x2, y2, color = '#d29922', coils = 8, amp = 5) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 2) return;
+  const ux = dx / len, uy = dy / len;
+  const px = -uy, py = ux;
+  const n = coils * 2;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 + ux * len * 0.08, y1 + uy * len * 0.08);
+  for (let i = 1; i <= n; i++) {
+    const t = 0.08 + (i / n) * 0.84;
+    const sign = i % 2 === 0 ? 1 : -1;
+    ctx.lineTo(x1 + ux * len * t + px * amp * sign, y1 + uy * len * t + py * amp * sign);
+  }
+  ctx.lineTo(x2, y2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.stroke();
+}
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const WHEEL_OFFSET_X = 44;
+const CHASSIS_H = 18;
+const MOTOR_RATE = 13;
+const WORLD_W = 4000;
+
+// ── Module-level refs ──────────────────────────────────────────────────────
+let _chassis = null;
+let _fWheel = null;
+let _rWheel = null;
+let _rMotor = null;
+const keys = {};
+
+// ── Terrain generation ─────────────────────────────────────────────────────
+function buildTerrain(space, worldW, groundY) {
+  const segW = 40;
+  const numSegs = Math.ceil(worldW / segW);
+
+  for (let i = 0; i < numSegs; i++) {
+    const x = i * segW;
+
+    // Compose multiple sine waves for varied terrain
+    const y0 = groundY
+      + Math.sin(x * 0.008) * 30
+      + Math.sin(x * 0.02) * 12
+      + Math.sin(x * 0.05) * 5;
+    const x1 = x + segW;
+    const y1 = groundY
+      + Math.sin(x1 * 0.008) * 30
+      + Math.sin(x1 * 0.02) * 12
+      + Math.sin(x1 * 0.05) * 5;
+
+    // Build a quad from the two surface points down to a flat bottom
+    const bottom = groundY + 80;
+    const verts = [
+      new Vec2(x, y0),
+      new Vec2(x1, y1),
+      new Vec2(x1, bottom),
+      new Vec2(x, bottom),
+    ];
+    const seg = new Body(BodyType.STATIC);
+    seg.shapes.add(new Polygon(verts));
+    seg.space = space;
+  }
+
+}
 
 export default {
   id: "car-sideview",
   label: "2D Car — Side View",
   featured: false,
-  tags: ["PivotJoint", "MotorJoint", "DistanceJoint"],
-  desc: "A car with spring suspension and motor-driven wheels. Click to spawn obstacles.",
+  tags: ["SpringJoint", "LineJoint", "MotorJoint"],
+  desc: "A car with SpringJoint suspension on wavy terrain. Use <b>← →</b> arrow keys or tap left/right to drive.",
   walls: false,
+
+  camera: null,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);
 
-    // Ground with bumps
-    const ground = new Body(BodyType.STATIC, new Vec2(W / 2, H - 10));
-    ground.shapes.add(new Polygon(Polygon.box(W + 400, 20)));
-    ground.space = space;
+    const groundY = H - 40;
 
-    // Add ramp bumps
-    for (let i = 0; i < 5; i++) {
-      const bump = new Body(BodyType.STATIC, new Vec2(80 + i * 90, H - 25));
-      bump.shapes.add(new Polygon(Polygon.regular(8 + Math.random() * 8, 6 + Math.random() * 6, 3 + Math.floor(Math.random() * 4))));
-      bump.space = space;
-    }
+    // Build wavy terrain across full world width
+    buildTerrain(space, WORLD_W, groundY);
 
-    const cx = W / 2 - 60, cy = H - 80;
+    // Left / right world walls
+    const wallL = new Body(BodyType.STATIC, new Vec2(-10, H / 2));
+    wallL.shapes.add(new Polygon(Polygon.box(20, H * 2)));
+    wallL.space = space;
 
-    // Car body
-    const carBody = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-    carBody.shapes.add(new Polygon(Polygon.box(80, 16)));
-    try { carBody.userData._colorIdx = 0; } catch(_) {}
-    carBody.space = space;
+    const wallR = new Body(BodyType.STATIC, new Vec2(WORLD_W + 10, H / 2));
+    wallR.shapes.add(new Polygon(Polygon.box(20, H * 2)));
+    wallR.space = space;
+
+    // Car spawn
+    const cx = 200, cy = groundY - 80;
+
+    // Car body (chassis) — pickup truck, facing right (~1.15x)
+    const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
+    // Lower body — full-length base with rounded bumpers
+    chassis.shapes.add(new Polygon([
+      new Vec2(-58, -5), new Vec2(58, -5),
+      new Vec2(60,  3),  new Vec2(58,  9),
+      new Vec2(-58, 9),  new Vec2(-60, 3),
+    ]));
+    // Cabin — tall section with sloped windshield and vertical rear
+    chassis.shapes.add(new Polygon([
+      new Vec2(-21, -32), new Vec2(  5, -32),
+      new Vec2( 18, -14), new Vec2( 18,  -5),
+      new Vec2(-21,  -5),
+    ]));
+    // Hood — tapers down from windshield base to front
+    chassis.shapes.add(new Polygon([
+      new Vec2(18, -14), new Vec2(51, -9),
+      new Vec2(51,  -5), new Vec2(18, -5),
+    ]));
+    // Bed — low cargo area behind cabin
+    chassis.shapes.add(new Polygon([
+      new Vec2(-53, -16), new Vec2(-21, -16),
+      new Vec2(-21,  -5), new Vec2(-53,  -5),
+    ]));
+    try { chassis.userData._colorIdx = 0; } catch(_) {}
+    chassis.space = space;
 
     // Front wheel
-    const fWheel = new Body(BodyType.DYNAMIC, new Vec2(cx + 30, cy + 20));
+    const fWheel = new Body(BodyType.DYNAMIC, new Vec2(cx + WHEEL_OFFSET_X, cy + 45));
     fWheel.shapes.add(new Circle(14, undefined, new Material(0.8, 0.5, 0.5, 2)));
     try { fWheel.userData._colorIdx = 3; } catch(_) {}
     fWheel.space = space;
 
     // Rear wheel
-    const rWheel = new Body(BodyType.DYNAMIC, new Vec2(cx - 30, cy + 20));
+    const rWheel = new Body(BodyType.DYNAMIC, new Vec2(cx - WHEEL_OFFSET_X, cy + 45));
     rWheel.shapes.add(new Circle(14, undefined, new Material(0.8, 0.5, 0.5, 2)));
     try { rWheel.userData._colorIdx = 3; } catch(_) {}
     rWheel.space = space;
 
-    // Suspension (spring distance joints)
-    const fSusp = new DistanceJoint(carBody, fWheel, new Vec2(30, 8), new Vec2(0, 0), 10, 25);
-    fSusp.stiff = false;
-    fSusp.frequency = 4;
+    // SpringJoint suspension
+    const fSusp = new SpringJoint(
+      chassis, fWheel,
+      new Vec2(WHEEL_OFFSET_X, CHASSIS_H / 2), new Vec2(0, 0),
+      30,
+    );
+    fSusp.frequency = 2.5;
     fSusp.damping = 0.4;
     fSusp.space = space;
 
-    const rSusp = new DistanceJoint(carBody, rWheel, new Vec2(-30, 8), new Vec2(0, 0), 10, 25);
-    rSusp.stiff = false;
-    rSusp.frequency = 4;
+    const rSusp = new SpringJoint(
+      chassis, rWheel,
+      new Vec2(-WHEEL_OFFSET_X, CHASSIS_H / 2), new Vec2(0, 0),
+      30,
+    );
+    rSusp.frequency = 2.5;
     rSusp.damping = 0.4;
     rSusp.space = space;
 
-    // Motor on rear wheel
-    const rMotor = new MotorJoint(carBody, rWheel, -6);
-    rMotor.space = space;
+    // LineJoints to constrain wheels to vertical travel
+    new LineJoint(
+      chassis, fWheel,
+      new Vec2(WHEEL_OFFSET_X, CHASSIS_H / 2), new Vec2(0, 0),
+      new Vec2(0, 1), -5, 40,
+    ).space = space;
+
+    new LineJoint(
+      chassis, rWheel,
+      new Vec2(-WHEEL_OFFSET_X, CHASSIS_H / 2), new Vec2(0, 0),
+      new Vec2(0, 1), -5, 40,
+    ).space = space;
+
+    // Motor on rear wheel (rate controlled in step)
+    _rMotor = new MotorJoint(chassis, rWheel, 0);
+    _rMotor.space = space;
+
+    _chassis = chassis;
+    _fWheel = fWheel;
+    _rWheel = rWheel;
+
+    // Camera follows the chassis
+    this.camera = {
+      follow: chassis,
+      offsetX: 0,
+      offsetY: -20,
+      bounds: { minX: 0, minY: 0, maxX: WORLD_W, maxY: H + 200 },
+      lerp: 0.08,
+    };
+
+    // Keyboard controls
+    window.addEventListener("keydown", (e) => {
+      keys[e.code] = true;
+      if (e.code === "ArrowLeft" || e.code === "ArrowRight") e.preventDefault();
+    });
+    window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+  },
+
+  step(space, W, H) {
+    if (!_rMotor) return;
+    const left = keys["ArrowLeft"] || keys["KeyA"] || keys._touchLeft;
+    const right = keys["ArrowRight"] || keys["KeyD"] || keys._touchRight;
+    if (left) {
+      _rMotor.rate = -MOTOR_RATE;
+    } else if (right) {
+      _rMotor.rate = MOTOR_RATE;
+    } else {
+      _rMotor.rate = 0;
+    }
   },
 
   click(x, y, space, W, H) {
-    const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-    const sz = 10 + Math.random() * 20;
-    b.shapes.add(new Polygon(Polygon.box(sz, sz)));
-    try { b.userData._colorIdx = Math.floor(Math.random() * 6); } catch(_) {}
-    b.space = space;
+    // Touch: left half = drive left, right half = drive right
+    if (x < _chassis.position.x) {
+      keys._touchLeft = true;
+    } else {
+      keys._touchRight = true;
+    }
   },
 
-  code2d: `// 2D Car — side view with spring suspension
+  release() {
+    keys._touchLeft = false;
+    keys._touchRight = false;
+  },
+
+  render(ctx, space, W, H, debugDraw, camX, camY) {
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    drawGrid(ctx, W, H, camX, camY);
+
+    // Draw all bodies
+    for (const body of space.bodies) drawBody(ctx, body, debugDraw);
+
+    // Draw suspension springs
+    if (_chassis && _fWheel && _rWheel) {
+      const cp = _chassis.position;
+      const ca = _chassis.rotation;
+      const cos = Math.cos(ca), sin = Math.sin(ca);
+      const offY = CHASSIS_H / 2;
+
+      const fax = cp.x + (WHEEL_OFFSET_X * cos - offY * sin);
+      const fay = cp.y + (WHEEL_OFFSET_X * sin + offY * cos);
+      drawSpring(ctx, fax, fay, _fWheel.position.x, _fWheel.position.y, '#d2992288', 5, 6);
+
+      const rax = cp.x + (-WHEEL_OFFSET_X * cos - offY * sin);
+      const ray = cp.y + (-WHEEL_OFFSET_X * sin + offY * cos);
+      drawSpring(ctx, rax, ray, _rWheel.position.x, _rWheel.position.y, '#d2992288', 5, 6);
+    }
+
+    ctx.restore();
+  },
+
+  renderPixi(adapter, space, W, H, showOutlines, camX, camY) {
+    const { app } = adapter.getEngine();
+    if (!app) return;
+    adapter.syncBodies(space);
+    app.stage.x = -camX;
+    app.stage.y = -camY;
+    app.render();
+  },
+
+  code2d: `// 2D Car — side view with SpringJoint suspension
 const space = new Space(new Vec2(0, 600));
 const W = canvas.width, H = canvas.height;
 
-// Ground with bumps
-const ground = new Body(BodyType.STATIC, new Vec2(W / 2, H - 10));
-ground.shapes.add(new Polygon(Polygon.box(W + 400, 20)));
-ground.space = space;
-
-for (let i = 0; i < 5; i++) {
-  const bump = new Body(BodyType.STATIC, new Vec2(80 + i * 90, H - 25));
-  bump.shapes.add(new Polygon(Polygon.regular(8 + Math.random() * 8, 6 + Math.random() * 6, 3 + Math.floor(Math.random() * 4))));
-  bump.space = space;
+// Spring drawing helper
+function drawSpring(x1, y1, x2, y2, color = '#d29922', coils = 8, amp = 5) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 2) return;
+  const ux = dx / len, uy = dy / len;
+  const px = -uy, py = ux;
+  const n = coils * 2;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 + ux * len * 0.08, y1 + uy * len * 0.08);
+  for (let i = 1; i <= n; i++) {
+    const t = 0.08 + (i / n) * 0.84;
+    const sign = i % 2 === 0 ? 1 : -1;
+    ctx.lineTo(x1 + ux * len * t + px * amp * sign, y1 + uy * len * t + py * amp * sign);
+  }
+  ctx.lineTo(x2, y2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.stroke();
 }
 
-const cx = W / 2 - 60, cy = H - 80;
+// Wavy terrain
+const groundY = H - 40;
+const segW = 40;
+for (let i = 0; i < Math.ceil(W / segW); i++) {
+  const x = i * segW, x1 = x + segW;
+  const y0 = groundY + Math.sin(x*0.008)*30 + Math.sin(x*0.02)*12 + Math.sin(x*0.05)*5;
+  const y1g = groundY + Math.sin(x1*0.008)*30 + Math.sin(x1*0.02)*12 + Math.sin(x1*0.05)*5;
+  const bot = groundY + 80;
+  const seg = new Body(BodyType.STATIC);
+  seg.shapes.add(new Polygon([new Vec2(x,y0), new Vec2(x1,y1g), new Vec2(x1,bot), new Vec2(x,bot)]));
+  seg.space = space;
+}
 
-// Car body
-const carBody = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-carBody.shapes.add(new Polygon(Polygon.box(80, 16)));
-carBody.space = space;
+const cx = W / 2 - 60, cy = groundY - 80;
+const offX = 44, chassisH = 18;
 
-// Front wheel
-const fWheel = new Body(BodyType.DYNAMIC, new Vec2(cx + 30, cy + 20));
+// Car body — pickup truck (facing right)
+const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
+chassis.shapes.add(new Polygon([new Vec2(-58,-5),new Vec2(58,-5),new Vec2(60,3),new Vec2(58,9),new Vec2(-58,9),new Vec2(-60,3)]));
+chassis.shapes.add(new Polygon([new Vec2(-21,-32),new Vec2(5,-32),new Vec2(18,-14),new Vec2(18,-5),new Vec2(-21,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(18,-14),new Vec2(51,-9),new Vec2(51,-5),new Vec2(18,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(-53,-16),new Vec2(-21,-16),new Vec2(-21,-5),new Vec2(-53,-5)]));
+chassis.space = space;
+
+// Wheels
+const fWheel = new Body(BodyType.DYNAMIC, new Vec2(cx + offX, cy + 45));
 fWheel.shapes.add(new Circle(14, undefined, new Material(0.8, 0.5, 0.5, 2)));
 fWheel.space = space;
-
-// Rear wheel
-const rWheel = new Body(BodyType.DYNAMIC, new Vec2(cx - 30, cy + 20));
+const rWheel = new Body(BodyType.DYNAMIC, new Vec2(cx - offX, cy + 45));
 rWheel.shapes.add(new Circle(14, undefined, new Material(0.8, 0.5, 0.5, 2)));
 rWheel.space = space;
 
-// Spring suspension (soft distance joints)
-const fSusp = new DistanceJoint(carBody, fWheel, new Vec2(30, 8), new Vec2(0, 0), 10, 25);
-fSusp.stiff = false; fSusp.frequency = 4; fSusp.damping = 0.4;
-fSusp.space = space;
+// SpringJoint suspension
+const fSusp = new SpringJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), 30);
+fSusp.frequency = 2.5; fSusp.damping = 0.4; fSusp.space = space;
+const rSusp = new SpringJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), 30);
+rSusp.frequency = 2.5; rSusp.damping = 0.4; rSusp.space = space;
 
-const rSusp = new DistanceJoint(carBody, rWheel, new Vec2(-30, 8), new Vec2(0, 0), 10, 25);
-rSusp.stiff = false; rSusp.frequency = 4; rSusp.damping = 0.4;
-rSusp.space = space;
+// LineJoints — constrain wheels to vertical travel
+new LineJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
+new LineJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
 
-// Motor on rear wheel
-const rMotor = new MotorJoint(carBody, rWheel, -6);
-rMotor.space = space;
+// Motor (rate controlled by keyboard)
+const motor = new MotorJoint(chassis, rWheel, 0);
+motor.space = space;
+const RATE = 13;
 
-// Click to spawn obstacles
-canvasWrap.addEventListener("click", (e) => {
-  const r = canvas.getBoundingClientRect();
-  const x = e.clientX - r.left, y = e.clientY - r.top;
-  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-  const sz = 10 + Math.random() * 20;
-  b.shapes.add(new Polygon(Polygon.box(sz, sz)));
-  b.space = space;
+// Keyboard controls
+const keys = {};
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (e.code === "ArrowLeft" || e.code === "ArrowRight") e.preventDefault();
 });
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
 function loop() {
+  const left = keys["ArrowLeft"] || keys["KeyA"];
+  const right = keys["ArrowRight"] || keys["KeyD"];
+  motor.rate = left ? -RATE : right ? RATE : 0;
+
   space.step(1 / 60, 8, 3);
   ctx.clearRect(0, 0, W, H);
   drawGrid();
   drawConstraintLines();
   for (const body of space.bodies) drawBody(body);
+
+  // Suspension spring visuals
+  const cp = chassis.position, ca = chassis.rotation;
+  const cos = Math.cos(ca), sin = Math.sin(ca);
+  const oy = chassisH / 2;
+  drawSpring(cp.x+(offX*cos-oy*sin), cp.y+(offX*sin+oy*cos), fWheel.position.x, fWheel.position.y, '#d2992288', 5, 6);
+  drawSpring(cp.x+(-offX*cos-oy*sin), cp.y+(-offX*sin+oy*cos), rWheel.position.x, rWheel.position.y, '#d2992288', 5, 6);
+
   requestAnimationFrame(loop);
 }
 loop();`,
 
-  codePixi: `// 2D Car — side view with spring suspension
+  codePixi: `// 2D Car — side view with SpringJoint suspension
 const space = new Space(new Vec2(0, 600));
 
-// Ground with bumps
-const ground = new Body(BodyType.STATIC, new Vec2(W / 2, H - 10));
-ground.shapes.add(new Polygon(Polygon.box(W + 400, 20)));
-ground.space = space;
-
-for (let i = 0; i < 5; i++) {
-  const bump = new Body(BodyType.STATIC, new Vec2(80 + i * 90, H - 25));
-  bump.shapes.add(new Polygon(Polygon.regular(8 + Math.random() * 8, 6 + Math.random() * 6, 3 + Math.floor(Math.random() * 4))));
-  bump.space = space;
+// Wavy terrain
+const groundY = H - 40;
+const segW = 40;
+for (let i = 0; i < Math.ceil(W / segW); i++) {
+  const x = i * segW, x1 = x + segW;
+  const y0 = groundY + Math.sin(x*0.008)*30 + Math.sin(x*0.02)*12 + Math.sin(x*0.05)*5;
+  const y1g = groundY + Math.sin(x1*0.008)*30 + Math.sin(x1*0.02)*12 + Math.sin(x1*0.05)*5;
+  const bot = groundY + 80;
+  const seg = new Body(BodyType.STATIC);
+  seg.shapes.add(new Polygon([new Vec2(x,y0), new Vec2(x1,y1g), new Vec2(x1,bot), new Vec2(x,bot)]));
+  seg.space = space;
 }
 
-const cx = W / 2 - 60, cy = H - 80;
+const cx = W / 2 - 60, cy = groundY - 80;
+const offX = 44, chassisH = 18;
 
-// Car body
-const carBody = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-carBody.shapes.add(new Polygon(Polygon.box(80, 16)));
-carBody.space = space;
+// Car body — pickup truck (facing right)
+const chassis = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
+chassis.shapes.add(new Polygon([new Vec2(-58,-5),new Vec2(58,-5),new Vec2(60,3),new Vec2(58,9),new Vec2(-58,9),new Vec2(-60,3)]));
+chassis.shapes.add(new Polygon([new Vec2(-21,-32),new Vec2(5,-32),new Vec2(18,-14),new Vec2(18,-5),new Vec2(-21,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(18,-14),new Vec2(51,-9),new Vec2(51,-5),new Vec2(18,-5)]));
+chassis.shapes.add(new Polygon([new Vec2(-53,-16),new Vec2(-21,-16),new Vec2(-21,-5),new Vec2(-53,-5)]));
+chassis.space = space;
 
-// Front wheel
-const fWheel = new Body(BodyType.DYNAMIC, new Vec2(cx + 30, cy + 20));
+// Wheels
+const fWheel = new Body(BodyType.DYNAMIC, new Vec2(cx + offX, cy + 45));
 fWheel.shapes.add(new Circle(14, undefined, new Material(0.8, 0.5, 0.5, 2)));
 fWheel.space = space;
-
-// Rear wheel
-const rWheel = new Body(BodyType.DYNAMIC, new Vec2(cx - 30, cy + 20));
+const rWheel = new Body(BodyType.DYNAMIC, new Vec2(cx - offX, cy + 45));
 rWheel.shapes.add(new Circle(14, undefined, new Material(0.8, 0.5, 0.5, 2)));
 rWheel.space = space;
 
-// Spring suspension (soft distance joints)
-const fSusp = new DistanceJoint(carBody, fWheel, new Vec2(30, 8), new Vec2(0, 0), 10, 25);
-fSusp.stiff = false; fSusp.frequency = 4; fSusp.damping = 0.4;
-fSusp.space = space;
+// SpringJoint suspension
+const fSusp = new SpringJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), 30);
+fSusp.frequency = 2.5; fSusp.damping = 0.4; fSusp.space = space;
+const rSusp = new SpringJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), 30);
+rSusp.frequency = 2.5; rSusp.damping = 0.4; rSusp.space = space;
 
-const rSusp = new DistanceJoint(carBody, rWheel, new Vec2(-30, 8), new Vec2(0, 0), 10, 25);
-rSusp.stiff = false; rSusp.frequency = 4; rSusp.damping = 0.4;
-rSusp.space = space;
+// LineJoints — constrain wheels to vertical travel
+new LineJoint(chassis, fWheel, new Vec2(offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
+new LineJoint(chassis, rWheel, new Vec2(-offX, chassisH/2), new Vec2(0,0), new Vec2(0,1), -5, 40).space = space;
 
-// Motor on rear wheel
-const rMotor = new MotorJoint(carBody, rWheel, -6);
-rMotor.space = space;
+// Motor (rate controlled by keyboard)
+const motor = new MotorJoint(chassis, rWheel, 0);
+motor.space = space;
+const RATE = 13;
 
-// Click to spawn obstacles
-app.canvas.addEventListener("click", (e) => {
-  const r = app.canvas.getBoundingClientRect();
-  const sx = W / r.width, sy = H / r.height;
-  const x = (e.clientX - r.left) * sx, y = (e.clientY - r.top) * sy;
-  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-  const sz = 10 + Math.random() * 20;
-  b.shapes.add(new Polygon(Polygon.box(sz, sz)));
-  b.space = space;
+const keys = {};
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (e.code === "ArrowLeft" || e.code === "ArrowRight") e.preventDefault();
 });
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 
 function loop() {
+  const left = keys["ArrowLeft"] || keys["KeyA"];
+  const right = keys["ArrowRight"] || keys["KeyD"];
+  motor.rate = left ? -RATE : right ? RATE : 0;
+
   space.step(1 / 60, 8, 3);
   drawGrid();
   drawConstraintLines();

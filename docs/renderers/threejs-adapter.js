@@ -201,6 +201,13 @@ export class ThreeJSAdapter {
       mesh.rotation.z = -body.rotation;
     }
 
+    // Apply camera offset (follow target)
+    if (camX || camY) {
+      const camZ = this.#camera.position.z;
+      this.#camera.position.set(W / 2 + camX, -H / 2 - camY, camZ);
+      this.#camera.lookAt(W / 2 + camX, -H / 2 - camY, 0);
+    }
+
     this.#renderer.render(this.#scene, this.#camera);
 
     // 2D overlay

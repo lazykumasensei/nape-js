@@ -1,6 +1,6 @@
 import {
-  Body, BodyType, Vec2, Polygon,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, PulleyJoint,
+  Body, BodyType, Vec2, Polygon, Circle,
+  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, PulleyJoint, SpringJoint,
 } from '../nape-js.esm.js';
 
 import { drawBody, drawGrid } from '../renderer.js';
@@ -20,6 +20,7 @@ const COLORS = {
   pulley:   [3, 3],  // red
   angle:    [4, 4],  // purple
   motor:    [3, 3],  // red
+  spring:   [1, 2],  // yellow, green
 };
 
 function cellOrigin(col, row, W, H) {
@@ -101,10 +102,10 @@ let _dragY = 0;
 export default {
   id: 'constraints',
   label: 'Constraints Showcase',
-  tags: ['PivotJoint', 'DistanceJoint', 'AngleJoint', 'WeldJoint', 'MotorJoint', 'LineJoint', 'PulleyJoint'],
+  tags: ['PivotJoint', 'DistanceJoint', 'AngleJoint', 'WeldJoint', 'MotorJoint', 'LineJoint', 'PulleyJoint', 'SpringJoint'],
   featured: true,
   featuredOrder: 4,
-  desc: 'All 7 built-in constraint types in a 3×3 grid (original nape layout). <b>Drag</b> any body to feel how each constraint reacts.',
+  desc: 'All 8 built-in constraint types in a 3×3 grid. <b>Drag</b> any body to feel how each constraint reacts.',
   walls: true,
 
   // Body refs for constraint rendering
@@ -273,6 +274,33 @@ export default {
         3,
       ));
       this._bodies.motor = { b1, b2 };
+    }
+
+    // ── SpringJoint (col=2, row=2) ────────────────────────────────────────
+    {
+      const { cx, cy, top } = cellOrigin(2, 2, W, H);
+      const anchorY = top + SIZE + 8;
+
+      // Static ceiling anchor (small circle)
+      const pin = new Body(BodyType.STATIC, new Vec2(cx, anchorY));
+      pin.shapes.add(new Circle(4));
+      pin.space = space;
+
+      // Hanging body
+      const b = box(cx, cy + 10, false, COLORS.spring[1]);
+      const sj = new SpringJoint(
+        pin, b,
+        new Vec2(0, 0), new Vec2(0, -SIZE),
+        60,
+      );
+      sj.frequency = 3;
+      sj.damping = 0.3;
+      sj.space = space;
+
+      // Give it a nudge so it oscillates
+      b.applyImpulse(new Vec2(80, 0));
+
+      this._bodies.spring = { pin, b };
     }
 
     // Kinematic mouse body for dragging
@@ -519,6 +547,17 @@ export default {
       ctx.setLineDash([]);
     }
 
+    // SpringJoint: spring coil from anchor to body
+    if (this._bodies.spring) {
+      const { pin, b } = this._bodies.spring;
+      const cos = Math.cos(b.rotation), sin = Math.sin(b.rotation);
+      const ax = b.position.x + (-SIZE) * sin;
+      const ay = b.position.y - SIZE * cos;
+      drawSpring(ctx, pin.position.x, pin.position.y, ax, ay, '#3fb950');
+      drawPin(ctx, pin.position.x, pin.position.y, '#3fb950');
+      drawPin(ctx, ax, ay, '#3fb950');
+    }
+
     // ── Bodies ───────────────────────────────────────────────────────────
     for (const body of space.bodies) {
       if (body === _mouseBody) continue;
@@ -565,6 +604,7 @@ export default {
       { col: 2, row: 1, name: 'PulleyJoint', desc: 'pulley with ratio 2.5' },
       { col: 0, row: 2, name: 'AngleJoint', desc: 'linked rotation (ratio 2)' },
       { col: 1, row: 2, name: 'MotorJoint', desc: 'driven spin (ratio 3)' },
+      { col: 2, row: 2, name: 'SpringJoint', desc: 'soft spring + damper' },
     ];
     for (const { col, row, name, desc } of LABELS) {
       const c = cellOrigin(col, row, W, H);
@@ -697,6 +737,16 @@ export default {
       ctx.quadraticCurveTo(mx, my - 20, b2.position.x - r, b2.position.y);
       ctx.strokeStyle = '#f8514933'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
     }
+    // SpringJoint
+    if (this._bodies.spring) {
+      const { pin, b } = this._bodies.spring;
+      const cos = Math.cos(b.rotation), sin = Math.sin(b.rotation);
+      const ax = b.position.x + (-SIZE) * sin;
+      const ay = b.position.y - SIZE * cos;
+      drawSpring(ctx, pin.position.x, pin.position.y, ax, ay, '#3fb950');
+      drawPin(ctx, pin.position.x, pin.position.y, '#3fb950');
+      drawPin(ctx, ax, ay, '#3fb950');
+    }
 
     // Pinned markers
     if (this._pinnedBodies) {
@@ -727,6 +777,7 @@ export default {
       { col: 2, row: 1, name: 'PulleyJoint', desc: 'pulley with ratio 2.5' },
       { col: 0, row: 2, name: 'AngleJoint', desc: 'linked rotation (ratio 2)' },
       { col: 1, row: 2, name: 'MotorJoint', desc: 'driven spin (ratio 3)' },
+      { col: 2, row: 2, name: 'SpringJoint', desc: 'soft spring + damper' },
     ];
     for (const { col, row, name, desc } of LABELS) {
       const c = cellOrigin(col, row, W, H);
@@ -794,7 +845,16 @@ format(new AngleJoint(a1, a2, -Math.PI*1.5, Math.PI*1.5, 2));
 
 // MotorJoint — drives angular velocity
 const m1 = box(350, 500, true), m2 = box(450, 500, true);
-format(new MotorJoint(m1, m2, 10, 3));`,
+format(new MotorJoint(m1, m2, 10, 3));
+
+// SpringJoint — soft spring + damper
+const sPin = new Body(BodyType.STATIC, new Vec2(650, 420));
+sPin.shapes.add(new Circle(4));
+sPin.space = space;
+const sBody = box(650, 500);
+const sj = new SpringJoint(sPin, sBody, new Vec2(0,0), new Vec2(0,-14), 60);
+sj.frequency = 3; sj.damping = 0.3; sj.space = space;
+sBody.applyImpulse(new Vec2(80, 0));`,
 
   codePixi: `// Constraints Showcase — original nape layout (3×3 grid)
 const space = new Space(new Vec2(0, 600));
@@ -846,6 +906,15 @@ format(new AngleJoint(a1, a2, -Math.PI*1.5, Math.PI*1.5, 2));
 // MotorJoint — drives angular velocity
 const m1 = box(350, 500, true), m2 = box(450, 500, true);
 format(new MotorJoint(m1, m2, 10, 3));
+
+// SpringJoint — soft spring + damper
+const sPin2 = new Body(BodyType.STATIC, new Vec2(650, 420));
+sPin2.shapes.add(new Circle(4));
+sPin2.space = space;
+const sBody2 = box(650, 500);
+const sj2 = new SpringJoint(sPin2, sBody2, new Vec2(0,0), new Vec2(0,-14), 60);
+sj2.frequency = 3; sj2.damping = 0.3; sj2.space = space;
+sBody2.applyImpulse(new Vec2(80, 0));
 
 function loop() {
   space.step(1 / 60, 8, 3);

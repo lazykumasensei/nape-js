@@ -220,7 +220,7 @@ const TEMPLATES = {
     buildJS(code) {
       return `import {
   Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
+  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, SpringJoint,
   Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
   CharacterController, fractureBody,
@@ -243,7 +243,7 @@ ${code}`;
       return `import * as THREE from "${THREE_CDN}";
 import {
   Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
+  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, SpringJoint,
   Material, FluidProperties, InteractionFilter, InteractionGroup,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
   CharacterController, fractureBody,
@@ -261,7 +261,7 @@ ${code}`;
       return `import * as PIXI from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
 import {
   Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint,
+  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, SpringJoint,
   Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
   CharacterController, fractureBody,
