@@ -253,6 +253,23 @@ export default {
     ctx.restore();
   },
 
+  render3d(renderer, scene, camera, space, W, H, camX, camY) {
+    // Move Three.js camera to follow chassis
+    const camZ = camera.position.z;
+    camera.position.set(W / 2 + camX, -H / 2 - camY, camZ);
+    camera.lookAt(W / 2 + camX, -H / 2 - camY, 0);
+    renderer.render(scene, camera);
+  },
+
+  renderPixi(adapter, space, W, H, showOutlines, camX, camY) {
+    const { app } = adapter.getEngine();
+    if (!app) return;
+    adapter.syncBodies(space);
+    app.stage.x = -camX;
+    app.stage.y = -camY;
+    app.render();
+  },
+
   code2d: `// 2D Car — side view with SpringJoint suspension
 const space = new Space(new Vec2(0, 600));
 const W = canvas.width, H = canvas.height;
