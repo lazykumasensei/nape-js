@@ -253,14 +253,6 @@ export default {
     ctx.restore();
   },
 
-  render3d(renderer, scene, camera, space, W, H, camX, camY) {
-    // Move Three.js camera to follow chassis
-    const camZ = camera.position.z;
-    camera.position.set(W / 2 + camX, -H / 2 - camY, camZ);
-    camera.lookAt(W / 2 + camX, -H / 2 - camY, 0);
-    renderer.render(scene, camera);
-  },
-
   renderPixi(adapter, space, W, H, showOutlines, camX, camY) {
     const { app } = adapter.getEngine();
     if (!app) return;
