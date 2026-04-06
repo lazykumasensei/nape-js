@@ -18,7 +18,6 @@ import {
   PreListener,
   PreFlag,
   PivotJoint,
-  Material,
 } from "../../src";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -218,6 +217,7 @@ describe("Portal mechanics", () => {
       // This tests whether mid-step CbType addition works with PreListener
       // If this fails, it means PreListener cannot match CbTypes added mid-step
       // and we need to use PORTABLE for PreListener matching instead
+      expect(preFired).toBe(true);
     });
   });
 
@@ -226,9 +226,13 @@ describe("Portal mechanics", () => {
       const space = new Space(new Vec2(0, 400));
       const PORTABLE = new CbType();
 
-      let backShape: any;
       let preCount = 0;
       let ignoreCount = 0;
+
+      // Static wall
+      const wall = new Body(BodyType.STATIC);
+      const backShape = new Polygon(Polygon.box(200, 10));
+      wall.shapes.add(backShape);
 
       // Use PORTABLE on one side, ANY_BODY on the other
       const preL = new PreListener(InteractionType.COLLISION, PORTABLE, CbType.ANY_BODY, (cb) => {
@@ -243,11 +247,6 @@ describe("Portal mechanics", () => {
         return PreFlag.ACCEPT_ONCE;
       });
       preL.space = space;
-
-      // Static wall
-      const wall = new Body(BodyType.STATIC);
-      backShape = new Polygon(Polygon.box(200, 10));
-      wall.shapes.add(backShape);
       wall.position = new Vec2(200, 300);
       wall.space = space;
 
@@ -359,7 +358,17 @@ describe("Portal mechanics", () => {
 
       // Track which shapes are "in portal"
       const inPortal = new Set<any>();
-      let backShape: any;
+
+      // Static portal body
+      const portalBody = new Body(BodyType.STATIC);
+      // Large sensor extending upward
+      const sensor = new Polygon(Polygon.rect(-60, -50, 120, 60));
+      sensor.sensorEnabled = true;
+      sensor.cbTypes.add(PORTAL);
+      sensor.body = portalBody;
+      // Back shape (thin barrier) at the bottom of the sensor
+      const backShape = new Polygon(Polygon.rect(-60, 5, 120, 5));
+      backShape.body = portalBody;
 
       // Sensor listener: mark shape as in-portal
       const sensorBegin = new InteractionListener(
@@ -397,17 +406,6 @@ describe("Portal mechanics", () => {
         return PreFlag.ACCEPT_ONCE;
       });
       preL.space = space;
-
-      // Static portal body
-      const portalBody = new Body(BodyType.STATIC);
-      // Large sensor extending upward
-      const sensor = new Polygon(Polygon.rect(-60, -50, 120, 60));
-      sensor.sensorEnabled = true;
-      sensor.cbTypes.add(PORTAL);
-      sensor.body = portalBody;
-      // Back shape (thin barrier) at the bottom of the sensor
-      backShape = new Polygon(Polygon.rect(-60, 5, 120, 5));
-      backShape.body = portalBody;
       portalBody.position = new Vec2(200, 300);
       portalBody.space = space;
 
@@ -438,7 +436,17 @@ describe("Portal mechanics", () => {
 
       const inPortal = new Set<any>();
       let backIgnored = 0;
-      let backShape: any;
+
+      // Dynamic body with sensor + back (like cascade portal)
+      const portalBody = new Body(BodyType.DYNAMIC, new Vec2(200, 300));
+      // Large sensor extending in +x
+      const sensor = new Polygon(Polygon.rect(-5, -70, 40, 140));
+      sensor.sensorEnabled = true;
+      sensor.cbTypes.add(PORTAL);
+      sensor.body = portalBody;
+      // Back shape behind sensor
+      const backShape = new Polygon(Polygon.rect(-10, -70, 5, 140));
+      backShape.body = portalBody;
 
       const sBegin = new InteractionListener(
         CbEvent.BEGIN,
@@ -465,17 +473,6 @@ describe("Portal mechanics", () => {
         return PreFlag.ACCEPT_ONCE;
       });
       preL.space = space;
-
-      // Dynamic body with sensor + back (like cascade portal)
-      const portalBody = new Body(BodyType.DYNAMIC, new Vec2(200, 300));
-      // Large sensor extending in +x
-      const sensor = new Polygon(Polygon.rect(-5, -70, 40, 140));
-      sensor.sensorEnabled = true;
-      sensor.cbTypes.add(PORTAL);
-      sensor.body = portalBody;
-      // Back shape behind sensor
-      backShape = new Polygon(Polygon.rect(-10, -70, 5, 140));
-      backShape.body = portalBody;
       portalBody.space = space;
 
       // Pin the portal body
