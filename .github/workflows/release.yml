@@ -1,7 +1,9 @@
 name: Release & Publish to npm
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [master]
 
 permissions:
@@ -14,8 +16,11 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Skip runs triggered by the version bump commit (loop prevention)
-    if: "!startsWith(github.event.head_commit.message, 'release: v')"
+    # Only run when CI succeeded on a push event (not PRs), and skip release commits
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      !startsWith(github.event.workflow_run.head_commit.message, 'release: v')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -133,3 +138,17 @@ jobs:
               generate_release_notes: true,
             });
             console.log(`Created release: ${release.html_url}`);
+
+      # Trigger GitHub Pages deploy after successful release
+      - name: Deploy GitHub Pages
+        if: steps.bump.outputs.bump != 'none'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy-pages.yml',
+              ref: 'master',
+            });
+            console.log('Triggered GitHub Pages deploy');
