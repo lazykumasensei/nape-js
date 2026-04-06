@@ -66,4 +66,12 @@ for (const jsFile of ["app.js", "examples.js"]) {
   ]);
 }
 
+// --- codepen-templates.js: stamp CDN URL with explicit version ---
+stamp(resolve(docs, "codepen-templates.js"), [
+  [
+    /https:\/\/cdn\.jsdelivr\.net\/npm\/@newkrok\/nape-js(@[^/]*)?\/dist\/index\.js/g,
+    `https://cdn.jsdelivr.net/npm/@newkrok/nape-js@${version}/dist/index.js`,
+  ],
+]);
+
 console.log(`docs/ assets stamped with ?${v}`);

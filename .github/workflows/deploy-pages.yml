@@ -17,6 +17,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Only deploy on release version-bump commits or manual trigger.
+    # This prevents deploying with a stale version before npm publish completes.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message, 'release: v')
     steps:
       - uses: actions/checkout@v4
 
