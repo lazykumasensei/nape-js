@@ -71,6 +71,8 @@ const ALL_DEMOS = [
   portals,
 ];
 
+const gtag = window.gtag || function() {};
+
 const CW = 900;
 const CH = 500;
 
@@ -183,6 +185,7 @@ function createCard(demo, { onTagClick } = {}) {
     btn2d.classList.toggle("active", mode === "2d");
     btn3d.classList.toggle("active", mode === "3d");
     btnPixi.classList.toggle("active", mode === "pixi");
+    gtag("event", "click", { event_category: "render_mode", event_label: mode, demo: demo.id });
     await runner.setMode(adapterId);
     updateUrlForCard(demo.id, { mode: cardMode, outline: runner.debugDraw });
   });
@@ -254,11 +257,16 @@ function createCard(demo, { onTagClick } = {}) {
     fsBtn.title = expand ? "Exit fullscreen" : "Fullscreen";
     fsBtn.innerHTML = expand ? ICON_COLLAPSE : ICON_EXPAND;
     document.body.style.overflow = expand ? "hidden" : "";
+    // Clear any inline height left by renderer switching so the card
+    // falls back to the CSS aspect-ratio sizing when collapsed.
+    if (!expand) renderWrap.style.height = "";
   }
 
   fsBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    setExpanded(!isExpanded);
+    const expand = !isExpanded;
+    gtag("event", "click", { event_category: "demo_action", event_label: expand ? "fullscreen" : "exit_fullscreen", demo: demo.id });
+    setExpanded(expand);
   });
 
   document.addEventListener("keydown", (e) => {
@@ -312,6 +320,7 @@ function createCard(demo, { onTagClick } = {}) {
   codeToggle.addEventListener("click", async (e) => {
     e.stopPropagation();
     codePanel.hidden = !codePanel.hidden;
+    if (!codePanel.hidden) gtag("event", "click", { event_category: "code_action", event_label: "view_code", demo: demo.id });
     if (!codePanel.hidden && !rendered) {
       rendered = true;
       const source = getPreviewCode(demo, "canvas2d") ?? await fetch(`./demos/${demo.id}.js`).then(r => r.text());
@@ -329,6 +338,7 @@ function createCard(demo, { onTagClick } = {}) {
     codepenBtn.textContent = "CodePen";
     codepenBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      gtag("event", "click", { event_category: "code_action", event_label: "open_codepen", demo: demo.id });
       openInCodePen(demo);
     });
     btnGroup.appendChild(codepenBtn);
@@ -343,6 +353,7 @@ function createCard(demo, { onTagClick } = {}) {
   </svg>`;
   shareBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    gtag("event", "click", { event_category: "demo_action", event_label: "share", demo: demo.id });
     const params = new URLSearchParams();
     params.set("open", demo.id);
     if (cardMode === "3d") params.set("mode", "3d");
@@ -415,7 +426,10 @@ function createCard(demo, { onTagClick } = {}) {
   }
 
   overlay.addEventListener("pointerdown", (e) => e.stopPropagation());
-  overlay.addEventListener("click", startDemo);
+  overlay.addEventListener("click", () => {
+    gtag("event", "click", { event_category: "demo_play", event_label: demo.id });
+    startDemo();
+  });
 
   return {
     card, runner, overlay, statsBar, cardRef,
@@ -513,6 +527,7 @@ function buildTagBar() {
 
 function setActiveTag(tag) {
   activeTag = tag;
+  if (tag) gtag("event", "click", { event_category: "tag_filter", event_label: tag });
   if (tag && !tagsExpanded) {
     tagsExpanded = true;
     tagBar.classList.remove("collapsed");
@@ -551,9 +566,16 @@ function applyFilter() {
   }
 }
 
+let searchDebounce;
 searchEl.addEventListener("input", () => {
   searchQuery = searchEl.value;
   applyFilter();
+  clearTimeout(searchDebounce);
+  if (searchQuery.trim()) {
+    searchDebounce = setTimeout(() => {
+      gtag("event", "search", { event_category: "examples", search_term: searchQuery.trim() });
+    }, 800);
+  }
 });
 
 const cardEntries = [...ALL_DEMOS].reverse().map((demo) => {
@@ -596,6 +618,7 @@ document.getElementById("gridSizeToggle").addEventListener("click", (e) => {
   const btn = e.target.closest(".grid-size-btn");
   if (!btn) return;
   const size = btn.dataset.size;
+  gtag("event", "click", { event_category: "grid_size", event_label: size });
   document.querySelectorAll(".grid-size-btn").forEach(b => b.classList.toggle("active", b.dataset.size === size));
   grid.classList.toggle("size-small", size === "small");
   grid.classList.toggle("size-full",  size === "full");
