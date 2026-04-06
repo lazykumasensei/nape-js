@@ -7,7 +7,7 @@
  * a sensor portal, handled via the Nape callbacks system.
  */
 import {
-  Body, BodyType, Vec2, Circle, Polygon,
+  Body, BodyType, Vec2, Circle, Polygon, Capsule,
   PivotJoint, UserConstraint,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
 } from "../nape-js.esm.js";
@@ -733,24 +733,26 @@ export default {
     // Portal body (static) — add all shapes BEFORE adding to space
     const portalBody = new Body(BodyType.STATIC);
 
-    // X-layout: 4 portals (offset 35px from walls so back-faces don't overlap wall shapes)
+    // X-layout: 4 portals (pulled inward for tighter layout)
     // Portal A: top-left, direction RIGHT
-    const portalA = genPortal(120, new Vec2(35, 100), 0, portalBody);
+    const portalA = genPortal(120, new Vec2(200, 100), 0, portalBody);
     // Portal A target: bottom-right, direction LEFT
-    const portalA2 = genPortal(120, new Vec2(W - 35, H - 120), Math.PI, portalBody);
+    const portalA2 = genPortal(120, new Vec2(W - 200, H - 120), Math.PI, portalBody);
     // Portal B: bottom-left, direction RIGHT
-    const portalB = genPortal(120, new Vec2(35, H - 120), 0, portalBody);
+    const portalB = genPortal(120, new Vec2(200, H - 120), 0, portalBody);
     // Portal B target: top-right, direction LEFT
-    const portalB2 = genPortal(120, new Vec2(W - 35, 100), Math.PI, portalBody);
+    const portalB2 = genPortal(120, new Vec2(W - 200, 100), Math.PI, portalBody);
 
     portalBody.space = space;
 
     portalA.target = portalA2; portalA2.target = portalA;
     portalB.target = portalB2; portalB2.target = portalB;
 
-    // Spawn initial shapes in the middle
-    for (let i = 0; i < 10; i++) {
-      spawnBall(space, W / 2 - 80 + (i % 5) * 40, H / 2 - 20 + Math.floor(i / 5) * 40, manager);
+    // Spawn initial shapes: 5 circles, 5 boxes, 5 capsules
+    for (let i = 0; i < 5; i++) {
+      spawnShape(space, W / 2 - 80 + i * 40, H / 2 - 60, "circle", manager);
+      spawnShape(space, W / 2 - 80 + i * 40, H / 2,      "box",     manager);
+      spawnShape(space, W / 2 - 80 + i * 40, H / 2 + 60,  "capsule", manager);
     }
 
     // Drag anchor
@@ -882,13 +884,18 @@ function loop() {
 loop();`,
 };
 
-function spawnBall(space, x, y, mgr) {
+let _spawnIdx = 0;
+const _shapeTypes = ["circle", "box", "capsule"];
+
+function spawnShape(space, x, y, type, mgr) {
   const body = new Body();
-  const r = 8 + Math.random() * 10;
-  if (Math.random() < 0.6) {
+  const r = 12;
+  if (type === "circle") {
     body.shapes.add(new Circle(r));
-  } else {
+  } else if (type === "box") {
     body.shapes.add(new Polygon(Polygon.box(r * 2, r * 2)));
+  } else {
+    body.shapes.add(new Capsule(r * 2.5, r * 1.4));
   }
   body.position = new Vec2(x, y);
   body.space = space;
