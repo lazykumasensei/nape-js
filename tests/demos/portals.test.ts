@@ -44,7 +44,9 @@ describe("Portal mechanics", () => {
         InteractionType.SENSOR,
         PORTAL,
         PORTABLE,
-        () => { beginFired = true; },
+        () => {
+          beginFired = true;
+        },
       );
       listener.space = space;
 
@@ -81,17 +83,17 @@ describe("Portal mechanics", () => {
         InteractionType.SENSOR,
         PORTAL,
         PORTABLE,
-        () => { events.push("sensor_begin"); },
+        () => {
+          events.push("sensor_begin");
+        },
       );
       sensorL.space = space;
 
       // PreListener for collisions involving PORTABLE
-      const preL = new PreListener(
-        InteractionType.COLLISION,
-        PORTABLE,
-        CbType.ANY_SHAPE,
-        () => { events.push("pre_collision"); return PreFlag.ACCEPT_ONCE; },
-      );
+      const preL = new PreListener(InteractionType.COLLISION, PORTABLE, CbType.ANY_SHAPE, () => {
+        events.push("pre_collision");
+        return PreFlag.ACCEPT_ONCE;
+      });
       preL.space = space;
 
       // Static body with both a sensor shape AND a solid shape
@@ -137,12 +139,10 @@ describe("Portal mechanics", () => {
       const MY_TYPE = new CbType();
       let preFired = false;
 
-      const preL = new PreListener(
-        InteractionType.COLLISION,
-        MY_TYPE,
-        CbType.ANY_SHAPE,
-        () => { preFired = true; return PreFlag.ACCEPT_ONCE; },
-      );
+      const preL = new PreListener(InteractionType.COLLISION, MY_TYPE, CbType.ANY_SHAPE, () => {
+        preFired = true;
+        return PreFlag.ACCEPT_ONCE;
+      });
       preL.space = space;
 
       // Two overlapping bodies
@@ -183,12 +183,10 @@ describe("Portal mechanics", () => {
       sensorL.space = space;
 
       // PreListener that matches PARTIAL
-      const preL = new PreListener(
-        InteractionType.COLLISION,
-        PARTIAL,
-        CbType.ANY_SHAPE,
-        () => { preFired = true; return PreFlag.ACCEPT_ONCE; },
-      );
+      const preL = new PreListener(InteractionType.COLLISION, PARTIAL, CbType.ANY_SHAPE, () => {
+        preFired = true;
+        return PreFlag.ACCEPT_ONCE;
+      });
       preL.space = space;
 
       // Portal body: sensor shape + solid shape overlapping
@@ -233,22 +231,17 @@ describe("Portal mechanics", () => {
       let ignoreCount = 0;
 
       // Use PORTABLE on one side, ANY_BODY on the other
-      const preL = new PreListener(
-        InteractionType.COLLISION,
-        PORTABLE,
-        CbType.ANY_BODY,
-        (cb) => {
-          preCount++;
-          // Use arbiter shapes for reliable reference equality
-          const as1 = cb.arbiter.shape1;
-          const as2 = cb.arbiter.shape2;
-          if (as1 === backShape || as2 === backShape) {
-            ignoreCount++;
-            return PreFlag.IGNORE_ONCE;
-          }
-          return PreFlag.ACCEPT_ONCE;
-        },
-      );
+      const preL = new PreListener(InteractionType.COLLISION, PORTABLE, CbType.ANY_BODY, (cb) => {
+        preCount++;
+        // Use arbiter shapes for reliable reference equality
+        const as1 = cb.arbiter.shape1;
+        const as2 = cb.arbiter.shape2;
+        if (as1 === backShape || as2 === backShape) {
+          ignoreCount++;
+          return PreFlag.IGNORE_ONCE;
+        }
+        return PreFlag.ACCEPT_ONCE;
+      });
       preL.space = space;
 
       // Static wall
@@ -267,7 +260,6 @@ describe("Portal mechanics", () => {
 
       stepN(space, 120);
 
-
       expect(preCount).toBeGreaterThan(0);
       expect(ignoreCount).toBeGreaterThan(0);
       expect(ball.position.y).toBeGreaterThan(300);
@@ -278,12 +270,10 @@ describe("Portal mechanics", () => {
       const PORTABLE = new CbType();
       let preFired = false;
 
-      const preL = new PreListener(
-        InteractionType.COLLISION,
-        PORTABLE,
-        CbType.ANY_BODY,
-        () => { preFired = true; return PreFlag.ACCEPT_ONCE; },
-      );
+      const preL = new PreListener(InteractionType.COLLISION, PORTABLE, CbType.ANY_BODY, () => {
+        preFired = true;
+        return PreFlag.ACCEPT_ONCE;
+      });
       preL.space = space;
 
       const b1 = new Body(BodyType.DYNAMIC, new Vec2(0, 0));
@@ -305,12 +295,10 @@ describe("Portal mechanics", () => {
       const PORTABLE = new CbType();
       let preFired = false;
 
-      const preL = new PreListener(
-        InteractionType.COLLISION,
-        PORTABLE,
-        CbType.ANY_SHAPE,
-        () => { preFired = true; return PreFlag.ACCEPT_ONCE; },
-      );
+      const preL = new PreListener(InteractionType.COLLISION, PORTABLE, CbType.ANY_SHAPE, () => {
+        preFired = true;
+        return PreFlag.ACCEPT_ONCE;
+      });
       preL.space = space;
 
       const b1 = new Body(BodyType.DYNAMIC, new Vec2(0, 0));
@@ -333,17 +321,12 @@ describe("Portal mechanics", () => {
 
       const shapes: any[] = [];
 
-      const preL = new PreListener(
-        InteractionType.COLLISION,
-        MY_TYPE,
-        CbType.ANY_SHAPE,
-        (cb) => {
-          const s1 = cb.swapped ? cb.int2.castShape : cb.int1.castShape;
-          const s2 = cb.swapped ? cb.int1.castShape : cb.int2.castShape;
-          shapes.push({ s1, s2 });
-          return PreFlag.ACCEPT_ONCE;
-        },
-      );
+      const preL = new PreListener(InteractionType.COLLISION, MY_TYPE, CbType.ANY_SHAPE, (cb) => {
+        const s1 = cb.swapped ? cb.int2.castShape : cb.int1.castShape;
+        const s2 = cb.swapped ? cb.int1.castShape : cb.int2.castShape;
+        shapes.push({ s1, s2 });
+        return PreFlag.ACCEPT_ONCE;
+      });
       preL.space = space;
 
       // Two overlapping bodies
@@ -402,22 +385,17 @@ describe("Portal mechanics", () => {
       sensorEnd.space = space;
 
       // PreListener: ignore back shape if ball is in portal
-      const preL = new PreListener(
-        InteractionType.COLLISION,
-        PORTABLE,
-        CbType.ANY_BODY,
-        (cb) => {
-          // Use arbiter shapes for reliable reference equality
-          const s1 = cb.arbiter.shape1;
-          const s2 = cb.arbiter.shape2;
-          const portable = inPortal.has(s1) ? s1 : inPortal.has(s2) ? s2 : null;
-          const other = portable === s1 ? s2 : s1;
-          if (portable && (other === backShape)) {
-            return PreFlag.IGNORE_ONCE;
-          }
-          return PreFlag.ACCEPT_ONCE;
-        },
-      );
+      const preL = new PreListener(InteractionType.COLLISION, PORTABLE, CbType.ANY_BODY, (cb) => {
+        // Use arbiter shapes for reliable reference equality
+        const s1 = cb.arbiter.shape1;
+        const s2 = cb.arbiter.shape2;
+        const portable = inPortal.has(s1) ? s1 : inPortal.has(s2) ? s2 : null;
+        const other = portable === s1 ? s2 : s1;
+        if (portable && other === backShape) {
+          return PreFlag.IGNORE_ONCE;
+        }
+        return PreFlag.ACCEPT_ONCE;
+      });
       preL.space = space;
 
       // Static portal body
@@ -463,29 +441,29 @@ describe("Portal mechanics", () => {
       let backShape: any;
 
       const sBegin = new InteractionListener(
-        CbEvent.BEGIN, InteractionType.SENSOR,
-        PORTAL, PORTABLE,
-        (cb) => { inPortal.add(cb.int2.castShape); },
+        CbEvent.BEGIN,
+        InteractionType.SENSOR,
+        PORTAL,
+        PORTABLE,
+        (cb) => {
+          inPortal.add(cb.int2.castShape);
+        },
       );
       sBegin.space = space;
 
       // PreListener using arbiter shapes
-      const preL = new PreListener(
-        InteractionType.COLLISION,
-        PORTABLE, CbType.ANY_BODY,
-        (cb) => {
-          const s1 = cb.arbiter.shape1;
-          const s2 = cb.arbiter.shape2;
-          if (s1 === backShape || s2 === backShape) {
-            const portable = s1 === backShape ? s2 : s1;
-            if (inPortal.has(portable)) {
-              backIgnored++;
-              return PreFlag.IGNORE_ONCE;
-            }
+      const preL = new PreListener(InteractionType.COLLISION, PORTABLE, CbType.ANY_BODY, (cb) => {
+        const s1 = cb.arbiter.shape1;
+        const s2 = cb.arbiter.shape2;
+        if (s1 === backShape || s2 === backShape) {
+          const portable = s1 === backShape ? s2 : s1;
+          if (inPortal.has(portable)) {
+            backIgnored++;
+            return PreFlag.IGNORE_ONCE;
           }
-          return PreFlag.ACCEPT_ONCE;
-        },
-      );
+        }
+        return PreFlag.ACCEPT_ONCE;
+      });
       preL.space = space;
 
       // Dynamic body with sensor + back (like cascade portal)
@@ -558,9 +536,13 @@ describe("Portal mechanics", () => {
 
       let sensorCount = 0;
       const sBegin = new InteractionListener(
-        CbEvent.BEGIN, InteractionType.SENSOR,
-        PORTAL, PORTABLE,
-        () => { sensorCount++; },
+        CbEvent.BEGIN,
+        InteractionType.SENSOR,
+        PORTAL,
+        PORTABLE,
+        () => {
+          sensorCount++;
+        },
       );
       sBegin.space = space;
 
