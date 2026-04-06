@@ -721,7 +721,7 @@ export default {
   label: "Portals",
   tags: ["UserConstraint", "Callback", "Sensor", "Portal"],
   featured: false,
-  desc: 'Portal physics with <code>UserConstraint</code> and callbacks. <b>Drag</b> shapes into portals — they emerge from the linked partner. <b>Click</b> empty space to spawn more.',
+  desc: 'Portal physics with <code>UserConstraint</code> and callbacks. <b>Drag</b> shapes into portals — they emerge from the linked partner.',
   walls: true,
   workerCompatible: false,
 
