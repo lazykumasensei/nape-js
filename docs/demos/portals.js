@@ -819,37 +819,12 @@ export default {
     ctx.clearRect(0, 0, W, H);
     drawGrid(ctx, W, H);
     for (const body of space.bodies) drawBody(ctx, body, showOutlines);
+    _drawPortalGlow(ctx, space);
+  },
 
-    // Portal openings with glow
-    ctx.save();
-    const portalPairs = [["#58a6ff", "#58a6ff"], ["#f85149", "#f85149"]];
-    let pi = 0;
-    for (const body of space.bodies) {
-      for (const shape of body.shapes) {
-        const portal = shape.userData.__portal;
-        if (!portal) continue;
-        const wp = body.localPointToWorld(portal.position);
-        const wd = body.localVectorToWorld(portal.direction);
-        const perpX = -wd.y, perpY = wd.x;
-        const hw = portal.width / 2;
-
-        const color = pi < 2 ? "#58a6ff" : "#f85149";
-        pi++;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 15;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 4;
-        ctx.globalAlpha = 0.9;
-        ctx.beginPath();
-        ctx.moveTo(wp.x - perpX * hw, wp.y - perpY * hw);
-        ctx.lineTo(wp.x + perpX * hw, wp.y + perpY * hw);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        wp.dispose();
-        wd.dispose();
-      }
-    }
-    ctx.restore();
+  // Overlay for 3D and PixiJS modes — portal glow lines on top
+  render3dOverlay(ctx, space, W, H) {
+    _drawPortalGlow(ctx, space);
   },
 
   code2d: `// Portals — portal physics demo
@@ -883,6 +858,37 @@ function loop() {
 }
 loop();`,
 };
+
+function _drawPortalGlow(ctx, space) {
+  ctx.save();
+  let pi = 0;
+  for (const body of space.bodies) {
+    for (const shape of body.shapes) {
+      const portal = shape.userData.__portal;
+      if (!portal) continue;
+      const wp = body.localPointToWorld(portal.position);
+      const wd = body.localVectorToWorld(portal.direction);
+      const perpX = -wd.y, perpY = wd.x;
+      const hw = portal.width / 2;
+
+      const color = pi < 2 ? "#58a6ff" : "#f85149";
+      pi++;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 15;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(wp.x - perpX * hw, wp.y - perpY * hw);
+      ctx.lineTo(wp.x + perpX * hw, wp.y + perpY * hw);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      wp.dispose();
+      wd.dispose();
+    }
+  }
+  ctx.restore();
+}
 
 let _spawnIdx = 0;
 const _shapeTypes = ["circle", "box", "capsule"];

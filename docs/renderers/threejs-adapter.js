@@ -423,12 +423,14 @@ export class ThreeJSAdapter {
 
       const cIdx = (body.userData?._colorIdx ?? 0) % MESH_COLORS.length;
       const isZone = !!body.userData?._isZone;
-      const color = isZone
+      const isSensor = !!shape.sensorEnabled;
+      const useWireframe = isZone || isSensor;
+      const color = useWireframe
         ? MESH_COLORS[cIdx % MESH_COLORS.length]
         : body.isStatic() ? 0x455a64 : MESH_COLORS[cIdx];
       const mesh = new _THREE.Mesh(
         geom,
-        isZone
+        useWireframe
           ? new _THREE.MeshBasicMaterial({
               color,
               wireframe: true,
