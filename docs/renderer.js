@@ -35,9 +35,10 @@ export function drawBody(ctx, body, showOutlines = true) {
   ctx.translate(px, py);
   ctx.rotate(rot);
 
+  const c = bodyColor(body);
   const defaultColor = showOutlines
-    ? bodyColor(body)
-    : { fill: body.isStatic() ? "#2a3a48" : body.isSleeping ? "#1a3020" : "#162540", stroke: null };
+    ? c
+    : { fill: c.fill, stroke: null };
 
   for (const shape of body.shapes) {
     // Per-shape overrides for fluid and sensor shapes

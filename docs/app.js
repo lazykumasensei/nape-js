@@ -77,6 +77,7 @@ const outlineBtn = document.getElementById("outlineBtn");
 outlineBtn.addEventListener("click", () => {
   runner.debugDraw = !runner.debugDraw;
   outlineBtn.classList.toggle("active", runner.debugDraw);
+  updateCodePreview();
 });
 
 // --- Profiler toggle ---
@@ -193,7 +194,7 @@ document.getElementById("renderModeToggle").addEventListener("click", async (e) 
 function getActiveCode() {
   const demo = runner.currentDemo;
   if (!demo) return "// No demo loaded.";
-  return getPreviewCode(demo, runner.mode);
+  return getPreviewCode(demo, runner.mode, { showOutlines: runner.debugDraw });
 }
 
 function updateCodePreview() {
@@ -223,7 +224,7 @@ copyCodeBtn.addEventListener("click", () => {
 codepenBtn.addEventListener("click", () => {
   gtag("event", "click", { event_category: "code_action", event_label: "open_codepen", demo: currentDemoId });
   const demo = runner.currentDemo;
-  if (demo && !demo.noCodePen) _openInCodePen(demo, runner.mode);
+  if (demo && !demo.noCodePen) _openInCodePen(demo, runner.mode, { showOutlines: runner.debugDraw });
 });
 
 

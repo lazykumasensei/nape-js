@@ -49,7 +49,7 @@ export function resolveBodyColor(body) {
   const overrideIdx = ud?._colorIdx;
   const isStatic = body.isStatic();
   const isSleeping = !isStatic && body.isSleeping;
-  const hasOverride = overrideIdx != null && overrideIdx > 0;
+  const hasOverride = overrideIdx != null && overrideIdx >= 0;
   const index = (overrideIdx ?? 0) % BODY_COLORS_HEX.length;
 
   return { index, isStatic: hasOverride ? false : isStatic, isSleeping: hasOverride ? false : isSleeping, isCustom: false, customColor: null };

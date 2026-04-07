@@ -16,7 +16,8 @@ const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module
 // Shared embedded helpers — common to multiple templates
 // =========================================================================
 
-const SPAWN_RANDOM = `function spawnRandomShape(space, x, y) {
+const SPAWN_RANDOM = `let _spawnCount = 0;
+function spawnRandomShape(space, x, y) {
   const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
   if (Math.random() < 0.5) {
     body.shapes.add(new Circle(5 + Math.random() * 15));
@@ -24,6 +25,7 @@ const SPAWN_RANDOM = `function spawnRandomShape(space, x, y) {
     const w = 8 + Math.random() * 26, h = 8 + Math.random() * 26;
     body.shapes.add(new Polygon(Polygon.box(w, h)));
   }
+  try { body.userData._colorIdx = _spawnCount++; } catch (_) {}
   body.space = space;
   return body;
 }
@@ -56,41 +58,48 @@ const COLORS = [
   { fill: "rgba(163,113,247,0.18)", stroke: "#a371f7" },
   { fill: "rgba(219,171,255,0.18)", stroke: "#dbabff" },
 ];
+let _showOutlines = __OUTLINES__;
 function bodyColor(body) {
   if (body.isStatic()) return { fill: "rgba(120,160,200,0.15)", stroke: "#607888" };
-  const idx = (body.userData?._colorIdx ?? Math.abs(Math.round(body.position.x * 0.1))) % COLORS.length;
+  const idx = (body.userData?._colorIdx ?? 0) % COLORS.length;
   return COLORS[idx];
 }
 function drawBody(body) {
   const px = body.position.x, py = body.position.y;
   ctx.save(); ctx.translate(px, py); ctx.rotate(body.rotation);
-  const { fill, stroke } = bodyColor(body);
+  const _c = bodyColor(body);
+  const { fill, stroke } = _showOutlines
+    ? _c
+    : { fill: _c.fill, stroke: null };
   for (const shape of body.shapes) {
+    let sf = fill, ss = stroke;
+    if (shape.fluidEnabled) { sf = "rgba(30,144,255,0.25)"; ss = _showOutlines ? "rgba(100,200,255,0.6)" : null; }
+    else if (shape.sensorEnabled) { sf = _showOutlines ? "rgba(88,166,255,0.06)" : "rgba(88,166,255,0.03)"; ss = _showOutlines ? "rgba(88,166,255,0.3)" : null; }
     if (shape.isCircle()) {
       const r = shape.castCircle.radius;
       ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.fillStyle = fill; ctx.fill();
-      ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, 0);
-      ctx.strokeStyle = stroke + "55"; ctx.stroke();
+      ctx.fillStyle = sf; ctx.fill();
+      if (ss) { ctx.strokeStyle = ss; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r, 0);
+        ctx.strokeStyle = ss + "55"; ctx.stroke(); }
     } else if (shape.isCapsule()) {
       const cap = shape.castCapsule;
       const hl = cap.halfLength, r = cap.radius;
       ctx.beginPath();
-      ctx.moveTo(hl, -r);
+      ctx.moveTo(-hl, -r); ctx.lineTo(hl, -r);
       ctx.arc(hl, 0, r, -Math.PI / 2, Math.PI / 2);
       ctx.lineTo(-hl, r);
       ctx.arc(-hl, 0, r, Math.PI / 2, -Math.PI / 2);
       ctx.closePath();
-      ctx.fillStyle = fill; ctx.fill();
-      ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = sf; ctx.fill();
+      if (ss) { ctx.strokeStyle = ss; ctx.lineWidth = 1.2; ctx.stroke(); }
     } else if (shape.isPolygon()) {
       const verts = shape.castPolygon.localVerts;
       const len = verts.length; if (len < 3) continue;
       ctx.beginPath(); ctx.moveTo(verts.at(0).x, verts.at(0).y);
       for (let i = 1; i < len; i++) ctx.lineTo(verts.at(i).x, verts.at(i).y);
-      ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
-      ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.closePath(); ctx.fillStyle = sf; ctx.fill();
+      if (ss) { ctx.strokeStyle = ss; ctx.lineWidth = 1.2; ctx.stroke(); }
     }
   }
   ctx.restore();
@@ -119,6 +128,7 @@ function drawConstraintLines() {
 
 const RENDERER_3D = `// ── Three.js Renderer ───────────────────────────────────────────────────────
 const MESH_COLORS = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0xdbabff];
+let _showOutlines3D = __OUTLINES__;
 const _meshes = [];
 
 function addBodyMesh(body) {
@@ -164,9 +174,15 @@ function addBodyMesh(body) {
     const edges = new THREE.LineSegments(
       new THREE.EdgesGeometry(geom, 15),
       new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }));
+    edges.visible = _showOutlines3D;
     mesh.add(edges);
     _meshes.push({ mesh, body, edges });
   }
+}
+
+function setOutlines3D(show) {
+  _showOutlines3D = show;
+  for (const { edges } of _meshes) { if (edges) edges.visible = show; }
 }
 
 function syncBodies3D(space) {
@@ -192,30 +208,30 @@ function syncBodies3D(space) {
 const RENDERER_PIXI = `// ── PixiJS Renderer (Graphics-based) ────────────────────────────────────────
 const FILL_COLORS = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0xdbabff];
 const STATIC_FILL = 0x607888;
+let _showOutlinesPixi = __OUTLINES__;
 const bodySprites = new Map();
 
 function bodyFill(body) {
   if (body.isStatic()) return STATIC_FILL;
-  const idx = (body.userData?._colorIdx ?? Math.abs(Math.round(body.position.x * 0.1))) % FILL_COLORS.length;
+  const idx = (body.userData?._colorIdx ?? 0) % FILL_COLORS.length;
   return FILL_COLORS[idx];
 }
 
-function addGfx(body) {
-  if (bodySprites.has(body)) return bodySprites.get(body);
-
-  const gfx = new PIXI.Graphics();
+function drawBodyGfx(body, gfx) {
+  gfx.clear();
   const color = bodyFill(body);
   const alpha = body.isStatic() ? 0.15 : 0.25;
-
   for (const shape of body.shapes) {
     if (shape.isCircle()) {
       const r = shape.castCircle.radius;
       gfx.circle(0, 0, r);
       gfx.fill({ color, alpha });
-      gfx.circle(0, 0, r);
-      gfx.stroke({ color, width: 1.2, alpha: 0.8 });
-      gfx.moveTo(0, 0); gfx.lineTo(r, 0);
-      gfx.stroke({ color, width: 1, alpha: 0.4 });
+      if (_showOutlinesPixi) {
+        gfx.circle(0, 0, r);
+        gfx.stroke({ color, width: 1.2, alpha: 0.8 });
+        gfx.moveTo(0, 0); gfx.lineTo(r, 0);
+        gfx.stroke({ color, width: 1, alpha: 0.4 });
+      }
     } else if (shape.isPolygon()) {
       const verts = shape.castPolygon.localVerts;
       const len = verts.length; if (len < 3) continue;
@@ -223,22 +239,24 @@ function addGfx(body) {
       for (let i = 0; i < len; i++) pts.push(verts.at(i).x, verts.at(i).y);
       gfx.poly(pts, true);
       gfx.fill({ color, alpha });
-      gfx.poly(pts, true);
-      gfx.stroke({ color, width: 1.2, alpha: 0.8 });
+      if (_showOutlinesPixi) { gfx.poly(pts, true); gfx.stroke({ color, width: 1.2, alpha: 0.8 }); }
     } else if (shape.isCapsule()) {
       const cap = shape.castCapsule;
       const hl = cap.halfLength, r = cap.radius;
       gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r);
       gfx.fill({ color, alpha });
-      gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r);
-      gfx.stroke({ color, width: 1.2, alpha: 0.8 });
+      if (_showOutlinesPixi) { gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r); gfx.stroke({ color, width: 1.2, alpha: 0.8 }); }
     }
   }
+}
 
+function addGfx(body) {
+  if (bodySprites.has(body)) return bodySprites.get(body);
+  const gfx = new PIXI.Graphics();
+  drawBodyGfx(body, gfx);
   gfx.x = body.position.x;
   gfx.y = body.position.y;
   gfx.rotation = body.rotation;
-
   app.stage.addChild(gfx);
   bodySprites.set(body, gfx);
   return gfx;
@@ -260,6 +278,10 @@ function syncBodies(space) {
     gfx.rotation = body.rotation;
   }
   if (constraintGfx) app.stage.addChild(constraintGfx);
+}
+
+function redrawAllOutlines() {
+  for (const [body, gfx] of bodySprites) drawBodyGfx(body, gfx);
 }
 
 let gridGfx = null;
@@ -680,9 +702,10 @@ export function getDemoCode(demo, adapterId) {
  *
  * @param {Object} demo — demo definition
  * @param {string} adapterId — "canvas2d" | "threejs" | "pixijs"
+ * @param {{ showOutlines?: boolean }} [opts]
  * @returns {{ title, description, html, css, js, js_module } | null}
  */
-export function generateCodePen(demo, adapterId) {
+export function generateCodePen(demo, adapterId, { showOutlines = true } = {}) {
   const template = TEMPLATES[adapterId] ?? TEMPLATES.canvas2d;
   const result = getDemoCode(demo, adapterId);
 
@@ -697,7 +720,7 @@ export function generateCodePen(demo, adapterId) {
     tags: ["nape-js", "physics", "2d-physics", "typescript", "gamedev"],
     html: template.html,
     css: CODEPEN_CSS,
-    js: template.buildJS(result.code, result.auto),
+    js: template.buildJS(result.code, result.auto).replaceAll("__OUTLINES__", String(showOutlines)),
     js_module: true,
   };
 }
@@ -707,9 +730,10 @@ export function generateCodePen(demo, adapterId) {
  *
  * @param {Object} demo — demo definition
  * @param {string} adapterId — "canvas2d" | "threejs" | "pixijs"
+ * @param {{ showOutlines?: boolean }} [opts]
  */
-export function openInCodePen(demo, adapterId) {
-  const data = generateCodePen(demo, adapterId);
+export function openInCodePen(demo, adapterId, opts) {
+  const data = generateCodePen(demo, adapterId, opts);
   if (!data) return;
 
   const form = document.createElement("form");
@@ -734,12 +758,13 @@ export function openInCodePen(demo, adapterId) {
  *
  * @param {Object} demo — demo definition
  * @param {string} adapterId — current adapter ID
+ * @param {{ showOutlines?: boolean }} [opts]
  * @returns {string}
  */
-export function getPreviewCode(demo, adapterId) {
+export function getPreviewCode(demo, adapterId, { showOutlines = true } = {}) {
   const result = getDemoCode(demo, adapterId);
   if (!result) return "// No source code available for this demo.";
 
   const template = TEMPLATES[adapterId] ?? TEMPLATES.canvas2d;
-  return template.buildJS(result.code, result.auto);
+  return template.buildJS(result.code, result.auto).replaceAll("__OUTLINES__", String(showOutlines));
 }
