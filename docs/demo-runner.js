@@ -577,11 +577,14 @@ export class DemoRunner {
         const velIter = this.#demo?.velocityIterations ?? 8;
         const posIter = this.#demo?.positionIterations ?? 3;
 
+        // Call demo.step() once per frame (not per physics substep) so that
+        // frame counters, animation timers (_time += 1/60), and other
+        // per-frame logic run at the correct rate.
+        this.#demo?.step?.(this.#space, this.#W, this.#H);
+
         let stepMs = 0;
         let stepped = false;
         while (this.#accumulator >= FIXED_DT) {
-          this.#demo?.step?.(this.#space, this.#W, this.#H);
-
           const stepStart = performance.now();
           this.#space.step(FIXED_DT, velIter, posIter);
           stepMs += performance.now() - stepStart;
