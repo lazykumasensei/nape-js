@@ -3,13 +3,48 @@
  *
  * Provides templates for each renderer and a single openInCodePen() function
  * used by both app.js (homepage) and examples.js (grid page).
+ *
+ * Supports two modes:
+ *  1. Explicit code strings (demo.code, demo.code2d, demo.code3d, demo.codePixi)
+ *  2. Auto-generation from demo hooks (setup/step/click/drag/release) via .toString()
  */
 
 const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js@3.24.0/dist/index.js";
 const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
 
 // =========================================================================
-// Shared renderer helper code (embedded in CodePen output)
+// Shared embedded helpers — common to multiple templates
+// =========================================================================
+
+const SPAWN_RANDOM = `function spawnRandomShape(space, x, y) {
+  const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+  if (Math.random() < 0.5) {
+    body.shapes.add(new Circle(5 + Math.random() * 15));
+  } else {
+    const w = 8 + Math.random() * 26, h = 8 + Math.random() * 26;
+    body.shapes.add(new Polygon(Polygon.box(w, h)));
+  }
+  body.space = space;
+  return body;
+}
+`;
+
+const WALLS_HELPER = `function addWalls() {
+  const t = 20;
+  const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - t / 2));
+  floor.shapes.add(new Polygon(Polygon.box(W, t))); floor.space = space;
+  const left = new Body(BodyType.STATIC, new Vec2(t / 2, H / 2));
+  left.shapes.add(new Polygon(Polygon.box(t, H))); left.space = space;
+  const right = new Body(BodyType.STATIC, new Vec2(W - t / 2, H / 2));
+  right.shapes.add(new Polygon(Polygon.box(t, H))); right.space = space;
+  const ceil = new Body(BodyType.STATIC, new Vec2(W / 2, t / 2));
+  ceil.shapes.add(new Polygon(Polygon.box(W, t))); ceil.space = space;
+  return floor;
+}
+`;
+
+// =========================================================================
+// Renderer helpers embedded in CodePen output
 // =========================================================================
 
 const RENDERER_2D = `// ── Renderer ────────────────────────────────────────────────────────────────
@@ -41,12 +76,11 @@ function drawBody(body) {
     } else if (shape.isCapsule()) {
       const cap = shape.castCapsule;
       const hl = cap.halfLength, r = cap.radius;
-      const x0 = -hl, x1 = hl, top = -r, bot = r;
       ctx.beginPath();
-      ctx.moveTo(x1, top);
-      ctx.arc(x1, 0, r, -Math.PI / 2, Math.PI / 2);
-      ctx.lineTo(x0, bot);
-      ctx.arc(x0, 0, r, Math.PI / 2, -Math.PI / 2);
+      ctx.moveTo(hl, -r);
+      ctx.arc(hl, 0, r, -Math.PI / 2, Math.PI / 2);
+      ctx.lineTo(-hl, r);
+      ctx.arc(-hl, 0, r, Math.PI / 2, -Math.PI / 2);
       ctx.closePath();
       ctx.fillStyle = fill; ctx.fill();
       ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke();
@@ -83,7 +117,79 @@ function drawConstraintLines() {
 // ── End Renderer ─────────────────────────────────────────────────────────────
 `;
 
-const RENDERER_PIXI = `// ── PixiJS Renderer (Sprite + Texture) ──────────────────────────────────────
+const RENDERER_3D = `// ── Three.js Renderer ───────────────────────────────────────────────────────
+const MESH_COLORS = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0xdbabff];
+const _meshes = [];
+
+function addBodyMesh(body) {
+  if (body.userData?._hidden3d) return;
+  for (const shape of body.shapes) {
+    let geom;
+    if (shape.isCircle()) {
+      geom = new THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
+    } else if (shape.isCapsule()) {
+      const cap = shape.castCapsule, hl = cap.halfLength, r = cap.radius;
+      const pts = [];
+      for (let i = -12; i <= 12; i++) {
+        const a = (i / 12) * Math.PI / 2;
+        pts.push(new THREE.Vector2(hl + Math.cos(a) * r, Math.sin(a) * r));
+      }
+      for (let i = -12; i <= 12; i++) {
+        const a = Math.PI + (i / 12) * Math.PI / 2;
+        pts.push(new THREE.Vector2(-hl + Math.cos(a) * r, Math.sin(a) * r));
+      }
+      geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts),
+        { depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2 });
+      geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
+      geom.computeVertexNormals(); geom.translate(0, 0, -15);
+    } else if (shape.isPolygon()) {
+      const verts = shape.castPolygon.localVerts;
+      if (verts.length < 3) continue;
+      const pts = [];
+      for (let i = 0; i < verts.length; i++) pts.push(new THREE.Vector2(verts.at(i).x, verts.at(i).y));
+      geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts),
+        { depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2 });
+      geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
+      geom.computeVertexNormals(); geom.translate(0, 0, -15);
+    }
+    if (!geom) continue;
+    const isSensor = shape.sensorEnabled || shape.fluidEnabled;
+    const cIdx = (body.userData?._colorIdx ?? 0) % MESH_COLORS.length;
+    const color = body.isStatic() ? 0x607888 : MESH_COLORS[cIdx];
+    const mat = isSensor
+      ? new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.5 })
+      : new THREE.MeshPhongMaterial({ color, shininess: 80, specular: 0x444444, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geom, mat);
+    scene.add(mesh);
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geom, 15),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }));
+    mesh.add(edges);
+    _meshes.push({ mesh, body, edges });
+  }
+}
+
+function syncBodies3D(space) {
+  const alive = new Set();
+  for (const body of space.bodies) alive.add(body);
+  for (let i = _meshes.length - 1; i >= 0; i--) {
+    if (!alive.has(_meshes[i].body)) {
+      scene.remove(_meshes[i].mesh); _meshes.splice(i, 1);
+    }
+  }
+  const tracked = new Set(_meshes.map(m => m.body));
+  for (const body of space.bodies) {
+    if (!tracked.has(body)) addBodyMesh(body);
+  }
+  for (const { mesh, body } of _meshes) {
+    mesh.position.set(body.position.x, -body.position.y, 0);
+    mesh.rotation.z = -body.rotation;
+  }
+}
+// ── End Three.js Renderer ───────────────────────────────────────────────────
+`;
+
+const RENDERER_PIXI = `// ── PixiJS Renderer (Graphics-based) ────────────────────────────────────────
 const FILL_COLORS = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0xdbabff];
 const STATIC_FILL = 0x607888;
 const bodySprites = new Map();
@@ -94,7 +200,6 @@ function bodyFill(body) {
   return FILL_COLORS[idx];
 }
 
-// Draw body shapes into a temporary Graphics, bake to texture, return Sprite
 function addGfx(body) {
   if (bodySprites.has(body)) return bodySprites.get(body);
 
@@ -130,39 +235,30 @@ function addGfx(body) {
     }
   }
 
-  // Bake Graphics → Texture → Sprite (GPU-friendly batched quad)
-  const bounds = gfx.getLocalBounds();
-  const texture = app.renderer.generateTexture({ target: gfx, resolution: 2 });
-  const sprite = new PIXI.Sprite(texture);
-  sprite.anchor.set(-bounds.x / bounds.width, -bounds.y / bounds.height);
-  sprite.x = body.position.x;
-  sprite.y = body.position.y;
-  sprite.rotation = body.rotation;
+  gfx.x = body.position.x;
+  gfx.y = body.position.y;
+  gfx.rotation = body.rotation;
 
-  gfx.destroy();
-  app.stage.addChild(sprite);
-  bodySprites.set(body, sprite);
-  return sprite;
+  app.stage.addChild(gfx);
+  bodySprites.set(body, gfx);
+  return gfx;
 }
 
 function syncBodies(space) {
   const alive = new Set();
   for (const body of space.bodies) alive.add(body);
-  for (const [body, sprite] of bodySprites) {
+  for (const [body, gfx] of bodySprites) {
     if (!alive.has(body)) {
-      app.stage.removeChild(sprite);
-      sprite.texture.destroy(true);
-      sprite.destroy();
+      app.stage.removeChild(gfx); gfx.destroy();
       bodySprites.delete(body);
     }
   }
   for (const body of space.bodies) {
-    const sprite = addGfx(body);
-    sprite.x = body.position.x;
-    sprite.y = body.position.y;
-    sprite.rotation = body.rotation;
+    const gfx = addGfx(body);
+    gfx.x = body.position.x;
+    gfx.y = body.position.y;
+    gfx.rotation = body.rotation;
   }
-  // Keep overlays on top of body sprites
   if (constraintGfx) app.stage.addChild(constraintGfx);
 }
 
@@ -195,74 +291,250 @@ function drawConstraintLines() {
 // ── End PixiJS Renderer ─────────────────────────────────────────────────────
 `;
 
-// Interaction helper — screen → world coordinate transform + pointer events
-const INTERACTION_2D = `// ── Interaction ─────────────────────────────────────────────────────────────
-function getWorldPos(e) {
+// =========================================================================
+// Per-adapter auto-runtime templates
+//
+// These are appended AFTER the extracted demo code when auto-generating.
+// They provide the physics loop, rendering, and interaction forwarding.
+// =========================================================================
+
+const RUNTIME_2D = `
+// ── Runtime ──────────────────────────────────────────────────────────────────
+const W = canvas.width, H = canvas.height;
+const space = new Space();
+__WALLS__
+__GRAVITY__
+_demo.setup(space, W, H);
+
+function _loop() {
+  if (_demo.step) _demo.step(space, W, H);
+  space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
+  ctx.clearRect(0, 0, W, H);
+  drawGrid();
+  for (const body of space.bodies) drawBody(body);
+  drawConstraintLines();
+  requestAnimationFrame(_loop);
+}
+_loop();
+
+// Interaction
+function _getWorldPos(e) {
   const rect = canvas.getBoundingClientRect();
-  return {
-    x: (e.clientX - rect.left) * (canvas.width / rect.width),
-    y: (e.clientY - rect.top) * (canvas.height / rect.height),
-  };
+  return { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) };
 }
 let _dragging = false;
 canvas.addEventListener("pointerdown", (e) => {
   _dragging = true;
-  const { x, y } = getWorldPos(e);
-  if (typeof onClick === "function") onClick(x, y);
+  const { x, y } = _getWorldPos(e);
+  if (_demo.click) _demo.click(x, y, space, W, H);
 });
 canvas.addEventListener("pointermove", (e) => {
-  const { x, y } = getWorldPos(e);
-  if (_dragging && typeof onDrag === "function") onDrag(x, y);
-  if (typeof onHover === "function") onHover(x, y);
+  const { x, y } = _getWorldPos(e);
+  if (_dragging && _demo.drag) _demo.drag(x, y, space, W, H);
+  if (_demo.hover) _demo.hover(x, y, space, W, H);
 });
 canvas.addEventListener("pointerup", () => {
   _dragging = false;
-  if (typeof onRelease === "function") onRelease();
+  if (_demo.release) _demo.release(space);
 });
-// Define onClick, onDrag, onRelease, onHover in your demo code to handle events.
-// ── End Interaction ─────────────────────────────────────────────────────────
+canvas.addEventListener("wheel", (e) => {
+  if (_demo.wheel) { e.preventDefault(); _demo.wheel(e.deltaY, space, W, H); }
+}, { passive: false });
 `;
 
-const INTERACTION_PIXI = `// ── Interaction ─────────────────────────────────────────────────────────────
-function getWorldPos(e) {
+const RUNTIME_3D = `
+// ── Three.js Scene Setup ────────────────────────────────────────────────────
+const container = document.getElementById("container");
+const W = 900, H = 500;
+const fov = 45, aspect = W / H;
+const camZ = (W / 2) / Math.tan((fov / 2) * Math.PI / 180) / aspect;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d1117);
+const camera = new THREE.PerspectiveCamera(fov, aspect, 1, camZ * 6);
+camera.position.set(W / 2, -H / 2, camZ);
+camera.lookAt(W / 2, -H / 2, 0);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H);
+container.appendChild(renderer.domElement);
+
+// Lighting
+scene.add(new THREE.DirectionalLight(0xfff5e0, 2.0).translateX(-W * 0.3).translateY(H * 0.6).translateZ(800));
+scene.add(new THREE.DirectionalLight(0xadd8ff, 0.6).translateX(W * 1.2).translateY(-H * 0.3).translateZ(400));
+scene.add(new THREE.AmbientLight(0x1a1a2e, 1.0));
+
+// Grid
+const _gridPts = [];
+for (let x = 0; x <= W; x += 50) _gridPts.push(x, 0, 0, x, -H, 0);
+for (let y = 0; y <= H; y += 50) _gridPts.push(0, -y, 0, W, -y, 0);
+const _gridGeom = new THREE.BufferGeometry();
+_gridGeom.setAttribute("position", new THREE.Float32BufferAttribute(_gridPts, 3));
+scene.add(new THREE.LineSegments(_gridGeom, new THREE.LineBasicMaterial({ color: 0x1a2030, transparent: true, opacity: 0.5 })));
+
+// ── Runtime ──────────────────────────────────────────────────────────────────
+const space = new Space();
+__WALLS__
+__GRAVITY__
+_demo.setup(space, W, H);
+
+function _loop() {
+  if (_demo.step) _demo.step(space, W, H);
+  space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
+  syncBodies3D(space);
+  renderer.render(scene, camera);
+  requestAnimationFrame(_loop);
+}
+_loop();
+
+// Interaction
+function _getWorldPos(e) {
+  const rect = container.getBoundingClientRect();
+  return { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) };
+}
+let _dragging = false;
+container.addEventListener("pointerdown", (e) => {
+  _dragging = true;
+  const { x, y } = _getWorldPos(e);
+  if (_demo.click) _demo.click(x, y, space, W, H);
+});
+container.addEventListener("pointermove", (e) => {
+  const { x, y } = _getWorldPos(e);
+  if (_dragging && _demo.drag) _demo.drag(x, y, space, W, H);
+  if (_demo.hover) _demo.hover(x, y, space, W, H);
+});
+container.addEventListener("pointerup", () => {
+  _dragging = false;
+  if (_demo.release) _demo.release(space);
+});
+container.addEventListener("wheel", (e) => {
+  if (_demo.wheel) { e.preventDefault(); _demo.wheel(e.deltaY, space, W, H); }
+}, { passive: false });
+`;
+
+const RUNTIME_PIXI = `
+// ── Runtime ──────────────────────────────────────────────────────────────────
+const space = new Space();
+__WALLS__
+__GRAVITY__
+_demo.setup(space, W, H);
+
+function _loop() {
+  if (_demo.step) _demo.step(space, W, H);
+  space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
+  drawGrid();
+  syncBodies(space);
+  drawConstraintLines();
+  app.render();
+  requestAnimationFrame(_loop);
+}
+_loop();
+
+// Interaction
+function _getWorldPos(e) {
   const rect = app.canvas.getBoundingClientRect();
-  return {
-    x: (e.clientX - rect.left) * (W / rect.width),
-    y: (e.clientY - rect.top) * (H / rect.height),
-  };
+  return { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) };
 }
 let _dragging = false;
 app.canvas.addEventListener("pointerdown", (e) => {
   _dragging = true;
-  const { x, y } = getWorldPos(e);
-  if (typeof onClick === "function") onClick(x, y);
+  const { x, y } = _getWorldPos(e);
+  if (_demo.click) _demo.click(x, y, space, W, H);
 });
 app.canvas.addEventListener("pointermove", (e) => {
-  const { x, y } = getWorldPos(e);
-  if (_dragging && typeof onDrag === "function") onDrag(x, y);
-  if (typeof onHover === "function") onHover(x, y);
+  const { x, y } = _getWorldPos(e);
+  if (_dragging && _demo.drag) _demo.drag(x, y, space, W, H);
+  if (_demo.hover) _demo.hover(x, y, space, W, H);
 });
 app.canvas.addEventListener("pointerup", () => {
   _dragging = false;
-  if (typeof onRelease === "function") onRelease();
+  if (_demo.release) _demo.release(space);
 });
-// Define onClick, onDrag, onRelease, onHover in your demo code to handle events.
-// ── End Interaction ─────────────────────────────────────────────────────────
+app.canvas.addEventListener("wheel", (e) => {
+  if (_demo.wheel) { e.preventDefault(); _demo.wheel(e.deltaY, space, W, H); }
+}, { passive: false });
 `;
 
-const WALLS_HELPER = `function addWalls() {
-  const t = 20;
-  const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - t / 2));
-  floor.shapes.add(new Polygon(Polygon.box(W, t))); floor.space = space;
-  const left = new Body(BodyType.STATIC, new Vec2(t / 2, H / 2));
-  left.shapes.add(new Polygon(Polygon.box(t, H))); left.space = space;
-  const right = new Body(BodyType.STATIC, new Vec2(W - t / 2, H / 2));
-  right.shapes.add(new Polygon(Polygon.box(t, H))); right.space = space;
-  const ceil = new Body(BodyType.STATIC, new Vec2(W / 2, t / 2));
-  ceil.shapes.add(new Polygon(Polygon.box(W, t))); ceil.space = space;
-  return floor;
+// =========================================================================
+// Auto-generation: extract demo hooks via .toString()
+// =========================================================================
+
+const NAPE_IMPORTS = `import {
+  Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
+  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, SpringJoint,
+  Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
+  CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
+  CharacterController, fractureBody, UserConstraint,
+} from "${NAPE_CDN}";`;
+
+/**
+ * Convert a method-shorthand .toString() result to a standalone function.
+ * e.g. "setup(space, W, H) { ... }" → "function setup(space, W, H) { ... }"
+ */
+function toFunction(fnStr, name) {
+  const src = fnStr.trim();
+  // Already a proper function or arrow?
+  if (src.startsWith("function") || src.startsWith("(") || src.startsWith("async")) return src;
+  // Method shorthand: "name(...) { ... }" → "function name(...) { ... }"
+  return "function " + src;
 }
-`;
+
+/**
+ * Extract demo hooks and build a _demo object literal.
+ * Returns null if the demo has no extractable setup function.
+ */
+function extractDemoObject(demo) {
+  if (!demo.setup) return null;
+
+  const hooks = [];
+  for (const name of ["setup", "step", "click", "drag", "release", "hover", "wheel"]) {
+    if (typeof demo[name] === "function") {
+      hooks.push(`  ${demo[name].toString()}`);
+    }
+  }
+
+  return `const _demo = {\n${hooks.join(",\n")}\n};`;
+}
+
+/**
+ * Fill runtime template placeholders with demo config values.
+ */
+function fillRuntime(runtime, demo) {
+  const gravity = demo._extractedGravity ?? "space.gravity = new Vec2(0, 600);";
+  return runtime
+    .replace("__WALLS__", demo.walls !== false ? "addWalls();" : "")
+    .replace("__GRAVITY__", gravity)
+    .replace("__VEL_ITER__", String(demo.velocityIterations ?? 8))
+    .replace("__POS_ITER__", String(demo.positionIterations ?? 3));
+}
+
+/**
+ * Auto-generate CodePen code from demo hooks for a specific adapter.
+ * Returns null if the demo's setup function cannot be extracted.
+ */
+function autoGenerateCode(demo, adapterId) {
+  const demoObj = extractDemoObject(demo);
+  if (!demoObj) return null;
+
+  // Try to extract gravity from setup body (common pattern: space.gravity = new Vec2(...))
+  const setupSrc = demo.setup.toString();
+  const gravityMatch = setupSrc.match(/space\.gravity\s*=\s*new\s+Vec2\([^)]+\)\s*;?/);
+  const enrichedDemo = { ...demo };
+  if (gravityMatch) {
+    enrichedDemo._extractedGravity = gravityMatch[0].endsWith(";") ? gravityMatch[0] : gravityMatch[0] + ";";
+  }
+
+  if (adapterId === "canvas2d") {
+    return `${demoObj}\n${fillRuntime(RUNTIME_2D, enrichedDemo)}`;
+  }
+  if (adapterId === "threejs") {
+    return `${demoObj}\n${fillRuntime(RUNTIME_3D, enrichedDemo)}`;
+  }
+  if (adapterId === "pixijs") {
+    return `${demoObj}\n${fillRuntime(RUNTIME_PIXI, enrichedDemo)}`;
+  }
+
+  return null;
+}
 
 // =========================================================================
 // Template definitions by adapter ID
@@ -272,21 +544,28 @@ const TEMPLATES = {
   canvas2d: {
     html: `<canvas id="demoCanvas" width="900" height="500" style="background:#0a0e14;display:block;max-width:100%;border:1px solid #30363d;border-radius:8px"></canvas>`,
 
-    buildJS(code) {
-      return `import {
-  Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, SpringJoint,
-  Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
-  CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
-  CharacterController, fractureBody, UserConstraint,
-} from "${NAPE_CDN}";
+    buildJS(code, auto = false) {
+      if (auto) {
+        // Auto-generated: code already contains the _demo object + runtime
+        return `${NAPE_IMPORTS}
+
+const canvas = document.getElementById("demoCanvas");
+const ctx = canvas.getContext("2d");
+
+${RENDERER_2D}
+${SPAWN_RANDOM}
+${WALLS_HELPER}
+${code}`;
+      }
+      // Legacy explicit code string
+      return `${NAPE_IMPORTS}
 
 const canvas = document.getElementById("demoCanvas");
 const canvasWrap = canvas;
 const ctx = canvas.getContext("2d");
 
 ${RENDERER_2D}
-${INTERACTION_2D}
+${SPAWN_RANDOM}
 ${WALLS_HELPER}
 ${code}`;
     },
@@ -295,16 +574,20 @@ ${code}`;
   threejs: {
     html: `<div id="container" style="width:900px;max-width:100%;height:500px;border:1px solid #30363d;border-radius:8px;overflow:hidden"></div>`,
 
-    buildJS(code) {
-      return `import * as THREE from "${THREE_CDN}";
-import {
-  Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, SpringJoint,
-  Material, FluidProperties, InteractionFilter, InteractionGroup,
-  CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
-  CharacterController, fractureBody, UserConstraint,
-} from "${NAPE_CDN}";
+    buildJS(code, auto = false) {
+      if (auto) {
+        return `import * as THREE from "${THREE_CDN}";
+${NAPE_IMPORTS}
 
+${RENDERER_3D}
+${SPAWN_RANDOM}
+${WALLS_HELPER}
+${code}`;
+      }
+      return `import * as THREE from "${THREE_CDN}";
+${NAPE_IMPORTS}
+
+${SPAWN_RANDOM}
 ${WALLS_HELPER}
 ${code}`;
     },
@@ -313,15 +596,10 @@ ${code}`;
   pixijs: {
     html: `<div id="container" style="width:900px;max-width:100%;height:500px;border:1px solid #30363d;border-radius:8px;overflow:hidden"></div>`,
 
-    buildJS(code) {
-      return `import * as PIXI from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
-import {
-  Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, SpringJoint,
-  Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
-  CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
-  CharacterController, fractureBody, UserConstraint,
-} from "${NAPE_CDN}";
+    buildJS(code, auto = false) {
+      if (auto) {
+        return `import * as PIXI from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
+${NAPE_IMPORTS}
 
 const container = document.getElementById("container");
 const W = 900, H = 500;
@@ -330,7 +608,21 @@ await app.init({ width: W, height: H, backgroundColor: 0x0d1117, antialias: true
 container.appendChild(app.canvas);
 
 ${RENDERER_PIXI}
-${INTERACTION_PIXI}
+${SPAWN_RANDOM}
+${WALLS_HELPER}
+${code}`;
+      }
+      return `import * as PIXI from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
+${NAPE_IMPORTS}
+
+const container = document.getElementById("container");
+const W = 900, H = 500;
+const app = new PIXI.Application();
+await app.init({ width: W, height: H, backgroundColor: 0x0d1117, antialias: true });
+container.appendChild(app.canvas);
+
+${RENDERER_PIXI}
+${SPAWN_RANDOM}
 ${WALLS_HELPER}
 ${code}`;
     },
@@ -352,25 +644,35 @@ const CODEPEN_CSS = `body { margin: 20px; background: #0d1117; font-family: sans
  *
  * Priority:
  *   1. demo.codepenOverride — complete custom CodePen code (escape hatch)
- *   2. For threejs mode: demo.code3d → demo.code (never falls back to code2d)
- *   3. For canvas2d mode: demo.code2d → demo.code
- *   4. For pixijs mode: demo.codePixi → demo.code (never falls back to code2d)
+ *   2. Explicit per-adapter code: code3d, codePixi, code2d, code
+ *   3. Auto-generation from demo hooks (setup/step/click/drag/release)
+ *
+ * Returns { code, auto } where auto=true means the code was auto-generated.
  *
  * @param {Object} demo — demo definition
  * @param {string} adapterId — "canvas2d" | "threejs" | "pixijs"
- * @returns {string}
+ * @returns {{ code: string, auto: boolean } | null}
  */
 export function getDemoCode(demo, adapterId) {
-  if (demo.codepenOverride) return demo.codepenOverride;
+  if (demo.codepenOverride) return { code: demo.codepenOverride, auto: false };
 
+  // Check for explicit per-adapter code
+  let explicit = null;
   if (adapterId === "threejs") {
-    return demo.code3d ?? demo.code ?? null;
+    explicit = demo.code3d ?? demo.code ?? null;
+  } else if (adapterId === "pixijs") {
+    explicit = demo.codePixi ?? demo.code ?? null;
+  } else {
+    explicit = demo.code ?? demo.code2d ?? null;
   }
-  if (adapterId === "pixijs") {
-    return demo.codePixi ?? demo.code ?? null;
-  }
-  // canvas2d (default)
-  return demo.code ?? demo.code2d ?? null;
+
+  if (explicit) return { code: explicit, auto: false };
+
+  // Fall back to auto-generation from demo hooks
+  const auto = autoGenerateCode(demo, adapterId);
+  if (auto) return { code: auto, auto: true };
+
+  return null;
 }
 
 /**
@@ -382,9 +684,9 @@ export function getDemoCode(demo, adapterId) {
  */
 export function generateCodePen(demo, adapterId) {
   const template = TEMPLATES[adapterId] ?? TEMPLATES.canvas2d;
-  const code = getDemoCode(demo, adapterId);
+  const result = getDemoCode(demo, adapterId);
 
-  if (!code) return null;
+  if (!result) return null;
 
   const suffixes = { threejs: " (3D)", pixijs: " (PixiJS)" };
   const suffix = suffixes[adapterId] ?? "";
@@ -395,7 +697,7 @@ export function generateCodePen(demo, adapterId) {
     tags: ["nape-js", "physics", "2d-physics", "typescript", "gamedev"],
     html: template.html,
     css: CODEPEN_CSS,
-    js: template.buildJS(code),
+    js: template.buildJS(result.code, result.auto),
     js_module: true,
   };
 }
@@ -435,9 +737,9 @@ export function openInCodePen(demo, adapterId) {
  * @returns {string}
  */
 export function getPreviewCode(demo, adapterId) {
-  const code = getDemoCode(demo, adapterId);
-  if (!code) return "// No source code available for this demo.";
+  const result = getDemoCode(demo, adapterId);
+  if (!result) return "// No source code available for this demo.";
 
   const template = TEMPLATES[adapterId] ?? TEMPLATES.canvas2d;
-  return template.buildJS(code);
+  return template.buildJS(result.code, result.auto);
 }
