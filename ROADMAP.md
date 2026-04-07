@@ -2,7 +2,7 @@
 
 ## Completed Items
 
-Done: P21-P28, P30-P33, P35, P37-P43, P45-P48, P50-P55, P57, P63, P66, P68.
+Done: P21-P28, P30-P33, P35, P37-P43, P45-P48, P50-P55, P57, P63, P64, P66-P68.
 Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — superseded by P52), P49 (ECS adapter — trivial pattern).
 
 ---
@@ -38,15 +38,12 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | #   | Priority                        | Effort | Impact            | Why                                                                                                                                                                                                                                               |
 | --- | ------------------------------- | ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P62 | **Particle system**             | S-M    | features          | Physics-aware particle emitter — a frequently requested feature by gamedevs                                                                                                                                                                       |
-| P64 | **Spring/Damper joint**         | S      | features          | Missing basic constraint. Soft-body, vehicle suspension, ragdoll hair, UI animations all want springs. Currently only solvable via UserConstraint                                                                                                  |
-| P67 | **Destruction/Fracture system** | M      | :fire: wow-factor | Voronoi-based fracturing — `fractureBody(body, point, opts)` API. No other JS engine does this. Demos: **Voronoi Fracture** (click-to-shatter) and **Slingshot Siege** (slingshot + breakable castle with chain-reaction fracture). Visually impressive, great for marketing |
 
 ### Tooling & Infrastructure
 
 | #   | Priority                                 | Effort | Impact          | Why                                                                                                                                                                                                                              |
 | --- | ---------------------------------------- | ------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P61 | **Bundle size reduction**                | S-M    | competitiveness | Close the 87 KB vs Phaser Box2D 65 KB gap. Dead code audit, hot path optimization                                                                                                                                                |
-| P68 | ~~Performance profiler / debug overlay~~ | S      | DX              | :white_check_mark: **Done.** `PerformanceOverlay` + `PhysicsMetrics` in `nape-js/profiler`. Canvas overlay with rolling graph, phase breakdown bar, entity counters. `space.profilerEnabled` + `space.metrics` API.               |
 | P69 | **Deterministic replay system**          | M      | features        | Input recording + playback on top of existing serialization + deterministic mode. Debug bug reproduction, multiplayer rollback foundation, shareable replays, deterministic regression tests — one feature that connects many others |
 
 ---
@@ -60,20 +57,17 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 
 ### Phase 2 — Wow-factor + ecosystem
 
-3. **P67** — Destruction/Fracture system (unique feature, marketing value)
-4. **P58** — Phaser plugin/adapter (biggest community reach opportunity)
-5. **P65** — One-click game templates (first game in 5 minutes)
+3. **P58** — Phaser plugin/adapter (biggest community reach opportunity)
+4. **P65** — One-click game templates (first game in 5 minutes)
 
 ### Phase 3 — Ecosystem expand
 
-7. **P60** — Tilemap collision helper (low effort, high gamedev utility)
-8. **P59** — React/R3F integration (growing market)
-9. **P64** — Spring/Damper joint (fundamental physics feature)
+5. **P60** — Tilemap collision helper (low effort, high gamedev utility)
+6. **P59** — React/R3F integration (growing market)
 
 ### Phase 4 — Polish & tooling
 
-10. **P62** — Particle system
-11. ~~**P68** — Performance profiler~~ :white_check_mark: Done
-12. **P69** — Deterministic replay system
-13. **P61** — Bundle size reduction
-14. **P29** — Continue test coverage push toward 80%
+7. **P62** — Particle system
+8. **P69** — Deterministic replay system
+9. **P61** — Bundle size reduction
+10. **P29** — Continue test coverage push toward 80%
