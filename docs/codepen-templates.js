@@ -564,7 +564,8 @@ function autoGenerateCode(demo, adapterId) {
 
 const TEMPLATES = {
   canvas2d: {
-    html: `<canvas id="demoCanvas" width="900" height="500" style="background:#0a0e14;display:block;max-width:100%;border:1px solid #30363d;border-radius:8px"></canvas>`,
+    html: `<canvas id="demoCanvas" width="900" height="500" style="background:#0a0e14;display:block;max-width:100%;border:1px solid #30363d;border-radius:8px"></canvas>
+<a class="nape-badge" href="https://newkrok.github.io/nape-js/index.html" target="_blank">made with Nape-JS</a>`,
 
     buildJS(code, auto = false) {
       if (auto) {
@@ -594,7 +595,8 @@ ${code}`;
   },
 
   threejs: {
-    html: `<div id="container" style="width:900px;max-width:100%;height:500px;border:1px solid #30363d;border-radius:8px;overflow:hidden"></div>`,
+    html: `<div id="container" style="width:900px;max-width:100%;height:500px;border:1px solid #30363d;border-radius:8px;overflow:hidden"></div>
+<a class="nape-badge" href="https://newkrok.github.io/nape-js/index.html" target="_blank">made with Nape-JS</a>`,
 
     buildJS(code, auto = false) {
       if (auto) {
@@ -616,7 +618,8 @@ ${code}`;
   },
 
   pixijs: {
-    html: `<div id="container" style="width:900px;max-width:100%;height:500px;border:1px solid #30363d;border-radius:8px;overflow:hidden"></div>`,
+    html: `<div id="container" style="width:900px;max-width:100%;height:500px;border:1px solid #30363d;border-radius:8px;overflow:hidden"></div>
+<a class="nape-badge" href="https://newkrok.github.io/nape-js/index.html" target="_blank">made with Nape-JS</a>`,
 
     buildJS(code, auto = false) {
       if (auto) {
@@ -655,7 +658,9 @@ ${code}`;
 // CSS (shared across all templates)
 // =========================================================================
 
-const CODEPEN_CSS = `body { margin: 20px; background: #0d1117; font-family: sans-serif; color: #e6edf3; }`;
+const CODEPEN_CSS = `body { margin: 20px; background: #0d1117; font-family: sans-serif; color: #e6edf3; }
+.nape-badge { position: fixed; bottom: 12px; right: 16px; font-size: 13px; font-family: sans-serif; color: #8b949e; text-decoration: none; opacity: .75; transition: opacity .2s; z-index: 9999; }
+.nape-badge:hover { opacity: 1; color: #58a6ff; }`;
 
 // =========================================================================
 // Public API
@@ -711,13 +716,15 @@ export function generateCodePen(demo, adapterId, { showOutlines = true } = {}) {
 
   if (!result) return null;
 
-  const suffixes = { threejs: " (3D)", pixijs: " (PixiJS)" };
+  const suffixes = { threejs: " (three.js)", pixijs: " (PixiJS)" };
   const suffix = suffixes[adapterId] ?? "";
+  const rendererTags = { threejs: "threejs", pixijs: "pixijs", canvas2d: "canvas" };
+  const rendererTag = rendererTags[adapterId] ?? "canvas";
 
   return {
-    title: `nape-js — ${demo.label ?? demo.id}${suffix}`,
+    title: `Nape-JS — ${demo.label ?? demo.id}${suffix}`,
     description: `Interactive physics demo powered by nape-js, a fully typed TypeScript 2D physics engine.\nhttps://github.com/NewKrok/nape-js`,
-    tags: ["nape-js", "physics", "2d-physics", "typescript", "gamedev"],
+    tags: ["nape-js", "physics", "2d-physics", rendererTag, "gamedev"],
     html: template.html,
     css: CODEPEN_CSS,
     js: template.buildJS(result.code, result.auto).replaceAll("__OUTLINES__", String(showOutlines)),
