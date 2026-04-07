@@ -80,8 +80,8 @@ const CH = 500;
 // CodePen helper — uses shared codepen-templates.js
 // =========================================================================
 
-function openInCodePen(demo) {
-  _openInCodePen(demo, "canvas2d");
+function openInCodePen(demo, adapterId = "canvas2d") {
+  _openInCodePen(demo, adapterId);
 }
 
 // =========================================================================
@@ -188,6 +188,8 @@ function createCard(demo, { onTagClick } = {}) {
     gtag("event", "click", { event_category: "render_mode", event_label: mode, demo: demo.id });
     await runner.setMode(adapterId);
     updateUrlForCard(demo.id, { mode: cardMode, outline: runner.debugDraw });
+    // Refresh code preview if panel is open
+    if (!codePanel.hidden) updateCodePreview();
   });
 
   // Outline toggle
@@ -316,17 +318,22 @@ function createCard(demo, { onTagClick } = {}) {
   codePanel.className = "card-code-panel";
   codePanel.hidden = true;
 
-  let rendered = false;
+  let renderedMode = null;
+  function updateCodePreview() {
+    const adapterId = modeMap[cardMode] ?? "canvas2d";
+    if (renderedMode === adapterId) return;
+    renderedMode = adapterId;
+    const source = getPreviewCode(demo, adapterId);
+    const escaped = source.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    codePanel.innerHTML = `<pre class="line-numbers"><code class="language-javascript">${escaped}</code></pre>`;
+    if (typeof Prism !== "undefined") Prism.highlightAllUnder(codePanel);
+  }
   codeToggle.addEventListener("click", async (e) => {
     e.stopPropagation();
     codePanel.hidden = !codePanel.hidden;
-    if (!codePanel.hidden) gtag("event", "click", { event_category: "code_action", event_label: "view_code", demo: demo.id });
-    if (!codePanel.hidden && !rendered) {
-      rendered = true;
-      const source = getPreviewCode(demo, "canvas2d") ?? await fetch(`./demos/${demo.id}.js`).then(r => r.text());
-      const escaped = source.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      codePanel.innerHTML = `<pre class="line-numbers"><code class="language-javascript">${escaped}</code></pre>`;
-      Prism.highlightAllUnder(codePanel);
+    if (!codePanel.hidden) {
+      gtag("event", "click", { event_category: "code_action", event_label: "view_code", demo: demo.id });
+      updateCodePreview();
     }
   });
 
@@ -339,7 +346,7 @@ function createCard(demo, { onTagClick } = {}) {
     codepenBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       gtag("event", "click", { event_category: "code_action", event_label: "open_codepen", demo: demo.id });
-      openInCodePen(demo);
+      openInCodePen(demo, modeMap[cardMode] ?? "canvas2d");
     });
     btnGroup.appendChild(codepenBtn);
   }

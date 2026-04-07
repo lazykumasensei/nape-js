@@ -195,6 +195,61 @@ function drawConstraintLines() {
 // ── End PixiJS Renderer ─────────────────────────────────────────────────────
 `;
 
+// Interaction helper — screen → world coordinate transform + pointer events
+const INTERACTION_2D = `// ── Interaction ─────────────────────────────────────────────────────────────
+function getWorldPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (canvas.height / rect.height),
+  };
+}
+let _dragging = false;
+canvas.addEventListener("pointerdown", (e) => {
+  _dragging = true;
+  const { x, y } = getWorldPos(e);
+  if (typeof onClick === "function") onClick(x, y);
+});
+canvas.addEventListener("pointermove", (e) => {
+  const { x, y } = getWorldPos(e);
+  if (_dragging && typeof onDrag === "function") onDrag(x, y);
+  if (typeof onHover === "function") onHover(x, y);
+});
+canvas.addEventListener("pointerup", () => {
+  _dragging = false;
+  if (typeof onRelease === "function") onRelease();
+});
+// Define onClick, onDrag, onRelease, onHover in your demo code to handle events.
+// ── End Interaction ─────────────────────────────────────────────────────────
+`;
+
+const INTERACTION_PIXI = `// ── Interaction ─────────────────────────────────────────────────────────────
+function getWorldPos(e) {
+  const rect = app.canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (W / rect.width),
+    y: (e.clientY - rect.top) * (H / rect.height),
+  };
+}
+let _dragging = false;
+app.canvas.addEventListener("pointerdown", (e) => {
+  _dragging = true;
+  const { x, y } = getWorldPos(e);
+  if (typeof onClick === "function") onClick(x, y);
+});
+app.canvas.addEventListener("pointermove", (e) => {
+  const { x, y } = getWorldPos(e);
+  if (_dragging && typeof onDrag === "function") onDrag(x, y);
+  if (typeof onHover === "function") onHover(x, y);
+});
+app.canvas.addEventListener("pointerup", () => {
+  _dragging = false;
+  if (typeof onRelease === "function") onRelease();
+});
+// Define onClick, onDrag, onRelease, onHover in your demo code to handle events.
+// ── End Interaction ─────────────────────────────────────────────────────────
+`;
+
 const WALLS_HELPER = `function addWalls() {
   const t = 20;
   const floor = new Body(BodyType.STATIC, new Vec2(W / 2, H - t / 2));
@@ -231,6 +286,7 @@ const canvasWrap = canvas;
 const ctx = canvas.getContext("2d");
 
 ${RENDERER_2D}
+${INTERACTION_2D}
 ${WALLS_HELPER}
 ${code}`;
     },
@@ -274,6 +330,7 @@ await app.init({ width: W, height: H, backgroundColor: 0x0d1117, antialias: true
 container.appendChild(app.canvas);
 
 ${RENDERER_PIXI}
+${INTERACTION_PIXI}
 ${WALLS_HELPER}
 ${code}`;
     },

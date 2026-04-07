@@ -24,15 +24,14 @@ export function getPixi() {
   return _PIXI;
 }
 
-// ---------------------------------------------------------------------------
-// Colour palette (matching the 2D/3D adapters)
-// ---------------------------------------------------------------------------
+import {
+  BODY_COLORS_HEX, STATIC_COLOR_HEX, CONSTRAINT_COLOR_HEX,
+  bodyColorHex, bodyFillAlpha,
+} from "./shared-colors.js";
 
-const FILL_COLORS = [
-  0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0xdbabff,
-];
-const STATIC_FILL = 0x607888;
-const SLEEPING_FILL = 0x3fb950;
+// Aliases for backward compatibility
+const FILL_COLORS = BODY_COLORS_HEX;
+const STATIC_FILL = STATIC_COLOR_HEX;
 const OUTLINE_ALPHA = 0.8;
 
 // ---------------------------------------------------------------------------
@@ -49,6 +48,10 @@ export class PixiJSAdapter {
   #showOutlines = true;
   #app = null;
   #bodySprites = new Map(); // Body|number -> PIXI.Sprite
+
+  // Background grid + constraint lines
+  #gridGfx = null;
+  #constraintGfx = null;
 
   // 2D overlay canvas for HUD (legend, cursor hints, etc.)
   #overlay = null;
@@ -83,6 +86,24 @@ export class PixiJSAdapter {
       "display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:contain";
     container.appendChild(this.#app.canvas);
 
+    // Background grid (matching Canvas2D's 50px grid)
+    this.#gridGfx = new _PIXI.Graphics();
+    const step = 50;
+    for (let x = 0; x <= W; x += step) {
+      this.#gridGfx.moveTo(x, 0);
+      this.#gridGfx.lineTo(x, H);
+    }
+    for (let y = 0; y <= H; y += step) {
+      this.#gridGfx.moveTo(0, y);
+      this.#gridGfx.lineTo(W, y);
+    }
+    this.#gridGfx.stroke({ color: 0x1a2030, width: 0.5 });
+    this.#app.stage.addChildAt(this.#gridGfx, 0);
+
+    // Constraint lines overlay (reused each frame)
+    this.#constraintGfx = new _PIXI.Graphics();
+    this.#app.stage.addChild(this.#constraintGfx);
+
     // 2D overlay canvas for HUD (legend, density labels, etc.)
     this.#overlay = document.createElement("canvas");
     this.#overlay.width = W;
@@ -104,6 +125,8 @@ export class PixiJSAdapter {
       this.#app.destroy(true);
       this.#app = null;
     }
+    this.#gridGfx = null;
+    this.#constraintGfx = null;
     this.#bodySprites.clear();
     this.#container = null;
   }
@@ -152,6 +175,9 @@ export class PixiJSAdapter {
         sprite.y = body.position.y;
         sprite.rotation = body.rotation;
       }
+
+      // Draw constraint lines between connected bodies
+      this.#drawConstraintLines(space);
 
       // Ticker is stopped; we drive rendering manually from DemoRunner's rAF loop
       this.#app.render();
@@ -262,6 +288,30 @@ export class PixiJSAdapter {
   }
 
   // ---------------------------------------------------------------------------
+  // Internal: constraint rendering
+  // ---------------------------------------------------------------------------
+
+  #drawConstraintLines(space) {
+    if (!this.#constraintGfx) return;
+    this.#constraintGfx.clear();
+    try {
+      const raw = space.constraints;
+      const len = raw.length;
+      if (len === 0) return;
+      for (let i = 0; i < len; i++) {
+        const c = raw.at(i);
+        if (c.body1 && c.body2) {
+          this.#constraintGfx.moveTo(c.body1.position.x, c.body1.position.y);
+          this.#constraintGfx.lineTo(c.body2.position.x, c.body2.position.y);
+        }
+      }
+      this.#constraintGfx.stroke({ color: CONSTRAINT_COLOR_HEX, width: 1, alpha: 0.2 });
+    } catch (_) {}
+    // Keep constraints on top of body sprites
+    this.#app.stage.setChildIndex(this.#constraintGfx, this.#app.stage.children.length - 1);
+  }
+
+  // ---------------------------------------------------------------------------
   // Internal: body graphics management
   // ---------------------------------------------------------------------------
 
@@ -304,30 +354,11 @@ export class PixiJSAdapter {
   #drawBodyShapes(body, gfx, showOutlines) {
     gfx.clear();
 
-    // Support custom _color (e.g. bounce pads, ice platforms)
-    const customColor = body.userData?._color;
-    let fillColor, fillAlpha;
-    if (customColor) {
-      fillColor = parseInt(customColor.stroke.replace("#", ""), 16);
-      fillAlpha = 0.25;
-    } else {
-      const overrideIdx = body.userData?._colorIdx;
-      const colorIdx = (overrideIdx ?? 0) % FILL_COLORS.length;
-      // Respect explicit _colorIdx even on static bodies (e.g. one-way platforms, coins)
-      if (overrideIdx != null && overrideIdx > 0) {
-        fillColor = FILL_COLORS[colorIdx];
-        fillAlpha = 0.25;
-      } else {
-        fillColor = body.isStatic()
-          ? STATIC_FILL
-          : body.isSleeping
-            ? SLEEPING_FILL
-            : FILL_COLORS[colorIdx];
-        fillAlpha = body.userData?._isZone ? 0.05 : body.isStatic() ? 0.15 : 0.25;
-      }
-    }
-
     for (const shape of body.shapes) {
+      const isFluid = !!shape.fluidEnabled;
+      const isSensor = !!shape.sensorEnabled;
+      const fillColor = isFluid ? 0x1e90ff : bodyColorHex(body);
+      const fillAlpha = isFluid ? 0.25 : isSensor ? 0.08 : bodyFillAlpha(body);
       if (shape.isCircle()) {
         const r = shape.castCircle.radius;
         gfx.circle(0, 0, r);

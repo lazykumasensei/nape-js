@@ -4,33 +4,16 @@
  * Provides body/constraint/grid drawing and a global error overlay
  * that surfaces uncaught errors on mobile (where devtools aren't handy).
  */
+import { BODY_COLORS_CSS, bodyColorCSS } from "./renderers/shared-colors.js";
 
 // =========================================================================
-// Color palette
+// Color palette (re-exported for backward compatibility)
 // =========================================================================
 
-export const COLORS = [
-  { fill: "rgba(88,166,255,0.18)", stroke: "#58a6ff" },
-  { fill: "rgba(210,153,34,0.18)", stroke: "#d29922" },
-  { fill: "rgba(63,185,80,0.18)", stroke: "#3fb950" },
-  { fill: "rgba(248,81,73,0.18)", stroke: "#f85149" },
-  { fill: "rgba(163,113,247,0.18)", stroke: "#a371f7" },
-  { fill: "rgba(219,171,255,0.18)", stroke: "#dbabff" },
-];
+export const COLORS = BODY_COLORS_CSS;
 
 export function bodyColor(body) {
-  // Allow full custom color via _color (e.g. ice platforms)
-  const customColor = body.userData?._color;
-  if (customColor) return customColor;
-  // Allow explicit color override via _colorIdx (e.g. one-way platforms, player)
-  const overrideIdx = body.userData?._colorIdx;
-  if (overrideIdx != null && overrideIdx > 0) {
-    return COLORS[overrideIdx % COLORS.length];
-  }
-  if (body.isStatic()) return { fill: "rgba(120,160,200,0.15)", stroke: "#607888" };
-  if (body.isSleeping) return { fill: "rgba(100,200,100,0.12)", stroke: "#3fb950" };
-  const idx = (overrideIdx ?? 0) % COLORS.length;
-  return COLORS[idx];
+  return bodyColorCSS(body);
 }
 
 // =========================================================================
@@ -52,11 +35,21 @@ export function drawBody(ctx, body, showOutlines = true) {
   ctx.translate(px, py);
   ctx.rotate(rot);
 
-  const { fill, stroke } = showOutlines
+  const defaultColor = showOutlines
     ? bodyColor(body)
     : { fill: body.isStatic() ? "#2a3a48" : body.isSleeping ? "#1a3020" : "#162540", stroke: null };
 
   for (const shape of body.shapes) {
+    // Per-shape overrides for fluid and sensor shapes
+    let { fill, stroke } = defaultColor;
+    if (shape.fluidEnabled) {
+      fill = "rgba(30,144,255,0.25)";
+      stroke = showOutlines ? "rgba(100,200,255,0.6)" : null;
+    } else if (shape.sensorEnabled) {
+      fill = showOutlines ? "rgba(88,166,255,0.06)" : "rgba(88,166,255,0.03)";
+      stroke = showOutlines ? "rgba(88,166,255,0.3)" : null;
+    }
+
     if (shape.isCircle()) {
       const r = shape.castCircle.radius;
       ctx.beginPath();
