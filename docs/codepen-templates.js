@@ -17,12 +17,13 @@ const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module
 // =========================================================================
 
 const SPAWN_RANDOM = `let _spawnCount = 0;
-function spawnRandomShape(space, x, y) {
+function spawnRandomShape(space, x, y, opts) {
+  const { minR = 5, maxR = 20, minW = 8, maxW = 34 } = opts || {};
   const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
   if (Math.random() < 0.5) {
-    body.shapes.add(new Circle(5 + Math.random() * 15));
+    body.shapes.add(new Circle(minR + Math.random() * (maxR - minR)));
   } else {
-    const w = 8 + Math.random() * 26, h = 8 + Math.random() * 26;
+    const w = minW + Math.random() * (maxW - minW), h = minW + Math.random() * (maxW - minW);
     body.shapes.add(new Polygon(Polygon.box(w, h)));
   }
   try { body.userData._colorIdx = _spawnCount++; } catch (_) {}
