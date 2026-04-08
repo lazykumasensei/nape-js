@@ -1,28 +1,5 @@
 import { Body, BodyType, Vec2, Circle, Polygon, PivotJoint, AngleJoint } from "../nape-js.esm.js";
 
-
-export default {
-  id: "ragdoll",
-  label: "Ragdoll",
-  tags: ["PivotJoint", "AngleJoint", "Character", "Click"],
-  featured: true,
-  featuredOrder: 7,
-  desc: 'Ragdoll figures built from <code>PivotJoint</code> and <code>AngleJoint</code> constraints. <b>Click</b> to spawn a new ragdoll at the cursor.',
-  walls: true,
-  workerCompatible: true,
-
-  setup(space, W, H) {
-    space.gravity = new Vec2(0, 600);
-    spawnRagdoll(space, W / 2, 120, 0);
-    spawnRagdoll(space, W / 2 - 150, 80, 2);
-    spawnRagdoll(space, W / 2 + 150, 60, 4);
-  },
-
-  click(x, y, space, W, H) {
-    spawnRagdoll(space, x, y, Math.floor(Math.random() * 6));
-  },
-};
-
 function spawnRagdoll(space, x, y, colorBase) {
   // Torso
   const torso = new Body(BodyType.DYNAMIC, new Vec2(x, y));
@@ -130,3 +107,25 @@ function spawnRagdoll(space, x, y, colorBase) {
   const rKneeA = new AngleJoint(rUpperLeg, rLowerLeg, -0.1, Math.PI * 0.5);
   rKneeA.space = space;
 }
+
+export default {
+  id: "ragdoll",
+  label: "Ragdoll",
+  tags: ["PivotJoint", "AngleJoint", "Character", "Click"],
+  featured: true,
+  featuredOrder: 7,
+  desc: 'Ragdoll figures built from <code>PivotJoint</code> and <code>AngleJoint</code> constraints. <b>Click</b> to spawn a new ragdoll at the cursor.',
+  walls: true,
+  workerCompatible: true,
+
+  setup(space, W, H) {
+    space.gravity = new Vec2(0, 600);
+    spawnRagdoll(space, W / 2, 120, 0);
+    spawnRagdoll(space, W / 2 - 150, 80, 2);
+    spawnRagdoll(space, W / 2 + 150, 60, 4);
+  },
+
+  click(x, y, space, W, H) {
+    spawnRagdoll(space, x, y, Math.floor(Math.random() * 6));
+  },
+};

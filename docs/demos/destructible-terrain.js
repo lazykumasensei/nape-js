@@ -241,6 +241,37 @@ let _spawnTimer = 0;
 const SPAWN_INTERVAL = 40; // frames between spawns (~0.67s at 60fps)
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+let _lastMouseX = 450;
+let _lastMouseY = 250;
+
+function drawBlastCursor(ctx) {
+  ctx.strokeStyle = "rgba(255,100,50,0.25)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.arc(_lastMouseX, _lastMouseY, _blastR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function spawnObject(space, x, y, idx) {
+  const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+  if (Math.random() < 0.5) {
+    body.shapes.add(new Circle(8 + Math.random() * 12));
+  } else {
+    const sides = 3 + Math.floor(Math.random() * 3);
+    const r = 10 + Math.random() * 12;
+    body.shapes.add(new Polygon(Polygon.regular(r, r, sides)));
+  }
+  body.userData._colorIdx = idx;
+  body.space = space;
+  return body;
+}
+
+// ---------------------------------------------------------------------------
 // Demo definition
 // ---------------------------------------------------------------------------
 
@@ -358,34 +389,3 @@ export default {
   },
 
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-let _lastMouseX = 450;
-let _lastMouseY = 250;
-
-function drawBlastCursor(ctx) {
-  ctx.strokeStyle = "rgba(255,100,50,0.25)";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.arc(_lastMouseX, _lastMouseY, _blastR, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-}
-
-function spawnObject(space, x, y, idx) {
-  const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-  if (Math.random() < 0.5) {
-    body.shapes.add(new Circle(8 + Math.random() * 12));
-  } else {
-    const sides = 3 + Math.floor(Math.random() * 3);
-    const r = 10 + Math.random() * 12;
-    body.shapes.add(new Polygon(Polygon.regular(r, r, sides)));
-  }
-  body.userData._colorIdx = idx;
-  body.space = space;
-  return body;
-}
