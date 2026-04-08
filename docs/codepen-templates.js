@@ -369,6 +369,8 @@ if (_demo.render) {
     else _origDrawBody(a);
   };
   drawGrid = function() { _origDrawGrid(); };
+  // Alias: demo render hooks call drawConstraints(ctx, space) from renderer.js import
+  var drawConstraints = function() { drawConstraintLines(); };
 }
 
 function _loop() {
@@ -445,6 +447,9 @@ _gridGeom.setAttribute("position", new THREE.Float32BufferAttribute(_gridPts, 3)
 scene.add(new THREE.LineSegments(_gridGeom, new THREE.LineBasicMaterial({ color: 0x1a2030, transparent: true, opacity: 0.5 })));
 
 // ── Runtime ──────────────────────────────────────────────────────────────────
+// Compat: demos import loadThree() from threejs-adapter — in CodePen THREE is already global
+function loadThree() { return Promise.resolve(THREE); }
+
 const space = new Space();
 __WALLS__
 __GRAVITY__
@@ -594,7 +599,7 @@ function _loop() {
   space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
   _updateCamera();
   if (_demo.renderPixi) {
-    _demo.renderPixi({ syncBodies, getEngine: () => ({ app }) }, space, W, H, false, _camX, _camY);
+    _demo.renderPixi({ syncBodies, getEngine: () => ({ PIXI, app }) }, space, W, H, false, _camX, _camY);
   } else {
     drawGrid();
     syncBodies(space);
