@@ -328,6 +328,38 @@ __WALLS__
 __GRAVITY__
 _demo.setup(space, W, H);
 
+// ── Camera ──────────────────────────────────────────────────────────────────
+let _camX = 0, _camY = 0;
+const _camCfg = _demo.camera || null;
+function _updateCamera() {
+  const cfg = _camCfg;
+  if (!cfg) return;
+  let tx, ty;
+  if (typeof cfg.follow === "function") {
+    const p = cfg.follow();
+    if (!p) return;
+    tx = p.x; ty = p.y;
+  } else if (cfg.follow && cfg.follow.position) {
+    tx = cfg.follow.position.x; ty = cfg.follow.position.y;
+  } else { return; }
+  const offX = cfg.offsetX ?? 0, offY = cfg.offsetY ?? 0;
+  let goalX = tx + offX - W / 2, goalY = ty + offY - H / 2;
+  const b = cfg.bounds;
+  if (b) {
+    goalX = Math.max(b.minX, Math.min(goalX, b.maxX - W));
+    goalY = Math.max(b.minY, Math.min(goalY, b.maxY - H));
+  }
+  const lerp = cfg.lerp ?? 0.1;
+  _camX += (goalX - _camX) * lerp;
+  _camY += (goalY - _camY) * lerp;
+  if (b) {
+    _camX = Math.max(b.minX, Math.min(_camX, b.maxX - W));
+    _camY = Math.max(b.minY, Math.min(_camY, b.maxY - H));
+  }
+}
+// Snap camera to target on first frame
+if (_camCfg) { const _origLerp = _camCfg.lerp; _camCfg.lerp = 1; _updateCamera(); _camCfg.lerp = _origLerp; }
+
 // Compat: demo render hooks call drawBody(ctx, body, outlines) and drawGrid(ctx, W, H)
 // while CodePen helpers use drawBody(body) and drawGrid(). Wrap to accept both.
 if (_demo.render) {
@@ -342,13 +374,17 @@ if (_demo.render) {
 function _loop() {
   if (_demo.step) _demo.step(space, W, H);
   space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
+  _updateCamera();
   ctx.clearRect(0, 0, W, H);
   if (_demo.render) {
-    _demo.render(ctx, space, W, H, _showOutlines);
+    _demo.render(ctx, space, W, H, _showOutlines, _camX, _camY);
   } else {
+    ctx.save();
+    ctx.translate(-_camX, -_camY);
     drawGrid();
     for (const body of space.bodies) drawBody(body);
     drawConstraintLines();
+    ctx.restore();
   }
   requestAnimationFrame(_loop);
 }
@@ -357,7 +393,7 @@ _loop();
 // Interaction
 function _getWorldPos(e) {
   const rect = canvas.getBoundingClientRect();
-  return { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) };
+  return { x: (e.clientX - rect.left) * (W / rect.width) + _camX, y: (e.clientY - rect.top) * (H / rect.height) + _camY };
 }
 let _dragging = false;
 canvas.addEventListener("pointerdown", (e) => {
@@ -414,6 +450,37 @@ __WALLS__
 __GRAVITY__
 _demo.setup(space, W, H);
 
+// ── Camera ──────────────────────────────────────────────────────────────────
+let _camX = 0, _camY = 0;
+const _camCfg = _demo.camera || null;
+function _updateCamera() {
+  const cfg = _camCfg;
+  if (!cfg) return;
+  let tx, ty;
+  if (typeof cfg.follow === "function") {
+    const p = cfg.follow();
+    if (!p) return;
+    tx = p.x; ty = p.y;
+  } else if (cfg.follow && cfg.follow.position) {
+    tx = cfg.follow.position.x; ty = cfg.follow.position.y;
+  } else { return; }
+  const offX = cfg.offsetX ?? 0, offY = cfg.offsetY ?? 0;
+  let goalX = tx + offX - W / 2, goalY = ty + offY - H / 2;
+  const b = cfg.bounds;
+  if (b) {
+    goalX = Math.max(b.minX, Math.min(goalX, b.maxX - W));
+    goalY = Math.max(b.minY, Math.min(goalY, b.maxY - H));
+  }
+  const lerp = cfg.lerp ?? 0.1;
+  _camX += (goalX - _camX) * lerp;
+  _camY += (goalY - _camY) * lerp;
+  if (b) {
+    _camX = Math.max(b.minX, Math.min(_camX, b.maxX - W));
+    _camY = Math.max(b.minY, Math.min(_camY, b.maxY - H));
+  }
+}
+if (_camCfg) { const _origLerp = _camCfg.lerp; _camCfg.lerp = 1; _updateCamera(); _camCfg.lerp = _origLerp; }
+
 // 2D overlay canvas for constraint/label overlays
 let _overlayCtx = null;
 if (_demo.render3dOverlay) {
@@ -428,8 +495,18 @@ if (_demo.render3dOverlay) {
 function _loop() {
   if (_demo.step) _demo.step(space, W, H);
   space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
+  _updateCamera();
   syncBodies3D(space);
-  renderer.render(scene, camera);
+  if (_demo.render3d) {
+    _demo.render3d(renderer, scene, camera, space, W, H, _camX, _camY);
+  } else {
+    if (_camCfg) {
+      const _baseCamX = W / 2, _baseCamY = -H / 2, _camZZ = camera.position.z;
+      camera.position.set(_baseCamX + _camX, _baseCamY - _camY, _camZZ);
+      camera.lookAt(_baseCamX + _camX, _baseCamY - _camY, 0);
+    }
+    renderer.render(scene, camera);
+  }
   if (_overlayCtx) {
     _overlayCtx.clearRect(0, 0, W, H);
     _demo.render3dOverlay(_overlayCtx, space, W, H);
@@ -441,7 +518,7 @@ _loop();
 // Interaction
 function _getWorldPos(e) {
   const rect = container.getBoundingClientRect();
-  return { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) };
+  return { x: (e.clientX - rect.left) * (W / rect.width) + _camX, y: (e.clientY - rect.top) * (H / rect.height) + _camY };
 }
 let _dragging = false;
 container.addEventListener("pointerdown", (e) => {
@@ -470,6 +547,37 @@ __WALLS__
 __GRAVITY__
 _demo.setup(space, W, H);
 
+// ── Camera ──────────────────────────────────────────────────────────────────
+let _camX = 0, _camY = 0;
+const _camCfg = _demo.camera || null;
+function _updateCamera() {
+  const cfg = _camCfg;
+  if (!cfg) return;
+  let tx, ty;
+  if (typeof cfg.follow === "function") {
+    const p = cfg.follow();
+    if (!p) return;
+    tx = p.x; ty = p.y;
+  } else if (cfg.follow && cfg.follow.position) {
+    tx = cfg.follow.position.x; ty = cfg.follow.position.y;
+  } else { return; }
+  const offX = cfg.offsetX ?? 0, offY = cfg.offsetY ?? 0;
+  let goalX = tx + offX - W / 2, goalY = ty + offY - H / 2;
+  const b = cfg.bounds;
+  if (b) {
+    goalX = Math.max(b.minX, Math.min(goalX, b.maxX - W));
+    goalY = Math.max(b.minY, Math.min(goalY, b.maxY - H));
+  }
+  const lerp = cfg.lerp ?? 0.1;
+  _camX += (goalX - _camX) * lerp;
+  _camY += (goalY - _camY) * lerp;
+  if (b) {
+    _camX = Math.max(b.minX, Math.min(_camX, b.maxX - W));
+    _camY = Math.max(b.minY, Math.min(_camY, b.maxY - H));
+  }
+}
+if (_camCfg) { const _origLerp = _camCfg.lerp; _camCfg.lerp = 1; _updateCamera(); _camCfg.lerp = _origLerp; }
+
 // 2D overlay canvas for constraint/label overlays
 let _overlayCtx = null;
 if (_demo.render3dOverlay) {
@@ -484,10 +592,16 @@ if (_demo.render3dOverlay) {
 function _loop() {
   if (_demo.step) _demo.step(space, W, H);
   space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
-  drawGrid();
-  syncBodies(space);
-  if (!_demo.render3dOverlay) drawConstraintLines();
-  app.render();
+  _updateCamera();
+  if (_demo.renderPixi) {
+    _demo.renderPixi({ syncBodies, getEngine: () => ({ app }) }, space, W, H, false, _camX, _camY);
+  } else {
+    drawGrid();
+    syncBodies(space);
+    if (!_demo.render3dOverlay) drawConstraintLines();
+    if (_camCfg) { app.stage.x = -_camX; app.stage.y = -_camY; }
+    app.render();
+  }
   if (_overlayCtx) {
     _overlayCtx.clearRect(0, 0, W, H);
     _demo.render3dOverlay(_overlayCtx, space, W, H);
@@ -499,7 +613,7 @@ _loop();
 // Interaction
 function _getWorldPos(e) {
   const rect = app.canvas.getBoundingClientRect();
-  return { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) };
+  return { x: (e.clientX - rect.left) * (W / rect.width) + _camX, y: (e.clientY - rect.top) * (H / rect.height) + _camY };
 }
 let _dragging = false;
 app.canvas.addEventListener("pointerdown", (e) => {
@@ -640,10 +754,16 @@ function extractDemoObject(demo, preamble = "") {
   if (!demo.setup) return null;
 
   const hooks = [];
-  for (const name of ["setup", "step", "click", "drag", "release", "hover", "wheel", "render", "render3dOverlay"]) {
+  for (const name of ["setup", "step", "click", "drag", "release", "hover", "wheel", "render", "renderPixi", "render3d", "render3dOverlay"]) {
     if (typeof demo[name] === "function") {
       hooks.push(`  ${demo[name].toString()}`);
     }
+  }
+
+  // Include camera: null so setup() can assign this.camera = {...}
+  // Always emit null — the actual value (with Body refs) is set by setup() at runtime.
+  if ("camera" in demo) {
+    hooks.push(`  camera: null`);
   }
 
   const demoObj = `const _demo = {\n${hooks.join(",\n")}\n};`;
