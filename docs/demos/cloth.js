@@ -22,11 +22,51 @@ function loadLogo() {
     let resolved = false;
     const done = () => { if (!resolved) { resolved = true; resolve(); } };
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => { _logoImg = img; done(); };
     img.onerror = done;
     setTimeout(done, 2000);
     img.src = "./logo.svg";
   });
+}
+
+// ── Affine-textured triangle via canvas setTransform ────────────────────────
+function drawTexturedTriangle(ctx, img,
+  x0, y0, x1, y1, x2, y2,
+  u0, v0, u1, v1, u2, v2,
+) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+
+  // Source pixel coords
+  const sx0 = u0 * iw, sy0 = v0 * ih;
+  const sx1 = u1 * iw, sy1 = v1 * ih;
+  const sx2 = u2 * iw, sy2 = v2 * ih;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.closePath();
+  ctx.clip();
+
+  // Solve affine: [sx, sy] → [dx, dy]
+  // We need transform T such that T * [sx, sy, 1] = [dx, dy]
+  const denom = sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1);
+  if (Math.abs(denom) < 1e-10) { ctx.restore(); return; }
+  const invD = 1 / denom;
+
+  const a = (x0 * (sy1 - sy2) + x1 * (sy2 - sy0) + x2 * (sy0 - sy1)) * invD;
+  const b = (x0 * (sx2 - sx1) + x1 * (sx0 - sx2) + x2 * (sx1 - sx0)) * invD;
+  const e = (x0 * (sx1 * sy2 - sx2 * sy1) + x1 * (sx2 * sy0 - sx0 * sy2) + x2 * (sx0 * sy1 - sx1 * sy0)) * invD;
+  const c = (y0 * (sy1 - sy2) + y1 * (sy2 - sy0) + y2 * (sy0 - sy1)) * invD;
+  const d = (y0 * (sx2 - sx1) + y1 * (sx0 - sx2) + y2 * (sx1 - sx0)) * invD;
+  const f = (y0 * (sx1 * sy2 - sx2 * sy1) + y1 * (sx2 * sy0 - sx0 * sy2) + y2 * (sx0 * sy1 - sx1 * sy0)) * invD;
+
+  ctx.setTransform(a, c, b, d, e, f);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
 }
 
 export default {
@@ -527,42 +567,3 @@ let _clothRows = 0;`,
     renderer.render(scene, camera);
   },
 };
-
-// ── Affine-textured triangle via canvas setTransform ────────────────────────
-function drawTexturedTriangle(ctx, img,
-  x0, y0, x1, y1, x2, y2,
-  u0, v0, u1, v1, u2, v2,
-) {
-  const iw = img.naturalWidth || img.width;
-  const ih = img.naturalHeight || img.height;
-
-  // Source pixel coords
-  const sx0 = u0 * iw, sy0 = v0 * ih;
-  const sx1 = u1 * iw, sy1 = v1 * ih;
-  const sx2 = u2 * iw, sy2 = v2 * ih;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.closePath();
-  ctx.clip();
-
-  // Solve affine: [sx, sy] → [dx, dy]
-  // We need transform T such that T * [sx, sy, 1] = [dx, dy]
-  const denom = sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1);
-  if (Math.abs(denom) < 1e-10) { ctx.restore(); return; }
-  const invD = 1 / denom;
-
-  const a = (x0 * (sy1 - sy2) + x1 * (sy2 - sy0) + x2 * (sy0 - sy1)) * invD;
-  const b = (x0 * (sx2 - sx1) + x1 * (sx0 - sx2) + x2 * (sx1 - sx0)) * invD;
-  const e = (x0 * (sx1 * sy2 - sx2 * sy1) + x1 * (sx2 * sy0 - sx0 * sy2) + x2 * (sx0 * sy1 - sx1 * sy0)) * invD;
-  const c = (y0 * (sy1 - sy2) + y1 * (sy2 - sy0) + y2 * (sy0 - sy1)) * invD;
-  const d = (y0 * (sx2 - sx1) + y1 * (sx0 - sx2) + y2 * (sx1 - sx0)) * invD;
-  const f = (y0 * (sx1 * sy2 - sx2 * sy1) + y1 * (sx2 * sy0 - sx0 * sy2) + y2 * (sx0 * sy1 - sx1 * sy0)) * invD;
-
-  ctx.setTransform(a, c, b, d, e, f);
-  ctx.drawImage(img, 0, 0);
-  ctx.restore();
-}

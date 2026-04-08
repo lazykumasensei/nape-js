@@ -74,6 +74,7 @@ async function loadImageToCanvas(src, width, height) {
   canvas.height = height;
   await new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => { canvas.getContext("2d").drawImage(img, 0, 0, width, height); resolve(); };
     img.onerror = reject;
     img.src = src;

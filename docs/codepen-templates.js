@@ -477,6 +477,7 @@ const W = canvas.width, H = canvas.height;
 const space = new Space();
 __WALLS__
 __GRAVITY__
+if (_demo.preload) await _demo.preload();
 _demo.setup(space, W, H);
 
 // ── Camera ──────────────────────────────────────────────────────────────────
@@ -604,6 +605,7 @@ function loadThree() { return Promise.resolve(THREE); }
 const space = new Space();
 __WALLS__
 __GRAVITY__
+if (_demo.preload) await _demo.preload();
 _demo.setup(space, W, H);
 
 // ── Camera ──────────────────────────────────────────────────────────────────
@@ -701,6 +703,7 @@ const RUNTIME_PIXI = `
 const space = new Space();
 __WALLS__
 __GRAVITY__
+if (_demo.preload) await _demo.preload();
 _demo.setup(space, W, H);
 
 // ── Camera ──────────────────────────────────────────────────────────────────
@@ -910,7 +913,7 @@ function extractDemoObject(demo, preamble = "") {
   if (!demo.setup) return null;
 
   const hooks = [];
-  for (const name of ["setup", "step", "click", "drag", "release", "hover", "wheel", "render", "renderPixi", "render3d", "render3dOverlay"]) {
+  for (const name of ["preload", "setup", "step", "click", "drag", "release", "hover", "wheel", "render", "renderPixi", "render3d", "render3dOverlay"]) {
     if (typeof demo[name] === "function") {
       hooks.push(`  ${demo[name].toString()}`);
     }
@@ -946,9 +949,14 @@ function fillRuntime(runtime, demo) {
  * Auto-generate CodePen code from demo hooks for a specific adapter.
  * Returns null if the demo's setup function cannot be extracted.
  */
+const ASSET_BASE_URL = "https://newkrok.github.io/nape-js/";
+
 function autoGenerateCode(demo, adapterId, preamble = "") {
-  const demoObj = extractDemoObject(demo, preamble);
+  let demoObj = extractDemoObject(demo, preamble);
   if (!demoObj) return null;
+
+  // Rewrite relative asset URLs to absolute GitHub Pages URLs for CodePen
+  demoObj = demoObj.replace(/([\"'])\.\/(assets\/[^\"']+|[^\"']+\.(svg|png|webp|jpg|jpeg|gif))/g, `$1${ASSET_BASE_URL}$2`);
 
   // Try to extract gravity from setup body (common pattern: space.gravity = new Vec2(...))
   const setupSrc = demo.setup.toString();
