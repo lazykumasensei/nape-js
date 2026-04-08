@@ -11,6 +11,7 @@ export default {
   tags: ["PivotJoint", "Zero Gravity", "Friction"],
   desc: "Top-down car physics with friction-based steering. Bodies have no gravity.",
   walls: true,
+  moduleState: `let _topDownBodies = [];`,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 0); // no gravity

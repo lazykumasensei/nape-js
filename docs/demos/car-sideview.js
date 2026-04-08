@@ -79,6 +79,30 @@ export default {
   tags: ["SpringJoint", "LineJoint", "MotorJoint"],
   desc: "A car with SpringJoint suspension on wavy terrain. Use <b>← →</b> arrow keys or tap left/right to drive.",
   walls: false,
+  moduleState: `const WHEEL_OFFSET_X = 44;
+const CHASSIS_H = 18;
+const MOTOR_RATE = 13;
+const WORLD_W = 4000;
+let _chassis = null;
+let _fWheel = null;
+let _rWheel = null;
+let _rMotor = null;
+const keys = {};
+function buildTerrain(space, worldW, groundY) {
+  const segW = 40;
+  const numSegs = Math.ceil(worldW / segW);
+  for (let i = 0; i < numSegs; i++) {
+    const x = i * segW;
+    const y0 = groundY + Math.sin(x * 0.008) * 30 + Math.sin(x * 0.02) * 12 + Math.sin(x * 0.05) * 5;
+    const x1 = x + segW;
+    const y1 = groundY + Math.sin(x1 * 0.008) * 30 + Math.sin(x1 * 0.02) * 12 + Math.sin(x1 * 0.05) * 5;
+    const bottom = groundY + 80;
+    const verts = [new Vec2(x, y0), new Vec2(x1, y1), new Vec2(x1, bottom), new Vec2(x, bottom)];
+    const seg = new Body(BodyType.STATIC);
+    seg.shapes.add(new Polygon(verts));
+    seg.space = space;
+  }
+}`,
 
   camera: null,
 

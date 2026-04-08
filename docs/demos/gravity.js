@@ -13,6 +13,8 @@ export default {
   featuredOrder: 5,
   desc: 'Mario Galaxy-style gravity: bodies are pulled toward a central planet. <b>Click</b> to spawn orbiting bodies.',
   walls: false,
+  moduleState: `let _planetX = 0;
+let _planetY = 0;`,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 0); // no global gravity

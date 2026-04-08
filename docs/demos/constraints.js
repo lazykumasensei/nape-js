@@ -105,6 +105,12 @@ export default {
   tags: ['PivotJoint', 'DistanceJoint', 'AngleJoint', 'WeldJoint', 'MotorJoint', 'LineJoint', 'PulleyJoint', 'SpringJoint'],
   featured: true,
   featuredOrder: 4,
+  moduleState: `let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0;
+let _dragY = 0;`,
   desc: 'All 8 built-in constraint types in a 3×3 grid. <b>Drag</b> any body to feel how each constraint reacts.',
   walls: true,
 

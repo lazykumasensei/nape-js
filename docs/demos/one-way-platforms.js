@@ -15,6 +15,11 @@ export default {
   tags: ["PreListener", "CbType", "Kinematic"],
   desc: "Bodies pass through platforms from below but rest on them from above. Click &amp; drag a body to pull it through a platform — release to watch it land. Click empty space to spawn a new shape. The bottom conveyor belt pushes shapes sideways.",
   walls: true,
+  moduleState: `let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0, _dragY = 0;`,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

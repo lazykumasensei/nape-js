@@ -15,6 +15,12 @@ export default {
   featured: false,
   desc: 'A pendulum chain with a heavy bob. <b>Drag</b> any link to grab and pull it.',
   walls: true,
+  moduleState: `let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0;
+let _dragY = 0;`,
   velocityIterations: 10,
   positionIterations: 8,
 

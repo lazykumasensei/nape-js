@@ -9,7 +9,7 @@
  *  2. Auto-generation from demo hooks (setup/step/click/drag/release) via .toString()
  */
 
-const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js@3.24.0/dist/index.js";
+const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js@3.25.1/dist/index.js";
 const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
 
 // =========================================================================
@@ -501,10 +501,97 @@ function toFunction(fnStr, name) {
 }
 
 /**
+ * Extract module-level preamble (variables, constants, functions) from demo
+ * source text. Returns the code between the last import block and the
+ * `export default {` line, with import statements stripped.
+ * Returns empty string if nothing is found.
+ */
+function extractModulePreamble(sourceText) {
+  const lines = sourceText.split("\n");
+
+  // Find the end of the last import block and the export default line.
+  // Handles multiline imports like: import {\n  Foo,\n  Bar,\n} from '...';
+  let lastImportEndIdx = -1;
+  let exportIdx = -1;
+  let inMultilineImport = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    if (trimmed.startsWith("export default")) {
+      exportIdx = i;
+      break;
+    }
+
+    if (inMultilineImport) {
+      // Inside a multiline import — look for the closing `} from ...;`
+      if (trimmed.includes("from ") || trimmed.startsWith("}")) {
+        if (trimmed.endsWith(";")) {
+          inMultilineImport = false;
+          lastImportEndIdx = i;
+        }
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith("import ") || trimmed.startsWith("import{")) {
+      if (trimmed.endsWith(";")) {
+        // Single-line import
+        lastImportEndIdx = i;
+      } else {
+        // Start of multiline import
+        inMultilineImport = true;
+      }
+    }
+  }
+
+  if (exportIdx <= 0) return "";
+
+  const startIdx = lastImportEndIdx + 1;
+  if (startIdx >= exportIdx) return "";
+
+  // Extract lines between imports and export default, trim blank edges
+  const preamble = lines.slice(startIdx, exportIdx).join("\n").trim();
+  return preamble;
+}
+
+// Cache of fetched demo source preambles (keyed by demo id)
+const _preambleCache = new Map();
+
+/**
+ * Fetch the demo source file and extract its module-level preamble.
+ * Returns the preamble string or empty string on failure.
+ * Results are cached by demo id.
+ */
+async function fetchModulePreamble(demo) {
+  if (!demo.id) return "";
+  if (_preambleCache.has(demo.id)) return _preambleCache.get(demo.id);
+
+  // Determine the source file path from the demo id
+  // Convention: demos live at ./demos/<id>.js (relative to the page)
+  const path = `./demos/${demo.id}.js`;
+  try {
+    const resp = await fetch(path);
+    if (!resp.ok) throw new Error(resp.status);
+    const text = await resp.text();
+    const preamble = extractModulePreamble(text);
+    _preambleCache.set(demo.id, preamble);
+    return preamble;
+  } catch {
+    _preambleCache.set(demo.id, "");
+    return "";
+  }
+}
+
+/**
  * Extract demo hooks and build a _demo object literal.
  * Returns null if the demo has no extractable setup function.
+ *
+ * Module-level preamble (variables, functions, constants) is prepended before
+ * the _demo object so they are available at the CodePen top-level scope.
+ * Priority: fetched source preamble > demo.moduleState > nothing.
  */
-function extractDemoObject(demo) {
+function extractDemoObject(demo, preamble = "") {
   if (!demo.setup) return null;
 
   const hooks = [];
@@ -514,7 +601,12 @@ function extractDemoObject(demo) {
     }
   }
 
-  return `const _demo = {\n${hooks.join(",\n")}\n};`;
+  const demoObj = `const _demo = {\n${hooks.join(",\n")}\n};`;
+  const pre = preamble || demo.moduleState || "";
+  if (pre) {
+    return `${pre}\n\n${demoObj}`;
+  }
+  return demoObj;
 }
 
 /**
@@ -533,8 +625,8 @@ function fillRuntime(runtime, demo) {
  * Auto-generate CodePen code from demo hooks for a specific adapter.
  * Returns null if the demo's setup function cannot be extracted.
  */
-function autoGenerateCode(demo, adapterId) {
-  const demoObj = extractDemoObject(demo);
+function autoGenerateCode(demo, adapterId, preamble = "") {
+  const demoObj = extractDemoObject(demo, preamble);
   if (!demoObj) return null;
 
   // Try to extract gravity from setup body (common pattern: space.gravity = new Vec2(...))
@@ -678,9 +770,10 @@ const CODEPEN_CSS = `body { margin: 20px; background: #0d1117; font-family: sans
  *
  * @param {Object} demo — demo definition
  * @param {string} adapterId — "canvas2d" | "threejs" | "pixijs"
+ * @param {string} [preamble] — module-level code to prepend (from source fetch)
  * @returns {{ code: string, auto: boolean } | null}
  */
-export function getDemoCode(demo, adapterId) {
+export function getDemoCode(demo, adapterId, preamble = "") {
   if (demo.codepenOverride) return { code: demo.codepenOverride, auto: false };
 
   // Check for explicit per-adapter code
@@ -696,7 +789,7 @@ export function getDemoCode(demo, adapterId) {
   if (explicit) return { code: explicit, auto: false };
 
   // Fall back to auto-generation from demo hooks
-  const auto = autoGenerateCode(demo, adapterId);
+  const auto = autoGenerateCode(demo, adapterId, preamble);
   if (auto) return { code: auto, auto: true };
 
   return null;
@@ -708,11 +801,12 @@ export function getDemoCode(demo, adapterId) {
  * @param {Object} demo — demo definition
  * @param {string} adapterId — "canvas2d" | "threejs" | "pixijs"
  * @param {{ showOutlines?: boolean }} [opts]
+ * @param {string} [preamble] — module-level code to prepend
  * @returns {{ title, description, html, css, js, js_module } | null}
  */
-export function generateCodePen(demo, adapterId, { showOutlines = true } = {}) {
+export function generateCodePen(demo, adapterId, { showOutlines = true } = {}, preamble = "") {
   const template = TEMPLATES[adapterId] ?? TEMPLATES.canvas2d;
-  const result = getDemoCode(demo, adapterId);
+  const result = getDemoCode(demo, adapterId, preamble);
 
   if (!result) return null;
 
@@ -734,13 +828,16 @@ export function generateCodePen(demo, adapterId, { showOutlines = true } = {}) {
 
 /**
  * Open a CodePen with the demo's code in a new tab.
+ * Async — fetches the demo source file to extract module-level preamble
+ * (variables, constants, functions) needed by the CodePen.
  *
  * @param {Object} demo — demo definition
  * @param {string} adapterId — "canvas2d" | "threejs" | "pixijs"
  * @param {{ showOutlines?: boolean }} [opts]
  */
-export function openInCodePen(demo, adapterId, opts) {
-  const data = generateCodePen(demo, adapterId, opts);
+export async function openInCodePen(demo, adapterId, opts) {
+  const preamble = await fetchModulePreamble(demo);
+  const data = generateCodePen(demo, adapterId, opts, preamble);
   if (!data) return;
 
   const form = document.createElement("form");
@@ -766,10 +863,11 @@ export function openInCodePen(demo, adapterId, opts) {
  * @param {Object} demo — demo definition
  * @param {string} adapterId — current adapter ID
  * @param {{ showOutlines?: boolean }} [opts]
- * @returns {string}
+ * @returns {Promise<string>}
  */
-export function getPreviewCode(demo, adapterId, { showOutlines = true } = {}) {
-  const result = getDemoCode(demo, adapterId);
+export async function getPreviewCode(demo, adapterId, { showOutlines = true } = {}) {
+  const preamble = await fetchModulePreamble(demo);
+  const result = getDemoCode(demo, adapterId, preamble);
   if (!result) return "// No source code available for this demo.";
 
   const template = TEMPLATES[adapterId] ?? TEMPLATES.canvas2d;

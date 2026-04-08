@@ -255,6 +255,15 @@ export default {
   tags: ["MarchingSquares", "Procedural", "Interactive"],
   desc: "Drag any image file onto the canvas — <b>MarchingSquares</b> extracts the physics contour instantly and spawns a dynamic body. <b>Drag</b> bodies with the mouse.",
   walls: true,
+  moduleState: `let _colorCounter = 0;
+let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0, _dragY = 0;
+let _space = null;
+let _W = 900, _H = 500;
+let _dropWired = false;`,
 
   setup(space, W, H) {
     _space = space;

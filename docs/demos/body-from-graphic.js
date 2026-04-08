@@ -105,6 +105,12 @@ export default {
   tags: ["MarchingSquares", "Procedural"],
   desc: "Uses <b>MarchingSquares</b> to extract physics bodies from the cog bitmap. Three sizes, each processed independently. <b>Drag</b> any cog with the mouse.",
   walls: true,
+  moduleState: `let _cogCanvas = null;
+let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0, _dragY = 0;`,
 
   async preload() {
     // Load at the largest required size; smaller ones will be downscaled from this

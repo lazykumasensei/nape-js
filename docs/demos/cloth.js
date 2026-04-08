@@ -36,6 +36,14 @@ export default {
   tags: ["DistanceJoint", "Springs", "Grid"],
   desc: "A grid of particles connected by springs, simulating cloth with a logo texture. <b>Drag</b> the cloth with the mouse. A circle obstacle drifts across.",
   walls: false,
+  moduleState: `let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0, _dragY = 0;
+let _clothBodies = null;
+let _clothCols = 0;
+let _clothRows = 0;`,
 
   async preload() {
     await loadLogo();

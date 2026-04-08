@@ -58,6 +58,13 @@ export default {
   featuredOrder: 5,
   desc: 'SpringJoint demo — spring chain and soft-body blob. <b>Drag</b> any body to interact.',
   walls: true,
+  moduleState: `let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0;
+let _dragY = 0;
+let _sections = {};`,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 600);

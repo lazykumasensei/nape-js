@@ -24,6 +24,19 @@ export default {
   label: "Pinball",
   featured: false,
   tags: ["Circle", "Restitution", "Bumpers", "Kinematic"],
+  moduleState: `const keys = {};
+let _lFlipper = null, _rFlipper = null;
+let _lPivot = null, _rPivot = null;
+let _flipW = 0;
+let _oscillator = null;
+let _oscCenter = 0;
+let _oscTime = 0;
+let _tableW = 0;
+const FLIP_REST = 0.4;
+const FLIP_ACTIVE = -0.4;
+const FLIP_SPEED = 14;
+const BUMPER_IMPULSE = 350;
+const SLINGSHOT_IMPULSE = 280;`,
   desc: "Pinball with asymmetric bumpers, slingshots, pegs, a launch lane, and an oscillating blocker. Left/Right arrows or A/D to flip. Click left/right half to flip on mobile. Click upper area to spawn balls.",
   walls: false,
   workerCompatible: false,
