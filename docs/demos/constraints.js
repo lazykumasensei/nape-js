@@ -12,7 +12,7 @@ const ROWS = 3;
 const SIZE = 14; // half-size of each box (smaller for clarity)
 
 // Per-cell color indices (each constraint gets its own color pair)
-const COLORS = {
+const CELL_COLORS = {
   pivot:    [0, 0],  // blue
   weld:     [4, 5],  // purple, teal
   distance: [1, 1],  // yellow
@@ -167,8 +167,8 @@ let _dragY = 0;`,
     // ── PivotJoint (col=1, row=0) ─────────────────────────────────────────
     {
       const { cx, cy, cw } = cellOrigin(1, 0, W, H);
-      const b1 = box(cx - cw / 6, cy, false, COLORS.pivot[0]);
-      const b2 = box(cx + cw / 6, cy, false, COLORS.pivot[1]);
+      const b1 = box(cx - cw / 6, cy, false, CELL_COLORS.pivot[0]);
+      const b2 = box(cx + cw / 6, cy, false, CELL_COLORS.pivot[1]);
       const pivot = new Vec2(cx, cy);
       format(new PivotJoint(
         b1, b2,
@@ -182,8 +182,8 @@ let _dragY = 0;`,
     {
       const { cx, cy, cw } = cellOrigin(2, 0, W, H);
       const gap = SIZE + 2; // bodies nearly touching
-      const b1 = box(cx - gap, cy, false, COLORS.weld[0]);
-      const b2 = box(cx + gap, cy, false, COLORS.weld[1]);
+      const b1 = box(cx - gap, cy, false, CELL_COLORS.weld[0]);
+      const b2 = box(cx + gap, cy, false, CELL_COLORS.weld[1]);
       const weld = new Vec2(cx, cy);
       format(new WeldJoint(
         b1, b2,
@@ -198,8 +198,8 @@ let _dragY = 0;`,
     {
       const { cx, cy, cw, top } = cellOrigin(0, 1, W, H);
       const startY = top + SIZE * 2; // start near top of cell so spring effect is visible
-      const b1 = box(cx - cw * 0.12, startY, false, COLORS.distance[0]);
-      const b2 = box(cx + cw * 0.12, startY, false, COLORS.distance[1]);
+      const b1 = box(cx - cw * 0.12, startY, false, CELL_COLORS.distance[0]);
+      const b2 = box(cx + cw * 0.12, startY, false, CELL_COLORS.distance[1]);
       format(new DistanceJoint(
         b1, b2,
         new Vec2(0, -SIZE),
@@ -213,8 +213,8 @@ let _dragY = 0;`,
     // ── LineJoint (col=1, row=1) ──────────────────────────────────────────
     {
       const { cx, cy, cw } = cellOrigin(1, 1, W, H);
-      const b1 = box(cx - cw / 6, cy, false, COLORS.line[0]);
-      const b2 = box(cx + cw / 6, cy, false, COLORS.line[1]);
+      const b1 = box(cx - cw / 6, cy, false, CELL_COLORS.line[0]);
+      const b2 = box(cx + cw / 6, cy, false, CELL_COLORS.line[1]);
       const anchor = new Vec2(cx, cy);
       format(new LineJoint(
         b1, b2,
@@ -234,15 +234,15 @@ let _dragY = 0;`,
       // Bar at top (pinned)
       const bar = new Body(BodyType.DYNAMIC, new Vec2(cx, top + SIZE + 8));
       bar.shapes.add(new Polygon(Polygon.box(barW, SIZE)));
-      try { bar.userData._colorIdx = COLORS.pulley[0]; } catch (_) {}
+      try { bar.userData._colorIdx = CELL_COLORS.pulley[0]; } catch (_) {}
       bar.space = space;
       const pinBar = new PivotJoint(space.world, bar, new Vec2(cx, top + SIZE + 8), new Vec2(0, 0));
       pinBar.space = space;
       pinnedSet.add(bar);
 
       const hangGap = barW / 2 - SIZE; // hang points near bar ends
-      const b2 = box(cx - hangGap, cy - ch * 0.1, false, COLORS.pulley[0]);
-      const b3 = box(cx + hangGap, cy - ch * 0.1, false, COLORS.pulley[1]);
+      const b2 = box(cx - hangGap, cy - ch * 0.1, false, CELL_COLORS.pulley[0]);
+      const b3 = box(cx + hangGap, cy - ch * 0.1, false, CELL_COLORS.pulley[1]);
       format(new PulleyJoint(
         bar, b2,
         bar, b3,
@@ -258,8 +258,8 @@ let _dragY = 0;`,
     // ── AngleJoint (col=0, row=2) ─────────────────────────────────────────
     {
       const { cx, cy, cw } = cellOrigin(0, 2, W, H);
-      const b1 = box(cx - cw / 6, cy, true, COLORS.angle[0]);
-      const b2 = box(cx + cw / 6, cy, true, COLORS.angle[1]);
+      const b1 = box(cx - cw / 6, cy, true, CELL_COLORS.angle[0]);
+      const b2 = box(cx + cw / 6, cy, true, CELL_COLORS.angle[1]);
       format(new AngleJoint(
         b1, b2,
         -Math.PI * 1.5,
@@ -272,8 +272,8 @@ let _dragY = 0;`,
     // ── MotorJoint (col=1, row=2) ─────────────────────────────────────────
     {
       const { cx, cy, cw } = cellOrigin(1, 2, W, H);
-      const b1 = box(cx - cw / 6, cy, true, COLORS.motor[0]);
-      const b2 = box(cx + cw / 6, cy, true, COLORS.motor[1]);
+      const b1 = box(cx - cw / 6, cy, true, CELL_COLORS.motor[0]);
+      const b2 = box(cx + cw / 6, cy, true, CELL_COLORS.motor[1]);
       format(new MotorJoint(
         b1, b2,
         10,
@@ -293,7 +293,7 @@ let _dragY = 0;`,
       pin.space = space;
 
       // Hanging body
-      const b = box(cx, cy + 10, false, COLORS.spring[1]);
+      const b = box(cx, cy + 10, false, CELL_COLORS.spring[1]);
       const sj = new SpringJoint(
         pin, b,
         new Vec2(0, 0), new Vec2(0, -SIZE),

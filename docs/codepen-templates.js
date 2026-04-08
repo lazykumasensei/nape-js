@@ -64,7 +64,7 @@ function bodyColor(body) {
   const idx = (body.userData?._colorIdx ?? 0) % COLORS.length;
   return COLORS[idx];
 }
-function drawBody(body) {
+let drawBody = function(body) {
   const px = body.position.x, py = body.position.y;
   ctx.save(); ctx.translate(px, py); ctx.rotate(body.rotation);
   const _c = bodyColor(body);
@@ -103,12 +103,12 @@ function drawBody(body) {
     }
   }
   ctx.restore();
-}
-function drawGrid() {
+};
+let drawGrid = function() {
   ctx.strokeStyle = "#1a2030"; ctx.lineWidth = 0.5;
   for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
   for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-}
+};
 function drawConstraintLines() {
   try {
     const raw = space.constraints;
@@ -328,13 +328,28 @@ __WALLS__
 __GRAVITY__
 _demo.setup(space, W, H);
 
+// Compat: demo render hooks call drawBody(ctx, body, outlines) and drawGrid(ctx, W, H)
+// while CodePen helpers use drawBody(body) and drawGrid(). Wrap to accept both.
+if (_demo.render) {
+  const _origDrawBody = drawBody, _origDrawGrid = drawGrid;
+  drawBody = function(a, b, c) {
+    if (b !== undefined) { const prev = _showOutlines; _showOutlines = c ?? _showOutlines; _origDrawBody(b); _showOutlines = prev; }
+    else _origDrawBody(a);
+  };
+  drawGrid = function() { _origDrawGrid(); };
+}
+
 function _loop() {
   if (_demo.step) _demo.step(space, W, H);
   space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
   ctx.clearRect(0, 0, W, H);
-  drawGrid();
-  for (const body of space.bodies) drawBody(body);
-  drawConstraintLines();
+  if (_demo.render) {
+    _demo.render(ctx, space, W, H, _showOutlines);
+  } else {
+    drawGrid();
+    for (const body of space.bodies) drawBody(body);
+    drawConstraintLines();
+  }
   requestAnimationFrame(_loop);
 }
 _loop();
@@ -399,11 +414,26 @@ __WALLS__
 __GRAVITY__
 _demo.setup(space, W, H);
 
+// 2D overlay canvas for constraint/label overlays
+let _overlayCtx = null;
+if (_demo.render3dOverlay) {
+  const oc = document.createElement("canvas");
+  oc.width = W; oc.height = H;
+  oc.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none";
+  container.style.position = "relative";
+  container.appendChild(oc);
+  _overlayCtx = oc.getContext("2d");
+}
+
 function _loop() {
   if (_demo.step) _demo.step(space, W, H);
   space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
   syncBodies3D(space);
   renderer.render(scene, camera);
+  if (_overlayCtx) {
+    _overlayCtx.clearRect(0, 0, W, H);
+    _demo.render3dOverlay(_overlayCtx, space, W, H);
+  }
   requestAnimationFrame(_loop);
 }
 _loop();
@@ -440,13 +470,28 @@ __WALLS__
 __GRAVITY__
 _demo.setup(space, W, H);
 
+// 2D overlay canvas for constraint/label overlays
+let _overlayCtx = null;
+if (_demo.render3dOverlay) {
+  const oc = document.createElement("canvas");
+  oc.width = W; oc.height = H;
+  oc.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none";
+  container.style.position = "relative";
+  container.appendChild(oc);
+  _overlayCtx = oc.getContext("2d");
+}
+
 function _loop() {
   if (_demo.step) _demo.step(space, W, H);
   space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
   drawGrid();
   syncBodies(space);
-  drawConstraintLines();
+  if (!_demo.render3dOverlay) drawConstraintLines();
   app.render();
+  if (_overlayCtx) {
+    _overlayCtx.clearRect(0, 0, W, H);
+    _demo.render3dOverlay(_overlayCtx, space, W, H);
+  }
   requestAnimationFrame(_loop);
 }
 _loop();
@@ -482,7 +527,7 @@ app.canvas.addEventListener("wheel", (e) => {
 
 const NAPE_IMPORTS = `import {
   Space, Body, BodyType, Vec2, Circle, Polygon, Capsule,
-  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, SpringJoint,
+  PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, PulleyJoint, SpringJoint,
   Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
   CharacterController, fractureBody, UserConstraint,
@@ -595,7 +640,7 @@ function extractDemoObject(demo, preamble = "") {
   if (!demo.setup) return null;
 
   const hooks = [];
-  for (const name of ["setup", "step", "click", "drag", "release", "hover", "wheel"]) {
+  for (const name of ["setup", "step", "click", "drag", "release", "hover", "wheel", "render", "render3dOverlay"]) {
     if (typeof demo[name] === "function") {
       hooks.push(`  ${demo[name].toString()}`);
     }
