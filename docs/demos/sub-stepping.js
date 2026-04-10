@@ -168,6 +168,45 @@ function countAwake(space) {
 }
 
 // ---------------------------------------------------------------------------
+// 3D helper — shared by render3d (CodePen) and _render3d (live adapter)
+// ---------------------------------------------------------------------------
+
+function ensureMeshes3d(scene, sp, meshList, trackedSet, offsetX) {
+  /* eslint-disable no-undef -- THREE: module import in CodePen, _THREE in local adapter */
+  const _T = _THREE || (typeof THREE !== "undefined" ? THREE : null);
+  if (!_T) return;
+  for (const body of sp.bodies) {
+    if (trackedSet.has(body)) continue;
+    trackedSet.add(body);
+    for (const shape of body.shapes) {
+      let geom;
+      if (shape.isCircle()) {
+        geom = new _T.SphereGeometry(shape.castCircle.radius, 16, 16);
+      } else if (shape.isPolygon()) {
+        const verts = shape.castPolygon.localVerts;
+        const len = verts.length;
+        if (len < 3) continue;
+        const pts = [];
+        for (let i = 0; i < len; i++) pts.push(new _T.Vector2(verts.at(i).x, verts.at(i).y));
+        geom = new _T.ExtrudeGeometry(new _T.Shape(pts), {
+          depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2,
+        });
+        geom.applyMatrix4(new _T.Matrix4().makeScale(1, -1, 1));
+        geom.computeVertexNormals();
+        geom.translate(0, 0, -15);
+      }
+      if (!geom) continue;
+      const color = body.isStatic() ? 0x455a64 : (body.isSleeping ? 0x32b450 : 0xff5020);
+      const mesh = new _T.Mesh(geom, new _T.MeshPhongMaterial({
+        color, shininess: 80, specular: 0x444444, side: _T.DoubleSide,
+      }));
+      scene.add(mesh);
+      meshList.push({ mesh, body, mat: mesh.material, offsetX });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Demo definition
 // ---------------------------------------------------------------------------
 
@@ -319,57 +358,15 @@ const demoDef = {
       adapter.getRenderer().render(adapter.getScene(), adapter.getCamera());
       return;
     }
-    const THREE = _THREE;
+    this.render3d(adapter.getRenderer(), adapter.getScene(), adapter.getCamera(), space, W, H);
+  },
+
+  render3d(renderer, scene, camera, space, W, H) {
+    /* eslint-disable no-undef -- THREE: module import in CodePen, _THREE in local adapter */
+    const _T = _THREE || (typeof THREE !== "undefined" ? THREE : null);
+    if (!_T) return;
     const halfW = W / 2;
-    const scene = adapter.getScene();
-    const renderer = adapter.getRenderer();
-    const camera = adapter.getCamera();
 
-    // Helper: ensure meshes exist for all bodies in a space, track in a Set
-    function ensureMeshes(sp, meshList, trackedSet) {
-      for (const body of sp.bodies) {
-        if (trackedSet.has(body)) continue;
-        trackedSet.add(body);
-        for (const shape of body.shapes) {
-          let geom;
-          if (shape.isCircle()) {
-            geom = new THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
-          } else if (shape.isPolygon()) {
-            const verts = shape.castPolygon.localVerts;
-            const len = verts.length;
-            if (len < 3) continue;
-            const pts = [];
-            for (let i = 0; i < len; i++) pts.push(new THREE.Vector2(verts.at(i).x, verts.at(i).y));
-            geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
-              depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2,
-            });
-            geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
-            geom.computeVertexNormals();
-            geom.translate(0, 0, -15);
-          }
-          if (!geom) continue;
-          const color = body.isStatic() ? 0x455a64 : (body.isSleeping ? 0x32b450 : 0xff5020);
-          const mesh = new THREE.Mesh(geom, new THREE.MeshPhongMaterial({
-            color, shininess: 80, specular: 0x444444, side: THREE.DoubleSide,
-          }));
-          scene.add(mesh);
-          meshList.push({ mesh, body, mat: mesh.material });
-        }
-      }
-    }
-
-    // Helper: sync mesh positions + sleep color
-    function syncMeshes(meshList, offsetX) {
-      for (const entry of meshList) {
-        const b = entry.body;
-        entry.mesh.position.set(b.position.x + offsetX, -b.position.y, 0);
-        entry.mesh.rotation.z = -b.rotation;
-        const wantColor = b.isStatic() ? 0x455a64 : (b.isSleeping ? 0x32b450 : 0xff5020);
-        if (entry.mat.color.getHex() !== wantColor) entry.mat.color.setHex(wantColor);
-      }
-    }
-
-    // Init tracking data
     if (!scene.userData._subA) {
       scene.userData._subA = [];
       scene.userData._subASet = new Set();
@@ -377,19 +374,25 @@ const demoDef = {
       scene.userData._subBSet = new Set();
     }
 
-    // Build & sync Space A (left, offset=0)
-    ensureMeshes(space, scene.userData._subA, scene.userData._subASet);
-    syncMeshes(scene.userData._subA, 0);
+    // Build meshes for both spaces
+    ensureMeshes3d(scene, space, scene.userData._subA, scene.userData._subASet, 0);
+    ensureMeshes3d(scene, _spaceB, scene.userData._subB, scene.userData._subBSet, halfW);
 
-    // Build & sync Space B (right, offset=halfW)
-    ensureMeshes(_spaceB, scene.userData._subB, scene.userData._subBSet);
-    syncMeshes(scene.userData._subB, halfW);
+    // Sync positions + sleep color
+    const allMeshes = [...scene.userData._subA, ...scene.userData._subB];
+    for (const entry of allMeshes) {
+      const b = entry.body;
+      entry.mesh.position.set(b.position.x + entry.offsetX, -b.position.y, 0);
+      entry.mesh.rotation.z = -b.rotation;
+      const wantColor = b.isStatic() ? 0x455a64 : (b.isSleeping ? 0x32b450 : 0xff5020);
+      if (entry.mat.color.getHex() !== wantColor) entry.mat.color.setHex(wantColor);
+    }
 
     // Divider plane
     if (!scene.userData._divider) {
-      const dg = new THREE.PlaneGeometry(2, H);
-      const dm = new THREE.MeshBasicMaterial({ color: 0xff8c32, transparent: true, opacity: 0.4 });
-      const divider = new THREE.Mesh(dg, dm);
+      const dg = new _T.PlaneGeometry(2, H);
+      const dm = new _T.MeshBasicMaterial({ color: 0xff8c32, transparent: true, opacity: 0.4 });
+      const divider = new _T.Mesh(dg, dm);
       divider.position.set(halfW, -H / 2, 10);
       scene.add(divider);
       scene.userData._divider = divider;
