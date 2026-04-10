@@ -656,7 +656,7 @@ function _loop() {
   if (_demo.step) _demo.step(space, W, H);
   space.step(1 / 60, __VEL_ITER__, __POS_ITER__);
   _updateCamera();
-  syncBodies3D(space);
+  if (!_demo.render3d) syncBodies3D(space);
   if (_demo.render3d) {
     _demo.render3d(renderer, scene, camera, space, W, H, _camX, _camY);
   } else {
