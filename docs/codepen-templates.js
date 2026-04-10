@@ -805,7 +805,7 @@ const NAPE_IMPORTS = `import {
   PivotJoint, DistanceJoint, AngleJoint, WeldJoint, MotorJoint, LineJoint, PulleyJoint, SpringJoint,
   Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
-  CharacterController, fractureBody, UserConstraint,
+  CharacterController, fractureBody, UserConstraint, TriggerZone,
 } from "${NAPE_CDN}";`;
 
 /**
