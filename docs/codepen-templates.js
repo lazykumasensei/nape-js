@@ -540,6 +540,8 @@ function _loop() {
     drawConstraintLines();
     ctx.restore();
   }
+  // HUD overlay (legend, labels) — same as canvas2d-adapter locally
+  if (_demo.render3dOverlay) _demo.render3dOverlay(ctx, space, W, H);
   requestAnimationFrame(_loop);
 }
 _loop();
