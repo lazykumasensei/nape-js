@@ -714,6 +714,57 @@ function genPortal(width, position, rotation, body) {
   return portal;
 }
 
+function _drawPortalGlow(ctx, space) {
+  ctx.save();
+  let pi = 0;
+  for (const body of space.bodies) {
+    for (const shape of body.shapes) {
+      const portal = shape.userData.__portal;
+      if (!portal) continue;
+      const wp = body.localPointToWorld(portal.position);
+      const wd = body.localVectorToWorld(portal.direction);
+      const perpX = -wd.y, perpY = wd.x;
+      const hw = portal.width / 2;
+
+      const color = pi < 2 ? "#58a6ff" : "#f85149";
+      pi++;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 15;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(wp.x - perpX * hw, wp.y - perpY * hw);
+      ctx.lineTo(wp.x + perpX * hw, wp.y + perpY * hw);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      wp.dispose();
+      wd.dispose();
+    }
+  }
+  ctx.restore();
+}
+
+let _spawnIdx = 0;
+const _shapeTypes = ["circle", "box", "capsule"];
+
+function spawnShape(space, x, y, type, mgr) {
+  const body = new Body();
+  const r = 12;
+  if (type === "circle") {
+    body.shapes.add(new Circle(r));
+  } else if (type === "box") {
+    body.shapes.add(new Polygon(Polygon.box(r * 2, r * 2)));
+  } else {
+    body.shapes.add(new Capsule(r * 2.5, r * 1.4));
+  }
+  body.position = new Vec2(x, y);
+  body.space = space;
+  for (const s of body.shapes) {
+    s.cbTypes.add(mgr.PORTABLE);
+  }
+}
+
 // ─── Demo export ───────────────────────────────────────────────────────────
 
 export default {
@@ -827,55 +878,3 @@ export default {
     _drawPortalGlow(ctx, space);
   },
 };
-
-
-function _drawPortalGlow(ctx, space) {
-  ctx.save();
-  let pi = 0;
-  for (const body of space.bodies) {
-    for (const shape of body.shapes) {
-      const portal = shape.userData.__portal;
-      if (!portal) continue;
-      const wp = body.localPointToWorld(portal.position);
-      const wd = body.localVectorToWorld(portal.direction);
-      const perpX = -wd.y, perpY = wd.x;
-      const hw = portal.width / 2;
-
-      const color = pi < 2 ? "#58a6ff" : "#f85149";
-      pi++;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 15;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 4;
-      ctx.globalAlpha = 0.9;
-      ctx.beginPath();
-      ctx.moveTo(wp.x - perpX * hw, wp.y - perpY * hw);
-      ctx.lineTo(wp.x + perpX * hw, wp.y + perpY * hw);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      wp.dispose();
-      wd.dispose();
-    }
-  }
-  ctx.restore();
-}
-
-let _spawnIdx = 0;
-const _shapeTypes = ["circle", "box", "capsule"];
-
-function spawnShape(space, x, y, type, mgr) {
-  const body = new Body();
-  const r = 12;
-  if (type === "circle") {
-    body.shapes.add(new Circle(r));
-  } else if (type === "box") {
-    body.shapes.add(new Polygon(Polygon.box(r * 2, r * 2)));
-  } else {
-    body.shapes.add(new Capsule(r * 2.5, r * 1.4));
-  }
-  body.position = new Vec2(x, y);
-  body.space = space;
-  for (const s of body.shapes) {
-    s.cbTypes.add(mgr.PORTABLE);
-  }
-}
