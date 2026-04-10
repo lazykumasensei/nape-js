@@ -22,11 +22,51 @@ function loadLogo() {
     let resolved = false;
     const done = () => { if (!resolved) { resolved = true; resolve(); } };
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => { _logoImg = img; done(); };
     img.onerror = done;
     setTimeout(done, 2000);
     img.src = "./logo.svg";
   });
+}
+
+// ── Affine-textured triangle via canvas setTransform ────────────────────────
+function drawTexturedTriangle(ctx, img,
+  x0, y0, x1, y1, x2, y2,
+  u0, v0, u1, v1, u2, v2,
+) {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+
+  // Source pixel coords
+  const sx0 = u0 * iw, sy0 = v0 * ih;
+  const sx1 = u1 * iw, sy1 = v1 * ih;
+  const sx2 = u2 * iw, sy2 = v2 * ih;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.closePath();
+  ctx.clip();
+
+  // Solve affine: [sx, sy] → [dx, dy]
+  // We need transform T such that T * [sx, sy, 1] = [dx, dy]
+  const denom = sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1);
+  if (Math.abs(denom) < 1e-10) { ctx.restore(); return; }
+  const invD = 1 / denom;
+
+  const a = (x0 * (sy1 - sy2) + x1 * (sy2 - sy0) + x2 * (sy0 - sy1)) * invD;
+  const b = (x0 * (sx2 - sx1) + x1 * (sx0 - sx2) + x2 * (sx1 - sx0)) * invD;
+  const e = (x0 * (sx1 * sy2 - sx2 * sy1) + x1 * (sx2 * sy0 - sx0 * sy2) + x2 * (sx0 * sy1 - sx1 * sy0)) * invD;
+  const c = (y0 * (sy1 - sy2) + y1 * (sy2 - sy0) + y2 * (sy0 - sy1)) * invD;
+  const d = (y0 * (sx2 - sx1) + y1 * (sx0 - sx2) + y2 * (sx1 - sx0)) * invD;
+  const f = (y0 * (sx1 * sy2 - sx2 * sy1) + y1 * (sx2 * sy0 - sx0 * sy2) + y2 * (sx0 * sy1 - sx1 * sy0)) * invD;
+
+  ctx.setTransform(a, c, b, d, e, f);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
 }
 
 export default {
@@ -36,202 +76,14 @@ export default {
   tags: ["DistanceJoint", "Springs", "Grid"],
   desc: "A grid of particles connected by springs, simulating cloth with a logo texture. <b>Drag</b> the cloth with the mouse. A circle obstacle drifts across.",
   walls: false,
-
-  code2d: `// Cloth Simulation — spring-connected particle grid
-const W = canvas.width, H = canvas.height;
-const space = new Space(new Vec2(0, 300));
-
-const cols = 20, rows = 14, gap = 20;
-const startX = W / 2 - (cols * gap) / 2;
-const startY = 30;
-const clothBodies = [];
-
-for (let r = 0; r < rows; r++) {
-  clothBodies[r] = [];
-  for (let c = 0; c < cols; c++) {
-    const isTop = r === 0 && (c % 4 === 0 || c === cols - 1);
-    const b = new Body(isTop ? BodyType.STATIC : BodyType.DYNAMIC, new Vec2(startX + c * gap, startY + r * gap));
-    const circle = new Circle(2);
-    circle.filter = new InteractionFilter(2, ~2);
-    b.shapes.add(circle);
-    b.userData._colorIdx = isTop ? 3 : (r + c) % 6;
-    b.space = space;
-    clothBodies[r][c] = b;
-  }
-}
-
-function connect(b1, b2, rest) {
-  const dj = new DistanceJoint(b1, b2, new Vec2(0, 0), new Vec2(0, 0), rest * 0.9, rest * 1.1);
-  dj.stiff = false; dj.frequency = 20; dj.damping = 0.3; dj.space = space;
-}
-for (let r = 0; r < rows; r++) {
-  for (let c = 0; c < cols; c++) {
-    if (c < cols - 1) connect(clothBodies[r][c], clothBodies[r][c + 1], gap);
-    if (r < rows - 1) connect(clothBodies[r][c], clothBodies[r + 1][c], gap);
-  }
-}
-
-// Moving circle obstacle
-const obstacleR = 29;
-const obstacle = new Body(BodyType.KINEMATIC, new Vec2(obstacleR + 20, H * 0.55 - 50));
-obstacle.shapes.add(new Circle(obstacleR));
-obstacle.userData._colorIdx = 4;
-obstacle.space = space;
-
-// Drag state
-let mouseBody = new Body(BodyType.KINEMATIC, new Vec2(-1000, -1000));
-mouseBody.space = space;
-let grabJoint = null, dragX = 0, dragY = 0;
-
-canvas.addEventListener("pointerdown", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  dragX = (e.clientX - rect.left) * (W / rect.width);
-  dragY = (e.clientY - rect.top) * (H / rect.height);
-  let best = null, bestDist = 40;
-  for (const body of space.bodies) {
-    if (!body.isDynamic()) continue;
-    const dx = body.position.x - dragX, dy = body.position.y - dragY;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    if (d < bestDist) { bestDist = d; best = body; }
-  }
-  if (!best) return;
-  if (grabJoint) { grabJoint.space = null; grabJoint = null; }
-  mouseBody.position.setxy(dragX, dragY);
-  grabJoint = new PivotJoint(mouseBody, best, new Vec2(0, 0), best.worldPointToLocal(new Vec2(dragX, dragY)));
-  grabJoint.stiff = false; grabJoint.frequency = 8; grabJoint.damping = 0.9;
-  grabJoint.space = space;
-});
-canvas.addEventListener("pointermove", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  dragX = (e.clientX - rect.left) * (W / rect.width);
-  dragY = (e.clientY - rect.top) * (H / rect.height);
-});
-canvas.addEventListener("pointerup", () => {
-  if (grabJoint) { grabJoint.space = null; grabJoint = null; }
-  mouseBody.position.setxy(-1000, -1000); mouseBody.velocity.setxy(0, 0);
-});
-
-// Build cloth body lookup set
-const clothSet = new Set();
-for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) clothSet.add(clothBodies[r][c]);
-
-function frame() {
-  // Animate obstacle
-  const range = W / 2 - obstacleR - 20;
-  const t = performance.now() / 1000;
-  const targetX = W / 2 + Math.sin(t * 0.35 - Math.PI / 2) * range;
-  obstacle.velocity = new Vec2((targetX - obstacle.position.x) * 5, 0);
-
-  // Move mouse body
-  if (grabJoint) {
-    const dx = dragX - mouseBody.position.x, dy = dragY - mouseBody.position.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 1) {
-      const spd = Math.min(dist * 60, 600);
-      mouseBody.velocity.setxy(dx / dist * spd, dy / dist * spd);
-    } else mouseBody.velocity.setxy(0, 0);
-  }
-
-  space.step(1 / 60, 8, 3);
-  ctx.clearRect(0, 0, W, H);
-  drawGrid();
-
-  // Draw cloth quads
-  for (let r = 0; r < rows - 1; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      const tl = clothBodies[r][c].position, tr = clothBodies[r][c + 1].position;
-      const bl = clothBodies[r + 1][c].position, br = clothBodies[r + 1][c + 1].position;
-      ctx.beginPath();
-      ctx.moveTo(tl.x, tl.y); ctx.lineTo(tr.x, tr.y);
-      ctx.lineTo(br.x, br.y); ctx.lineTo(bl.x, bl.y);
-      ctx.closePath();
-      ctx.fillStyle = "rgba(88,166,255,0.15)"; ctx.fill();
-      ctx.strokeStyle = "rgba(88,166,255,0.5)"; ctx.lineWidth = 0.5; ctx.stroke();
-    }
-  }
-
-  drawConstraintLines();
-
-  // Draw non-cloth bodies
-  for (const body of space.bodies) {
-    if (body === mouseBody || clothSet.has(body)) continue;
-    drawBody(body);
-  }
-  requestAnimationFrame(frame);
-}
-frame();
-`,
-
-  codePixi: `// Cloth Simulation — spring-connected particle grid
-const space = new Space(new Vec2(0, 300));
-
-const cols = 20, rows = 14, gap = 20;
-const startX = W / 2 - (cols * gap) / 2;
-const startY = 30;
-const clothBodies = [];
-
-for (let r = 0; r < rows; r++) {
-  clothBodies[r] = [];
-  for (let c = 0; c < cols; c++) {
-    const isTop = r === 0 && (c % 4 === 0 || c === cols - 1);
-    const b = new Body(isTop ? BodyType.STATIC : BodyType.DYNAMIC, new Vec2(startX + c * gap, startY + r * gap));
-    const circle = new Circle(2);
-    circle.filter = new InteractionFilter(2, ~2);
-    b.shapes.add(circle);
-    b.space = space;
-    clothBodies[r][c] = b;
-  }
-}
-
-function connect(b1, b2, rest) {
-  const dj = new DistanceJoint(b1, b2, new Vec2(0, 0), new Vec2(0, 0), rest * 0.9, rest * 1.1);
-  dj.stiff = false; dj.frequency = 20; dj.damping = 0.3; dj.space = space;
-}
-for (let r = 0; r < rows; r++) {
-  for (let c = 0; c < cols; c++) {
-    if (c < cols - 1) connect(clothBodies[r][c], clothBodies[r][c + 1], gap);
-    if (r < rows - 1) connect(clothBodies[r][c], clothBodies[r + 1][c], gap);
-  }
-}
-
-// Moving circle obstacle
-const obstacleR = 29;
-const obstacle = new Body(BodyType.KINEMATIC, new Vec2(obstacleR + 20, H * 0.55 - 50));
-obstacle.shapes.add(new Circle(obstacleR));
-obstacle.space = space;
-
-// Cloth quad mesh
-const clothGfx = new PIXI.Graphics();
-app.stage.addChild(clothGfx);
-
-function frame() {
-  // Animate obstacle
-  const range = W / 2 - obstacleR - 20;
-  const t = performance.now() / 1000;
-  const targetX = W / 2 + Math.sin(t * 0.35 - Math.PI / 2) * range;
-  obstacle.velocity = new Vec2((targetX - obstacle.position.x) * 5, 0);
-
-  space.step(1 / 60, 8, 3);
-
-  // Draw cloth quads
-  clothGfx.clear();
-  for (let r = 0; r < rows - 1; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      const tl = clothBodies[r][c].position, tr = clothBodies[r][c + 1].position;
-      const bl = clothBodies[r + 1][c].position, br = clothBodies[r + 1][c + 1].position;
-      clothGfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
-      clothGfx.fill({ color: 0x58a6ff, alpha: 0.15 });
-      clothGfx.poly([tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y], true);
-      clothGfx.stroke({ color: 0x58a6ff, width: 0.5, alpha: 0.5 });
-    }
-  }
-
-  drawGrid();
-  syncBodies(space);
-  app.render();
-  requestAnimationFrame(frame);
-}
-frame();`,
+  moduleState: `let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0, _dragY = 0;
+let _clothBodies = null;
+let _clothCols = 0;
+let _clothRows = 0;`,
 
   async preload() {
     await loadLogo();
@@ -715,42 +567,3 @@ frame();`,
     renderer.render(scene, camera);
   },
 };
-
-// ── Affine-textured triangle via canvas setTransform ────────────────────────
-function drawTexturedTriangle(ctx, img,
-  x0, y0, x1, y1, x2, y2,
-  u0, v0, u1, v1, u2, v2,
-) {
-  const iw = img.naturalWidth || img.width;
-  const ih = img.naturalHeight || img.height;
-
-  // Source pixel coords
-  const sx0 = u0 * iw, sy0 = v0 * ih;
-  const sx1 = u1 * iw, sy1 = v1 * ih;
-  const sx2 = u2 * iw, sy2 = v2 * ih;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.closePath();
-  ctx.clip();
-
-  // Solve affine: [sx, sy] → [dx, dy]
-  // We need transform T such that T * [sx, sy, 1] = [dx, dy]
-  const denom = sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1);
-  if (Math.abs(denom) < 1e-10) { ctx.restore(); return; }
-  const invD = 1 / denom;
-
-  const a = (x0 * (sy1 - sy2) + x1 * (sy2 - sy0) + x2 * (sy0 - sy1)) * invD;
-  const b = (x0 * (sx2 - sx1) + x1 * (sx0 - sx2) + x2 * (sx1 - sx0)) * invD;
-  const e = (x0 * (sx1 * sy2 - sx2 * sy1) + x1 * (sx2 * sy0 - sx0 * sy2) + x2 * (sx0 * sy1 - sx1 * sy0)) * invD;
-  const c = (y0 * (sy1 - sy2) + y1 * (sy2 - sy0) + y2 * (sy0 - sy1)) * invD;
-  const d = (y0 * (sx2 - sx1) + y1 * (sx0 - sx2) + y2 * (sx1 - sx0)) * invD;
-  const f = (y0 * (sx1 * sy2 - sx2 * sy1) + y1 * (sx2 * sy0 - sx0 * sy2) + y2 * (sx0 * sy1 - sx1 * sy0)) * invD;
-
-  ctx.setTransform(a, c, b, d, e, f);
-  ctx.drawImage(img, 0, 0);
-  ctx.restore();
-}

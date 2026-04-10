@@ -189,24 +189,26 @@ function drawOverlay(ctx, W, H) {
 // ---------------------------------------------------------------------------
 
 function ensureMeshes3d(scene, sp, meshList, trackedSet, offsetX) {
-  const THREE = _THREE;
+  /* eslint-disable no-undef -- THREE: module import in CodePen, _THREE in local adapter */
+  const _T = _THREE || (typeof THREE !== "undefined" ? THREE : null);
+  if (!_T) return;
   for (const body of sp.bodies) {
     if (trackedSet.has(body)) continue;
     trackedSet.add(body);
     for (const shape of body.shapes) {
       let geom;
       if (shape.isCircle()) {
-        geom = new THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
+        geom = new _T.SphereGeometry(shape.castCircle.radius, 16, 16);
       } else if (shape.isPolygon()) {
         const verts = shape.castPolygon.localVerts;
         const len = verts.length;
         if (len < 3) continue;
         const pts = [];
-        for (let i = 0; i < len; i++) pts.push(new THREE.Vector2(verts.at(i).x, verts.at(i).y));
-        geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
+        for (let i = 0; i < len; i++) pts.push(new _T.Vector2(verts.at(i).x, verts.at(i).y));
+        geom = new _T.ExtrudeGeometry(new _T.Shape(pts), {
           depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2,
         });
-        geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
+        geom.applyMatrix4(new _T.Matrix4().makeScale(1, -1, 1));
         geom.computeVertexNormals();
         geom.translate(0, 0, -15);
       }
@@ -214,8 +216,8 @@ function ensureMeshes3d(scene, sp, meshList, trackedSet, offsetX) {
       const cIdx = (body.userData?._colorIdx ?? 0) % 6;
       const MESH_COLORS = [0x4fc3f7, 0xffb74d, 0x81c784, 0xef5350, 0xce93d8, 0x4dd0e1];
       const color = body.isStatic() ? 0x455a64 : MESH_COLORS[cIdx];
-      const mesh = new THREE.Mesh(geom, new THREE.MeshPhongMaterial({
-        color, shininess: 80, specular: 0x444444, side: THREE.DoubleSide,
+      const mesh = new _T.Mesh(geom, new _T.MeshPhongMaterial({
+        color, shininess: 80, specular: 0x444444, side: _T.DoubleSide,
       }));
       scene.add(mesh);
       meshList.push({ mesh, body, offsetX });
@@ -312,8 +314,14 @@ const demoDef = {
       adapter.getRenderer().render(adapter.getScene(), adapter.getCamera());
       return;
     }
+    this.render3d(adapter.getRenderer(), adapter.getScene(), adapter.getCamera(), space, W, H);
+  },
+
+  render3d(renderer, scene, camera, space, W, H) {
+    /* eslint-disable no-undef -- THREE: module import in CodePen, _THREE in local adapter */
+    const _T = _THREE || (typeof THREE !== "undefined" ? THREE : null);
+    if (!_T) return;
     const halfW = W / 2;
-    const scene = adapter.getScene();
 
     if (!scene.userData._detA) {
       scene.userData._detA = [];
@@ -334,16 +342,15 @@ const demoDef = {
 
     // Divider
     if (!scene.userData._divider) {
-      const THREE = _THREE;
-      const dg = new THREE.PlaneGeometry(2, H);
-      const dm = new THREE.MeshBasicMaterial({ color: 0x58a6ff, transparent: true, opacity: 0.4 });
-      const divider = new THREE.Mesh(dg, dm);
+      const dg = new _T.PlaneGeometry(2, H);
+      const dm = new _T.MeshBasicMaterial({ color: 0x58a6ff, transparent: true, opacity: 0.4 });
+      const divider = new _T.Mesh(dg, dm);
       divider.position.set(halfW, -H / 2, 10);
       scene.add(divider);
       scene.userData._divider = divider;
     }
 
-    adapter.getRenderer().render(scene, adapter.getCamera());
+    renderer.render(scene, camera);
   },
 
   // -------------------------------------------------------------------------
@@ -422,288 +429,6 @@ const demoDef = {
     drawOverlay(ctx, W, H);
   },
 
-  // -------------------------------------------------------------------------
-  // CodePen snippets
-  // -------------------------------------------------------------------------
-
-  code2d: `// Deterministic Twin-Simulation
-const W = canvas.width, H = canvas.height;
-const halfW = W / 2;
-
-// Seeded PRNG for identical setup
-function mulberry32(seed) {
-  return function () {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function buildScene(space, w, h, rng) {
-  space.gravity = new Vec2(0, 600);
-  space.deterministic = true;
-  const hw = w / 2;
-
-  const floor = new Body(BodyType.STATIC, new Vec2(hw, h - 20));
-  floor.shapes.add(new Polygon(Polygon.box(hw - 10, 20)));
-  floor.space = space;
-
-  const ramp = new Body(BodyType.STATIC, new Vec2(hw * 0.6, h * 0.45));
-  ramp.shapes.add(new Polygon(Polygon.box(hw * 0.55, 12)));
-  ramp.rotation = -0.25;
-  ramp.space = space;
-
-  const shelf = new Body(BodyType.STATIC, new Vec2(hw * 0.85, h * 0.65));
-  shelf.shapes.add(new Polygon(Polygon.box(hw * 0.25, 10)));
-  shelf.rotation = 0.15;
-  shelf.space = space;
-
-  for (let i = 0; i < 20; i++) {
-    const x = hw * 0.2 + rng() * hw * 0.6;
-    const y = 40 + rng() * h * 0.25;
-    const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-    if (rng() < 0.5) {
-      body.shapes.add(new Circle(6 + rng() * 10));
-    } else {
-      body.shapes.add(new Polygon(Polygon.box(10 + rng() * 16, 10 + rng() * 16)));
-    }
-    body.space = space;
-  }
-
-  let prev = null;
-  for (let i = 0; i < 6; i++) {
-    const cx = hw * 0.15 + i * 22;
-    const cy = h * 0.2;
-    const link = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-    link.shapes.add(new Circle(5));
-    link.space = space;
-    if (prev) {
-      new DistanceJoint(prev, link, Vec2.weak(0,0), Vec2.weak(0,0), 18, 24).space = space;
-    } else {
-      new PivotJoint(space.world, link, Vec2.weak(cx, cy), Vec2.weak(0,0)).space = space;
-    }
-    prev = link;
-  }
-}
-
-const spaceA = new Space();
-const spaceB = new Space();
-buildScene(spaceA, halfW, H, mulberry32(42));
-buildScene(spaceB, halfW, H, mulberry32(42));
-
-let frame = 0, matched = 0;
-
-// Click to drop shapes in both spaces
-canvas.addEventListener("click", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const mx = (e.clientX - rect.left) * (W / rect.width);
-  const my = (e.clientY - rect.top) * (H / rect.height);
-  const lx = Math.min(Math.max(mx < halfW ? mx : mx - halfW, 30), halfW - 30);
-  for (const sp of [spaceA, spaceB]) {
-    for (let i = 0; i < 4; i++) {
-      const body = new Body(BodyType.DYNAMIC, new Vec2(
-        lx + (i % 2) * 16 - 8, Math.max(my, 30) - Math.floor(i / 2) * 16));
-      if (i % 2 === 0) body.shapes.add(new Circle(7 + i));
-      else body.shapes.add(new Polygon(Polygon.box(14, 14)));
-      body.space = sp;
-    }
-  }
-});
-
-function loop() {
-  spaceA.step(1 / 60, 8, 3);
-  spaceB.step(1 / 60, 8, 3);
-  frame++;
-
-  const aBodies = [...spaceA.bodies].filter(b => b.isDynamic());
-  const bBodies = [...spaceB.bodies].filter(b => b.isDynamic());
-  let match = aBodies.length === bBodies.length;
-  if (match) {
-    for (let i = 0; i < aBodies.length; i++) {
-      if (aBodies[i].position.x !== bBodies[i].position.x
-       || aBodies[i].position.y !== bBodies[i].position.y) {
-        match = false; break;
-      }
-    }
-  }
-  if (match) matched++;
-
-  ctx.clearRect(0, 0, W, H);
-
-  // Left half: Space A
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, halfW, H);
-  ctx.clip();
-  drawGrid();
-  for (const body of spaceA.bodies) drawBody(body);
-  drawConstraintLines();
-  ctx.restore();
-
-  // Divider
-  ctx.strokeStyle = "rgba(88,166,255,0.4)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath();
-  ctx.moveTo(halfW, 0);
-  ctx.lineTo(halfW, H);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Right half: Space B
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(halfW, 0, halfW, H);
-  ctx.clip();
-  ctx.translate(halfW, 0);
-  drawGrid();
-  for (const body of spaceB.bodies) drawBody(body);
-  drawConstraintLines();
-  ctx.restore();
-
-  // Labels
-  ctx.font = "bold 13px monospace";
-  ctx.fillStyle = "rgba(88,166,255,0.8)";
-  ctx.fillText("Space A", 12, 14);
-  ctx.fillText("Space B", halfW + 12, 14);
-
-  ctx.font = "11px monospace";
-  ctx.fillStyle = "rgba(200,220,255,0.6)";
-  ctx.fillText("Frame: " + frame, 12, 34);
-  ctx.fillStyle = match ? "rgba(63,185,80,0.9)" : "rgba(248,81,73,0.9)";
-  ctx.fillText(match ? "MATCH  " + matched + "/" + frame : "MISMATCH", 12, 50);
-  ctx.fillStyle = "rgba(200,220,255,0.4)";
-  ctx.fillText("Click to drop shapes", 12, H - 20);
-
-  requestAnimationFrame(loop);
-}
-loop();`,
-
-  codePixi: `// Deterministic Twin-Simulation (PixiJS)
-const halfW = W / 2;
-
-function mulberry32(seed) {
-  return function () {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function buildScene(space, w, h, rng) {
-  space.gravity = new Vec2(0, 600);
-  space.deterministic = true;
-  const hw = w / 2;
-
-  const floor = new Body(BodyType.STATIC, new Vec2(hw, h - 20));
-  floor.shapes.add(new Polygon(Polygon.box(hw - 10, 20)));
-  floor.space = space;
-
-  const ramp = new Body(BodyType.STATIC, new Vec2(hw * 0.6, h * 0.45));
-  ramp.shapes.add(new Polygon(Polygon.box(hw * 0.55, 12)));
-  ramp.rotation = -0.25;
-  ramp.space = space;
-
-  const shelf = new Body(BodyType.STATIC, new Vec2(hw * 0.85, h * 0.65));
-  shelf.shapes.add(new Polygon(Polygon.box(hw * 0.25, 10)));
-  shelf.rotation = 0.15;
-  shelf.space = space;
-
-  for (let i = 0; i < 20; i++) {
-    const x = hw * 0.2 + rng() * hw * 0.6;
-    const y = 40 + rng() * h * 0.25;
-    const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-    if (rng() < 0.5) {
-      body.shapes.add(new Circle(6 + rng() * 10));
-    } else {
-      body.shapes.add(new Polygon(Polygon.box(10 + rng() * 16, 10 + rng() * 16)));
-    }
-    body.space = space;
-  }
-
-  let prev = null;
-  for (let i = 0; i < 6; i++) {
-    const cx = hw * 0.15 + i * 22;
-    const cy = h * 0.2;
-    const link = new Body(BodyType.DYNAMIC, new Vec2(cx, cy));
-    link.shapes.add(new Circle(5));
-    link.space = space;
-    if (prev) {
-      new DistanceJoint(prev, link, Vec2.weak(0,0), Vec2.weak(0,0), 18, 24).space = space;
-    } else {
-      new PivotJoint(space.world, link, Vec2.weak(cx, cy), Vec2.weak(0,0)).space = space;
-    }
-    prev = link;
-  }
-}
-
-const spaceA = new Space();
-const spaceB = new Space();
-buildScene(spaceA, halfW, H, mulberry32(42));
-buildScene(spaceB, halfW, H, mulberry32(42));
-
-// Space B container offset to right half
-const containerB = new PIXI.Container();
-containerB.x = halfW;
-app.stage.addChild(containerB);
-const spritesB = new Map();
-const COLORS = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0xdbabff];
-
-function ensureSpritesB() {
-  for (const body of spaceB.bodies) {
-    if (spritesB.has(body)) continue;
-    const gfx = new PIXI.Graphics();
-    const color = body.isStatic() ? 0x607888 : COLORS[(body.userData?._colorIdx ?? 0) % 6];
-    for (const shape of body.shapes) {
-      if (shape.isCircle()) {
-        gfx.circle(0, 0, shape.castCircle.radius);
-        gfx.fill({ color, alpha: 0.35 });
-        gfx.stroke({ color, alpha: 0.8, width: 1.2 });
-      } else if (shape.isPolygon()) {
-        const verts = shape.castPolygon.localVerts;
-        const len = verts.length;
-        if (len < 3) continue;
-        gfx.moveTo(verts.at(0).x, verts.at(0).y);
-        for (let i = 1; i < len; i++) gfx.lineTo(verts.at(i).x, verts.at(i).y);
-        gfx.closePath();
-        gfx.fill({ color, alpha: 0.35 });
-        gfx.stroke({ color, alpha: 0.8, width: 1.2 });
-      }
-    }
-    containerB.addChild(gfx);
-    spritesB.set(body, gfx);
-  }
-}
-
-// Divider
-const div = new PIXI.Graphics();
-div.moveTo(halfW, 0);
-div.lineTo(halfW, H);
-div.stroke({ color: 0x58a6ff, alpha: 0.4, width: 2 });
-app.stage.addChild(div);
-
-function loop() {
-  spaceA.step(1 / 60, 8, 3);
-  spaceB.step(1 / 60, 8, 3);
-
-  drawGrid();
-  syncBodies(spaceA);
-  ensureSpritesB();
-
-  for (const [body, gfx] of spritesB) {
-    gfx.x = body.position.x;
-    gfx.y = body.position.y;
-    gfx.rotation = body.rotation;
-  }
-
-  app.render();
-  requestAnimationFrame(loop);
-}
-loop();`,
 };
 
 // ---------------------------------------------------------------------------

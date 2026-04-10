@@ -168,6 +168,45 @@ function countAwake(space) {
 }
 
 // ---------------------------------------------------------------------------
+// 3D helper — shared by render3d (CodePen) and _render3d (live adapter)
+// ---------------------------------------------------------------------------
+
+function ensureMeshes3d(scene, sp, meshList, trackedSet, offsetX) {
+  /* eslint-disable no-undef -- THREE: module import in CodePen, _THREE in local adapter */
+  const _T = _THREE || (typeof THREE !== "undefined" ? THREE : null);
+  if (!_T) return;
+  for (const body of sp.bodies) {
+    if (trackedSet.has(body)) continue;
+    trackedSet.add(body);
+    for (const shape of body.shapes) {
+      let geom;
+      if (shape.isCircle()) {
+        geom = new _T.SphereGeometry(shape.castCircle.radius, 16, 16);
+      } else if (shape.isPolygon()) {
+        const verts = shape.castPolygon.localVerts;
+        const len = verts.length;
+        if (len < 3) continue;
+        const pts = [];
+        for (let i = 0; i < len; i++) pts.push(new _T.Vector2(verts.at(i).x, verts.at(i).y));
+        geom = new _T.ExtrudeGeometry(new _T.Shape(pts), {
+          depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2,
+        });
+        geom.applyMatrix4(new _T.Matrix4().makeScale(1, -1, 1));
+        geom.computeVertexNormals();
+        geom.translate(0, 0, -15);
+      }
+      if (!geom) continue;
+      const color = body.isStatic() ? 0x455a64 : (body.isSleeping ? 0x32b450 : 0xff5020);
+      const mesh = new _T.Mesh(geom, new _T.MeshPhongMaterial({
+        color, shininess: 80, specular: 0x444444, side: _T.DoubleSide,
+      }));
+      scene.add(mesh);
+      meshList.push({ mesh, body, mat: mesh.material, offsetX });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Demo definition
 // ---------------------------------------------------------------------------
 
@@ -319,57 +358,15 @@ const demoDef = {
       adapter.getRenderer().render(adapter.getScene(), adapter.getCamera());
       return;
     }
-    const THREE = _THREE;
+    this.render3d(adapter.getRenderer(), adapter.getScene(), adapter.getCamera(), space, W, H);
+  },
+
+  render3d(renderer, scene, camera, space, W, H) {
+    /* eslint-disable no-undef -- THREE: module import in CodePen, _THREE in local adapter */
+    const _T = _THREE || (typeof THREE !== "undefined" ? THREE : null);
+    if (!_T) return;
     const halfW = W / 2;
-    const scene = adapter.getScene();
-    const renderer = adapter.getRenderer();
-    const camera = adapter.getCamera();
 
-    // Helper: ensure meshes exist for all bodies in a space, track in a Set
-    function ensureMeshes(sp, meshList, trackedSet) {
-      for (const body of sp.bodies) {
-        if (trackedSet.has(body)) continue;
-        trackedSet.add(body);
-        for (const shape of body.shapes) {
-          let geom;
-          if (shape.isCircle()) {
-            geom = new THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
-          } else if (shape.isPolygon()) {
-            const verts = shape.castPolygon.localVerts;
-            const len = verts.length;
-            if (len < 3) continue;
-            const pts = [];
-            for (let i = 0; i < len; i++) pts.push(new THREE.Vector2(verts.at(i).x, verts.at(i).y));
-            geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
-              depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2,
-            });
-            geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
-            geom.computeVertexNormals();
-            geom.translate(0, 0, -15);
-          }
-          if (!geom) continue;
-          const color = body.isStatic() ? 0x455a64 : (body.isSleeping ? 0x32b450 : 0xff5020);
-          const mesh = new THREE.Mesh(geom, new THREE.MeshPhongMaterial({
-            color, shininess: 80, specular: 0x444444, side: THREE.DoubleSide,
-          }));
-          scene.add(mesh);
-          meshList.push({ mesh, body, mat: mesh.material });
-        }
-      }
-    }
-
-    // Helper: sync mesh positions + sleep color
-    function syncMeshes(meshList, offsetX) {
-      for (const entry of meshList) {
-        const b = entry.body;
-        entry.mesh.position.set(b.position.x + offsetX, -b.position.y, 0);
-        entry.mesh.rotation.z = -b.rotation;
-        const wantColor = b.isStatic() ? 0x455a64 : (b.isSleeping ? 0x32b450 : 0xff5020);
-        if (entry.mat.color.getHex() !== wantColor) entry.mat.color.setHex(wantColor);
-      }
-    }
-
-    // Init tracking data
     if (!scene.userData._subA) {
       scene.userData._subA = [];
       scene.userData._subASet = new Set();
@@ -377,19 +374,25 @@ const demoDef = {
       scene.userData._subBSet = new Set();
     }
 
-    // Build & sync Space A (left, offset=0)
-    ensureMeshes(space, scene.userData._subA, scene.userData._subASet);
-    syncMeshes(scene.userData._subA, 0);
+    // Build meshes for both spaces
+    ensureMeshes3d(scene, space, scene.userData._subA, scene.userData._subASet, 0);
+    ensureMeshes3d(scene, _spaceB, scene.userData._subB, scene.userData._subBSet, halfW);
 
-    // Build & sync Space B (right, offset=halfW)
-    ensureMeshes(_spaceB, scene.userData._subB, scene.userData._subBSet);
-    syncMeshes(scene.userData._subB, halfW);
+    // Sync positions + sleep color
+    const allMeshes = [...scene.userData._subA, ...scene.userData._subB];
+    for (const entry of allMeshes) {
+      const b = entry.body;
+      entry.mesh.position.set(b.position.x + entry.offsetX, -b.position.y, 0);
+      entry.mesh.rotation.z = -b.rotation;
+      const wantColor = b.isStatic() ? 0x455a64 : (b.isSleeping ? 0x32b450 : 0xff5020);
+      if (entry.mat.color.getHex() !== wantColor) entry.mat.color.setHex(wantColor);
+    }
 
     // Divider plane
     if (!scene.userData._divider) {
-      const dg = new THREE.PlaneGeometry(2, H);
-      const dm = new THREE.MeshBasicMaterial({ color: 0xff8c32, transparent: true, opacity: 0.4 });
-      const divider = new THREE.Mesh(dg, dm);
+      const dg = new _T.PlaneGeometry(2, H);
+      const dm = new _T.MeshBasicMaterial({ color: 0xff8c32, transparent: true, opacity: 0.4 });
+      const divider = new _T.Mesh(dg, dm);
       divider.position.set(halfW, -H / 2, 10);
       scene.add(divider);
       scene.userData._divider = divider;
@@ -520,179 +523,6 @@ const demoDef = {
     ctx.fillText("Click to drop more boxes", 12, H - 18);
     ctx.restore();
   },
-
-  code2d: `// Sub-Stepping: pyramid stability comparison
-const W = canvas.width, H = canvas.height;
-const halfW = W / 2;
-
-// Low solver iterations to stress-test stability
-const VEL_ITER = 1, POS_ITER = 1;
-
-const spaceA = new Space(new Vec2(0, 1500));
-// subSteps=1 (default) — pyramid jitters
-
-const spaceB = new Space(new Vec2(0, 1500));
-spaceB.subSteps = 4; // pyramid settles cleanly
-
-function buildPyramid(space, w, h) {
-  const floor = new Body(BodyType.STATIC, new Vec2(w / 2, h - 10));
-  floor.shapes.add(new Polygon(Polygon.box(w - 10, 10)));
-  floor.space = space;
-
-  const cx = w / 2;
-  const baseY = h - 10 - 6;
-  for (let row = 0; row < 14; row++) {
-    const count = 14 - row;
-    const startX = cx - (count - 1) * 12;
-    for (let col = 0; col < count; col++) {
-      const box = new Body(BodyType.DYNAMIC,
-        new Vec2(startX + col * 24, baseY - row * 12));
-      box.shapes.add(new Polygon(Polygon.box(24, 12)));
-      box.space = space;
-    }
-  }
-}
-
-buildPyramid(spaceA, halfW, H);
-buildPyramid(spaceB, halfW, H);
-
-function loop() {
-  spaceA.step(1 / 60, VEL_ITER, POS_ITER);
-  spaceB.step(1 / 60, VEL_ITER, POS_ITER);
-  ctx.clearRect(0, 0, W, H);
-
-  for (const [sp, offX] of [[spaceA, 0], [spaceB, halfW]]) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(offX, 0, halfW, H);
-    ctx.clip();
-    ctx.translate(offX, 0);
-    drawGrid(halfW, H);
-    for (const body of sp.bodies) {
-      if (body.isStatic()) continue;
-      const sleeping = body.isSleeping;
-      ctx.save();
-      ctx.translate(body.position.x, body.position.y);
-      ctx.rotate(body.rotation);
-      for (const shape of body.shapes) {
-        const verts = shape.castPolygon.localVerts;
-        const len = verts.length;
-        if (len < 3) continue;
-        ctx.beginPath();
-        const v0 = verts.at(0);
-        ctx.moveTo(v0.x, v0.y);
-        for (let vi = 1; vi < len; vi++) {
-          const v = verts.at(vi);
-          ctx.lineTo(v.x, v.y);
-        }
-        ctx.closePath();
-        ctx.fillStyle = sleeping
-          ? "rgba(50,180,80,0.3)" : "rgba(255,120,40,0.35)";
-        ctx.fill();
-        ctx.strokeStyle = sleeping
-          ? "rgba(50,200,80,0.7)" : "rgba(255,80,30,0.8)";
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-    ctx.restore();
-  }
-
-  ctx.font = "bold 13px monospace";
-  ctx.fillStyle = "rgba(255,80,30,0.9)";
-  ctx.fillText("subSteps = 1", 12, 14);
-  ctx.fillStyle = "rgba(50,200,80,0.9)";
-  ctx.fillText("subSteps = 4", halfW + 12, 14);
-
-  requestAnimationFrame(loop);
-}
-loop();`,
-
-  codePixi: `// Sub-Stepping: pyramid stability comparison (PixiJS)
-const halfW = W / 2;
-const VEL_ITER = 1, POS_ITER = 1;
-
-const spaceA = new Space(new Vec2(0, 1500));
-const spaceB = new Space(new Vec2(0, 1500));
-spaceB.subSteps = 4;
-
-function buildPyramid(space, w, h) {
-  const floor = new Body(BodyType.STATIC, new Vec2(w / 2, h - 10));
-  floor.shapes.add(new Polygon(Polygon.box(w - 10, 10)));
-  floor.space = space;
-  const cx = w / 2, baseY = h - 10 - 6;
-  for (let row = 0; row < 14; row++) {
-    const count = 14 - row;
-    const startX = cx - (count - 1) * 12;
-    for (let col = 0; col < count; col++) {
-      const box = new Body(BodyType.DYNAMIC,
-        new Vec2(startX + col * 24, baseY - row * 12));
-      box.shapes.add(new Polygon(Polygon.box(24, 12)));
-      box.space = space;
-    }
-  }
-}
-
-buildPyramid(spaceA, halfW, H);
-buildPyramid(spaceB, halfW, H);
-
-// Space B sprites container (offset by halfW)
-const containerB = new PIXI.Container();
-containerB.x = halfW;
-app.stage.addChild(containerB);
-const spritesB = new Map();
-
-function ensureSpritesB() {
-  for (const body of spaceB.bodies) {
-    if (spritesB.has(body)) continue;
-    const gfx = new PIXI.Graphics();
-    const sleeping = body.isSleeping;
-    const isStatic = body.isStatic();
-    const color = isStatic ? 0x607888 : sleeping ? 0x32b450 : 0xff5020;
-    for (const shape of body.shapes) {
-      if (shape.isPolygon()) {
-        const verts = shape.castPolygon.localVerts;
-        const len = verts.length;
-        if (len < 3) continue;
-        const v0 = verts.at(0);
-        gfx.moveTo(v0.x, v0.y);
-        for (let i = 1; i < len; i++) gfx.lineTo(verts.at(i).x, verts.at(i).y);
-        gfx.closePath();
-        gfx.fill({ color, alpha: 0.5 });
-        gfx.stroke({ color, alpha: 0.8, width: 1.2 });
-      }
-    }
-    containerB.addChild(gfx);
-    spritesB.set(body, { gfx, wasSleeping: sleeping });
-  }
-}
-
-// Divider
-const divider = new PIXI.Graphics();
-divider.moveTo(halfW, 0);
-divider.lineTo(halfW, H);
-divider.stroke({ color: 0xff8c32, alpha: 0.5, width: 2 });
-app.stage.addChild(divider);
-
-function loop() {
-  spaceA.step(1 / 60, VEL_ITER, POS_ITER);
-  spaceB.step(1 / 60, VEL_ITER, POS_ITER);
-
-  drawGrid();
-  syncBodies(spaceA);
-  ensureSpritesB();
-
-  for (const [body, entry] of spritesB) {
-    entry.gfx.x = body.position.x;
-    entry.gfx.y = body.position.y;
-    entry.gfx.rotation = body.rotation;
-  }
-
-  app.render();
-  requestAnimationFrame(loop);
-}
-loop();`,
 };
 
 // ---------------------------------------------------------------------------

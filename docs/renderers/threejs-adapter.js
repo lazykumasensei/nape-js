@@ -25,14 +25,13 @@ export function getThree() {
   return _THREE;
 }
 
-// ---------------------------------------------------------------------------
-// Mesh colour palette
-// ---------------------------------------------------------------------------
+import {
+  BODY_COLORS_HEX, STATIC_COLOR_HEX, CONSTRAINT_COLOR_HEX,
+  bodyColorHex, bodyFillAlpha,
+} from "./shared-colors.js";
 
-const MESH_COLORS = [
-  0x4fc3f7, 0xffb74d, 0x81c784, 0xef5350,
-  0xce93d8, 0x4dd0e1, 0xfff176, 0xff8a65,
-];
+// Alias for backward compatibility with demos that reference MESH_COLORS
+const MESH_COLORS = BODY_COLORS_HEX;
 
 // ---------------------------------------------------------------------------
 // ThreeJSAdapter
@@ -52,6 +51,10 @@ export class ThreeJSAdapter {
   #scene = null;
   #camera = null;
   #meshes = []; // { mesh, body, edges }
+
+  // Background grid + constraint lines (default rendering)
+  #gridMesh = null;
+  #constraintLine = null;
 
   // 2D overlay canvas for HUD (cursor hints, legends, etc.)
   #overlay = null;
@@ -116,6 +119,13 @@ export class ThreeJSAdapter {
 
     this.#meshes = [];
 
+    // Background grid (matching Canvas2D's 50px grid)
+    this.#gridMesh = this.#buildGrid(W, H);
+    this.#scene.add(this.#gridMesh);
+
+    // Constraint line (reused each frame)
+    this.#constraintLine = null;
+
     // Resize observer
     this.#resizeObserver = new ResizeObserver((entries) => {
       const rect = entries[0].contentRect;
@@ -138,6 +148,16 @@ export class ThreeJSAdapter {
       this.#container.removeChild(this.#overlay);
       this.#overlay = null;
       this.#overlayCtx = null;
+    }
+    if (this.#gridMesh) {
+      this.#gridMesh.geometry.dispose();
+      this.#gridMesh.material.dispose();
+      this.#gridMesh = null;
+    }
+    if (this.#constraintLine) {
+      this.#constraintLine.geometry.dispose();
+      this.#constraintLine.material.dispose();
+      this.#constraintLine = null;
     }
     this.#scene = null;
     this.#camera = null;
@@ -193,8 +213,9 @@ export class ThreeJSAdapter {
       return;
     }
 
-    // Default rendering: sync body meshes
+    // Default rendering: sync body meshes + constraints
     this.#syncBodies(space);
+    this.#drawConstraintLines(space);
 
     for (const { mesh, body } of this.#meshes) {
       mesh.position.set(body.position.x, -body.position.y, 0);
@@ -346,6 +367,63 @@ export class ThreeJSAdapter {
   }
 
   // ---------------------------------------------------------------------------
+  // Internal: grid + constraint rendering
+  // ---------------------------------------------------------------------------
+
+  #buildGrid(W, H) {
+    const step = 50;
+    const points = [];
+    for (let x = 0; x <= W; x += step) {
+      points.push(x, 0, 0, x, -H, 0);
+    }
+    for (let y = 0; y <= H; y += step) {
+      points.push(0, -y, 0, W, -y, 0);
+    }
+    const geom = new _THREE.BufferGeometry();
+    geom.setAttribute("position", new _THREE.Float32BufferAttribute(points, 3));
+    const mat = new _THREE.LineBasicMaterial({ color: 0x1a2030, transparent: true, opacity: 0.5 });
+    return new _THREE.LineSegments(geom, mat);
+  }
+
+  #drawConstraintLines(space) {
+    // Remove previous constraint line mesh
+    if (this.#constraintLine) {
+      this.#scene.remove(this.#constraintLine);
+      this.#constraintLine.geometry.dispose();
+      this.#constraintLine.material.dispose();
+      this.#constraintLine = null;
+    }
+
+    try {
+      const constraints = space.constraints;
+      const len = constraints.length;
+      if (len === 0) return;
+
+      const points = [];
+      for (let i = 0; i < len; i++) {
+        const c = constraints.at(i);
+        if (c.body1 && c.body2) {
+          points.push(
+            c.body1.position.x, -c.body1.position.y, 0,
+            c.body2.position.x, -c.body2.position.y, 0,
+          );
+        }
+      }
+      if (points.length === 0) return;
+
+      const geom = new _THREE.BufferGeometry();
+      geom.setAttribute("position", new _THREE.Float32BufferAttribute(points, 3));
+      const mat = new _THREE.LineBasicMaterial({
+        color: CONSTRAINT_COLOR_HEX,
+        transparent: true,
+        opacity: 0.2,
+      });
+      this.#constraintLine = new _THREE.LineSegments(geom, mat);
+      this.#scene.add(this.#constraintLine);
+    } catch (_) {}
+  }
+
+  // ---------------------------------------------------------------------------
   // Internal: body mesh management
   // ---------------------------------------------------------------------------
 
@@ -421,29 +499,41 @@ export class ThreeJSAdapter {
       }
       if (!geom) continue;
 
-      const cIdx = (body.userData?._colorIdx ?? 0) % MESH_COLORS.length;
+      const color = bodyColorHex(body);
       const isZone = !!body.userData?._isZone;
       const isSensor = !!shape.sensorEnabled;
-      const useWireframe = isZone || isSensor;
-      const color = useWireframe
-        ? MESH_COLORS[cIdx % MESH_COLORS.length]
-        : body.isStatic() ? 0x455a64 : MESH_COLORS[cIdx];
-      const mesh = new _THREE.Mesh(
-        geom,
-        useWireframe
-          ? new _THREE.MeshBasicMaterial({
-              color,
-              wireframe: true,
-              transparent: true,
-              opacity: 0.5,
-            })
-          : new _THREE.MeshPhongMaterial({
-              color,
-              shininess: 80,
-              specular: 0x444444,
-              side: _THREE.DoubleSide,
-            }),
-      );
+      const isFluid = !!shape.fluidEnabled;
+      const useTransparent = isZone || isSensor || isFluid;
+
+      let material;
+      if (isFluid) {
+        // Fluid shapes: translucent blue water-like appearance
+        material = new _THREE.MeshPhongMaterial({
+          color: 0x1e90ff,
+          transparent: true,
+          opacity: 0.3,
+          shininess: 100,
+          specular: 0x444444,
+          side: _THREE.DoubleSide,
+        });
+      } else if (useTransparent) {
+        // Sensors / zones: wireframe
+        material = new _THREE.MeshBasicMaterial({
+          color,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.5,
+        });
+      } else {
+        material = new _THREE.MeshPhongMaterial({
+          color,
+          shininess: 80,
+          specular: 0x444444,
+          side: _THREE.DoubleSide,
+        });
+      }
+
+      const mesh = new _THREE.Mesh(geom, material);
       this.#scene.add(mesh);
 
       const edges = new _THREE.LineSegments(

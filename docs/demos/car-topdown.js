@@ -11,6 +11,7 @@ export default {
   tags: ["PivotJoint", "Zero Gravity", "Friction"],
   desc: "Top-down car physics with friction-based steering. Bodies have no gravity.",
   walls: true,
+  moduleState: `let _topDownBodies = [];`,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 0); // no gravity
@@ -57,83 +58,4 @@ export default {
       body.angularVel += Math.sin(performance.now() / 800) * 0.02;
     }
   },
-
-  code2d: `// 2D Car — top-down with friction-based steering
-const space = new Space(new Vec2(0, 0)); // no gravity
-const W = canvas.width, H = canvas.height;
-
-addWalls();
-
-// Car chassis
-const car = new Body(BodyType.DYNAMIC, new Vec2(W / 2, H / 2));
-car.shapes.add(new Polygon(Polygon.box(20, 40), new Material(0.5, 1.0, 0.3, 2)));
-car.space = space;
-car.velocity = new Vec2(0, -60);
-
-// Obstacle cones
-for (let i = 0; i < 20; i++) {
-  const cone = new Body(BodyType.DYNAMIC, new Vec2(
-    40 + Math.random() * (W - 80),
-    40 + Math.random() * (H - 80),
-  ));
-  cone.shapes.add(new Circle(6, undefined, new Material(0.3, 0.8, 0.3, 1)));
-  cone.space = space;
-}
-
-function loop() {
-  // Kill lateral velocity on the car (simulates tire grip)
-  const rot = car.rotation;
-  const fx = Math.sin(rot), fy = -Math.cos(rot);
-  const fwd = car.velocity.x * fx + car.velocity.y * fy;
-  car.velocity = new Vec2(fx * fwd * 0.98, fy * fwd * 0.98);
-  car.angularVel *= 0.96;
-  car.applyImpulse(new Vec2(fx * 2, fy * 2));
-  car.angularVel += Math.sin(performance.now() / 800) * 0.02;
-
-  space.step(1 / 60, 8, 3);
-  ctx.clearRect(0, 0, W, H);
-  drawGrid();
-  for (const body of space.bodies) drawBody(body);
-  requestAnimationFrame(loop);
-}
-loop();`,
-
-  codePixi: `// 2D Car — top-down with friction-based steering
-const space = new Space(new Vec2(0, 0)); // no gravity
-
-addWalls();
-
-// Car chassis
-const car = new Body(BodyType.DYNAMIC, new Vec2(W / 2, H / 2));
-car.shapes.add(new Polygon(Polygon.box(20, 40), new Material(0.5, 1.0, 0.3, 2)));
-car.space = space;
-car.velocity = new Vec2(0, -60);
-
-// Obstacle cones
-for (let i = 0; i < 20; i++) {
-  const cone = new Body(BodyType.DYNAMIC, new Vec2(
-    40 + Math.random() * (W - 80),
-    40 + Math.random() * (H - 80),
-  ));
-  cone.shapes.add(new Circle(6, undefined, new Material(0.3, 0.8, 0.3, 1)));
-  cone.space = space;
-}
-
-function loop() {
-  // Kill lateral velocity on the car (simulates tire grip)
-  const rot = car.rotation;
-  const fx = Math.sin(rot), fy = -Math.cos(rot);
-  const fwd = car.velocity.x * fx + car.velocity.y * fy;
-  car.velocity = new Vec2(fx * fwd * 0.98, fy * fwd * 0.98);
-  car.angularVel *= 0.96;
-  car.applyImpulse(new Vec2(fx * 2, fy * 2));
-  car.angularVel += Math.sin(performance.now() / 800) * 0.02;
-
-  space.step(1 / 60, 8, 3);
-  drawGrid();
-  syncBodies(space);
-  app.render();
-  requestAnimationFrame(loop);
-}
-loop();`,
 };

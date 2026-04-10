@@ -127,6 +127,11 @@ export class DemoRunner {
   #frameCount = 0;
   #fpsAccum   = 0;
 
+  // Fixed-timestep accumulator (prevents 2× speed on 120 Hz displays)
+  #accumulator = 0;
+  static FIXED_DT = 1 / 60;            // 16.667 ms
+  static MAX_FRAME_TIME = 1 / 15;       // cap to avoid spiral of death
+
   // Stats DOM elements
   #statsFps    = null;
   #statsBodies = null;
@@ -404,9 +409,10 @@ export class DemoRunner {
   /** Begin the rAF loop. */
   start() {
     if (this.#animId) return;
-    this.#lastTime  = performance.now();
-    this.#frameCount = 0;
-    this.#fpsAccum  = 0;
+    this.#lastTime   = performance.now();
+    this.#frameCount  = 0;
+    this.#fpsAccum   = 0;
+    this.#accumulator = 0;
     this.#tick();
   }
 
@@ -561,19 +567,34 @@ export class DemoRunner {
           if (this.#statsBodies) this.#statsBodies.textContent = `Bodies: ${state.bodyCount}`;
         }
       } else if (this.#space) {
-        // Main-thread mode: step physics locally, render via adapter
+        // Fixed-timestep accumulator: decouple physics rate from display
+        // refresh rate so the simulation runs at the same speed on 60 Hz,
+        // 120 Hz, and 240 Hz displays.
+        const frameSec = Math.min(dt / 1000, DemoRunner.MAX_FRAME_TIME);
+        this.#accumulator += frameSec;
+
+        const FIXED_DT = DemoRunner.FIXED_DT;
+        const velIter = this.#demo?.velocityIterations ?? 8;
+        const posIter = this.#demo?.positionIterations ?? 3;
+
+        // Call demo.step() once per frame (not per physics substep) so that
+        // frame counters, animation timers (_time += 1/60), and other
+        // per-frame logic run at the correct rate.
         this.#demo?.step?.(this.#space, this.#W, this.#H);
 
-        const stepStart = performance.now();
-        this.#space.step(
-          1 / 60,
-          this.#demo?.velocityIterations ?? 8,
-          this.#demo?.positionIterations ?? 3,
-        );
-        const stepMs = performance.now() - stepStart;
+        let stepMs = 0;
+        let stepped = false;
+        while (this.#accumulator >= FIXED_DT) {
+          const stepStart = performance.now();
+          this.#space.step(FIXED_DT, velIter, posIter);
+          stepMs += performance.now() - stepStart;
+
+          this.#accumulator -= FIXED_DT;
+          stepped = true;
+        }
 
         // Update camera (opt-in — only when demo.camera is configured)
-        this.#updateCamera();
+        if (stepped) this.#updateCamera();
 
         const renderStart = performance.now();
         this.#activeAdapter.renderFrame(this.#space, this.#W, this.#H, {

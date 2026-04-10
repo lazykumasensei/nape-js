@@ -74,6 +74,7 @@ async function loadImageToCanvas(src, width, height) {
   canvas.height = height;
   await new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => { canvas.getContext("2d").drawImage(img, 0, 0, width, height); resolve(); };
     img.onerror = reject;
     img.src = src;
@@ -105,6 +106,12 @@ export default {
   tags: ["MarchingSquares", "Procedural"],
   desc: "Uses <b>MarchingSquares</b> to extract physics bodies from the cog bitmap. Three sizes, each processed independently. <b>Drag</b> any cog with the mouse.",
   walls: true,
+  moduleState: `let _cogCanvas = null;
+let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0, _dragY = 0;`,
 
   async preload() {
     // Load at the largest required size; smaller ones will be downscaled from this
@@ -196,66 +203,4 @@ export default {
   release() {
     _pendingRelease = true;
   },
-
-  code2d: `// Body From Graphic — MarchingSquares contour extraction
-const space = new Space(new Vec2(0, 600));
-const W = canvas.width, H = canvas.height;
-
-addWalls();
-
-// Load an image and extract its physics body using MarchingSquares
-async function createBodyFromImage(src, size, x, y) {
-  const imgCanvas = document.createElement("canvas");
-  imgCanvas.width = imgCanvas.height = size;
-  await new Promise((res, rej) => {
-    const img = new Image();
-    img.onload = () => { imgCanvas.getContext("2d").drawImage(img, 0, 0, size, size); res(); };
-    img.onerror = rej;
-    img.src = src;
-  });
-
-  // Luminance-based iso function (dark pixels = inside)
-  const w = imgCanvas.width, h = imgCanvas.height;
-  const data = imgCanvas.getContext("2d").getImageData(0, 0, w, h).data;
-  function iso(x, y) {
-    const ix = Math.max(0, Math.min(w - 1, Math.floor(x)));
-    const iy = Math.max(0, Math.min(h - 1, Math.floor(y)));
-    const i = (iy * w + ix) * 4;
-    return (0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2]) - 128;
-  }
-
-  // Run MarchingSquares → convex decomposition → physics body
-  const cellSize = Math.max(2, Math.round(size / 40));
-  const polys = MarchingSquares.run(iso, new AABB(0, 0, w, h), Vec2.weak(cellSize, cellSize), 2);
-
-  const body = new Body();
-  for (let i = 0; i < polys.length; i++) {
-    const p = polys.at(i);
-    const parts = p.simplify(1.5).convexDecomposition(true);
-    for (let j = 0; j < parts.length; j++) {
-      body.shapes.add(new Polygon(parts.at(j)));
-    }
-  }
-
-  // Center the shape on the body origin
-  const com = body.localCOM;
-  body.translateShapes(Vec2.get(-com.x, -com.y));
-  body.position.setxy(x, y);
-  body.space = space;
-  return body;
-}
-
-// Create 3 cogs at different sizes
-createBodyFromImage("./assets/cog.webp", 120, W * 0.22, H * 0.45);
-createBodyFromImage("./assets/cog.webp", 160, W * 0.5, H * 0.45);
-createBodyFromImage("./assets/cog.webp", 200, W * 0.78, H * 0.45);
-
-function loop() {
-  space.step(1 / 60, 8, 3);
-  ctx.clearRect(0, 0, W, H);
-  drawGrid();
-  for (const body of space.bodies) drawBody(body);
-  requestAnimationFrame(loop);
-}
-loop();`,
 };

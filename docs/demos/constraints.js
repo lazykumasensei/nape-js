@@ -12,7 +12,7 @@ const ROWS = 3;
 const SIZE = 14; // half-size of each box (smaller for clarity)
 
 // Per-cell color indices (each constraint gets its own color pair)
-const COLORS = {
+const CELL_COLORS = {
   pivot:    [0, 0],  // blue
   weld:     [4, 5],  // purple, teal
   distance: [1, 1],  // yellow
@@ -105,6 +105,12 @@ export default {
   tags: ['PivotJoint', 'DistanceJoint', 'AngleJoint', 'WeldJoint', 'MotorJoint', 'LineJoint', 'PulleyJoint', 'SpringJoint'],
   featured: true,
   featuredOrder: 4,
+  moduleState: `let _mouseBody = null;
+let _grabJoint = null;
+let _pendingGrab = null;
+let _pendingRelease = false;
+let _dragX = 0;
+let _dragY = 0;`,
   desc: 'All 8 built-in constraint types in a 3×3 grid. <b>Drag</b> any body to feel how each constraint reacts.',
   walls: true,
 
@@ -161,8 +167,8 @@ export default {
     // ── PivotJoint (col=1, row=0) ─────────────────────────────────────────
     {
       const { cx, cy, cw } = cellOrigin(1, 0, W, H);
-      const b1 = box(cx - cw / 6, cy, false, COLORS.pivot[0]);
-      const b2 = box(cx + cw / 6, cy, false, COLORS.pivot[1]);
+      const b1 = box(cx - cw / 6, cy, false, CELL_COLORS.pivot[0]);
+      const b2 = box(cx + cw / 6, cy, false, CELL_COLORS.pivot[1]);
       const pivot = new Vec2(cx, cy);
       format(new PivotJoint(
         b1, b2,
@@ -176,8 +182,8 @@ export default {
     {
       const { cx, cy, cw } = cellOrigin(2, 0, W, H);
       const gap = SIZE + 2; // bodies nearly touching
-      const b1 = box(cx - gap, cy, false, COLORS.weld[0]);
-      const b2 = box(cx + gap, cy, false, COLORS.weld[1]);
+      const b1 = box(cx - gap, cy, false, CELL_COLORS.weld[0]);
+      const b2 = box(cx + gap, cy, false, CELL_COLORS.weld[1]);
       const weld = new Vec2(cx, cy);
       format(new WeldJoint(
         b1, b2,
@@ -192,8 +198,8 @@ export default {
     {
       const { cx, cy, cw, top } = cellOrigin(0, 1, W, H);
       const startY = top + SIZE * 2; // start near top of cell so spring effect is visible
-      const b1 = box(cx - cw * 0.12, startY, false, COLORS.distance[0]);
-      const b2 = box(cx + cw * 0.12, startY, false, COLORS.distance[1]);
+      const b1 = box(cx - cw * 0.12, startY, false, CELL_COLORS.distance[0]);
+      const b2 = box(cx + cw * 0.12, startY, false, CELL_COLORS.distance[1]);
       format(new DistanceJoint(
         b1, b2,
         new Vec2(0, -SIZE),
@@ -207,8 +213,8 @@ export default {
     // ── LineJoint (col=1, row=1) ──────────────────────────────────────────
     {
       const { cx, cy, cw } = cellOrigin(1, 1, W, H);
-      const b1 = box(cx - cw / 6, cy, false, COLORS.line[0]);
-      const b2 = box(cx + cw / 6, cy, false, COLORS.line[1]);
+      const b1 = box(cx - cw / 6, cy, false, CELL_COLORS.line[0]);
+      const b2 = box(cx + cw / 6, cy, false, CELL_COLORS.line[1]);
       const anchor = new Vec2(cx, cy);
       format(new LineJoint(
         b1, b2,
@@ -228,15 +234,15 @@ export default {
       // Bar at top (pinned)
       const bar = new Body(BodyType.DYNAMIC, new Vec2(cx, top + SIZE + 8));
       bar.shapes.add(new Polygon(Polygon.box(barW, SIZE)));
-      try { bar.userData._colorIdx = COLORS.pulley[0]; } catch (_) {}
+      try { bar.userData._colorIdx = CELL_COLORS.pulley[0]; } catch (_) {}
       bar.space = space;
       const pinBar = new PivotJoint(space.world, bar, new Vec2(cx, top + SIZE + 8), new Vec2(0, 0));
       pinBar.space = space;
       pinnedSet.add(bar);
 
       const hangGap = barW / 2 - SIZE; // hang points near bar ends
-      const b2 = box(cx - hangGap, cy - ch * 0.1, false, COLORS.pulley[0]);
-      const b3 = box(cx + hangGap, cy - ch * 0.1, false, COLORS.pulley[1]);
+      const b2 = box(cx - hangGap, cy - ch * 0.1, false, CELL_COLORS.pulley[0]);
+      const b3 = box(cx + hangGap, cy - ch * 0.1, false, CELL_COLORS.pulley[1]);
       format(new PulleyJoint(
         bar, b2,
         bar, b3,
@@ -252,8 +258,8 @@ export default {
     // ── AngleJoint (col=0, row=2) ─────────────────────────────────────────
     {
       const { cx, cy, cw } = cellOrigin(0, 2, W, H);
-      const b1 = box(cx - cw / 6, cy, true, COLORS.angle[0]);
-      const b2 = box(cx + cw / 6, cy, true, COLORS.angle[1]);
+      const b1 = box(cx - cw / 6, cy, true, CELL_COLORS.angle[0]);
+      const b2 = box(cx + cw / 6, cy, true, CELL_COLORS.angle[1]);
       format(new AngleJoint(
         b1, b2,
         -Math.PI * 1.5,
@@ -266,8 +272,8 @@ export default {
     // ── MotorJoint (col=1, row=2) ─────────────────────────────────────────
     {
       const { cx, cy, cw } = cellOrigin(1, 2, W, H);
-      const b1 = box(cx - cw / 6, cy, true, COLORS.motor[0]);
-      const b2 = box(cx + cw / 6, cy, true, COLORS.motor[1]);
+      const b1 = box(cx - cw / 6, cy, true, CELL_COLORS.motor[0]);
+      const b2 = box(cx + cw / 6, cy, true, CELL_COLORS.motor[1]);
       format(new MotorJoint(
         b1, b2,
         10,
@@ -287,7 +293,7 @@ export default {
       pin.space = space;
 
       // Hanging body
-      const b = box(cx, cy + 10, false, COLORS.spring[1]);
+      const b = box(cx, cy + 10, false, CELL_COLORS.spring[1]);
       const sj = new SpringJoint(
         pin, b,
         new Vec2(0, 0), new Vec2(0, -SIZE),
@@ -794,182 +800,5 @@ export default {
 
     ctx.restore();
   },
-
-  code2d: `// Constraints Showcase — original nape layout (3\u00D73 grid)
-const W = canvas.width, H = canvas.height;
-const space = new Space(new Vec2(0, 600));
-
-// Common constraint settings
-const frequency = 20, damping = 1;
-function format(c) {
-  c.stiff = false;
-  c.frequency = frequency;
-  c.damping = damping;
-  c.space = space;
-}
-function box(x, y, pinned) {
-  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-  b.shapes.add(new Polygon(Polygon.box(28, 28)));
-  b.space = space;
-  if (pinned) new PivotJoint(space.world, b, new Vec2(x,y), new Vec2(0,0)).space = space;
-  return b;
-}
-
-// PivotJoint — two bodies share a pivot point
-const p1 = box(250, 100), p2 = box(350, 100);
-format(new PivotJoint(p1, p2,
-  p1.worldPointToLocal(new Vec2(300, 100)),
-  p2.worldPointToLocal(new Vec2(300, 100))));
-
-// WeldJoint — rigid connection with 45\u00B0 phase offset
-const w1 = box(550, 100), w2 = box(650, 100);
-format(new WeldJoint(w1, w2,
-  w1.worldPointToLocal(new Vec2(600, 100)),
-  w2.worldPointToLocal(new Vec2(600, 100)), Math.PI/4));
-
-// DistanceJoint — spring between two bodies
-const d1 = box(100, 300), d2 = box(180, 300);
-format(new DistanceJoint(d1, d2,
-  new Vec2(0, -14), new Vec2(0, -14), 60, 100));
-
-// LineJoint — constrained to slide along an axis
-const l1 = box(350, 300), l2 = box(450, 300);
-format(new LineJoint(l1, l2,
-  l1.worldPointToLocal(new Vec2(400, 300)),
-  l2.worldPointToLocal(new Vec2(400, 300)),
-  new Vec2(0, 1), -14, 14));
-
-// AngleJoint — limits relative rotation
-const a1 = box(100, 500, true), a2 = box(200, 500, true);
-format(new AngleJoint(a1, a2, -Math.PI*1.5, Math.PI*1.5, 2));
-
-// MotorJoint — drives angular velocity
-const m1 = box(350, 500, true), m2 = box(450, 500, true);
-format(new MotorJoint(m1, m2, 10, 3));
-
-// SpringJoint — soft spring + damper
-const sPin = new Body(BodyType.STATIC, new Vec2(650, 420));
-sPin.shapes.add(new Circle(4));
-sPin.space = space;
-const sBody = box(650, 500);
-const sj = new SpringJoint(sPin, sBody, new Vec2(0,0), new Vec2(0,-14), 60);
-sj.frequency = 3; sj.damping = 0.3; sj.space = space;
-sBody.applyImpulse(new Vec2(80, 0));`,
-
-  codePixi: `// Constraints Showcase — original nape layout (3×3 grid)
-const space = new Space(new Vec2(0, 600));
-
-// Common constraint settings
-const frequency = 20, damping = 1;
-function format(c) {
-  c.stiff = false;
-  c.frequency = frequency;
-  c.damping = damping;
-  c.space = space;
-}
-function box(x, y, pinned) {
-  const b = new Body(BodyType.DYNAMIC, new Vec2(x, y));
-  b.shapes.add(new Polygon(Polygon.box(28, 28)));
-  b.space = space;
-  if (pinned) new PivotJoint(space.world, b, new Vec2(x,y), new Vec2(0,0)).space = space;
-  return b;
-}
-
-// PivotJoint — two bodies share a pivot point
-const p1 = box(250, 100), p2 = box(350, 100);
-format(new PivotJoint(p1, p2,
-  p1.worldPointToLocal(new Vec2(300, 100)),
-  p2.worldPointToLocal(new Vec2(300, 100))));
-
-// WeldJoint — rigid connection with 45° phase offset
-const w1 = box(550, 100), w2 = box(650, 100);
-format(new WeldJoint(w1, w2,
-  w1.worldPointToLocal(new Vec2(600, 100)),
-  w2.worldPointToLocal(new Vec2(600, 100)), Math.PI/4));
-
-// DistanceJoint — spring between two bodies
-const d1 = box(100, 300), d2 = box(180, 300);
-format(new DistanceJoint(d1, d2,
-  new Vec2(0, -14), new Vec2(0, -14), 60, 100));
-
-// LineJoint — constrained to slide along an axis
-const l1 = box(350, 300), l2 = box(450, 300);
-format(new LineJoint(l1, l2,
-  l1.worldPointToLocal(new Vec2(400, 300)),
-  l2.worldPointToLocal(new Vec2(400, 300)),
-  new Vec2(0, 1), -14, 14));
-
-// AngleJoint — limits relative rotation
-const a1 = box(100, 500, true), a2 = box(200, 500, true);
-format(new AngleJoint(a1, a2, -Math.PI*1.5, Math.PI*1.5, 2));
-
-// MotorJoint — drives angular velocity
-const m1 = box(350, 500, true), m2 = box(450, 500, true);
-format(new MotorJoint(m1, m2, 10, 3));
-
-// SpringJoint — soft spring + damper
-const sPin2 = new Body(BodyType.STATIC, new Vec2(650, 420));
-sPin2.shapes.add(new Circle(4));
-sPin2.space = space;
-const sBody2 = box(650, 500);
-const sj2 = new SpringJoint(sPin2, sBody2, new Vec2(0,0), new Vec2(0,-14), 60);
-sj2.frequency = 3; sj2.damping = 0.3; sj2.space = space;
-sBody2.applyImpulse(new Vec2(80, 0));
-
-function loop() {
-  space.step(1 / 60, 8, 3);
-  drawGrid();
-  drawConstraintLines();
-  syncBodies(space);
-  app.render();
-  requestAnimationFrame(loop);
-}
-loop();`,
-
-  code3d: `// 3D view of constraints demo
-const container = document.getElementById("container");
-const W = 900, H = 600;
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d1117);
-const camera = new THREE.PerspectiveCamera(45, W/H, 1, 3000);
-camera.position.set(W/2, -H/2, 900);
-camera.lookAt(W/2, -H/2, 0);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(W, H);
-container.appendChild(renderer.domElement);
-scene.add(new THREE.DirectionalLight(0xfff5e0, 2.0));
-scene.add(new THREE.AmbientLight(0x1a1a2e, 1.5));
-
-const space = new Space(new Vec2(0, 600));
-const meshes = [];
-
-function addBox(body, color) {
-  const geom = new THREE.BoxGeometry(28, 28, 14);
-  const mesh = new THREE.Mesh(geom,
-    new THREE.MeshPhongMaterial({ color, shininess: 80 }));
-  scene.add(mesh);
-  meshes.push({ mesh, body });
-}
-
-// PivotJoint
-const p1 = new Body(BodyType.DYNAMIC, new Vec2(300, 100));
-p1.shapes.add(new Polygon(Polygon.box(28,28))); p1.space = space;
-const p2 = new Body(BodyType.DYNAMIC, new Vec2(400, 100));
-p2.shapes.add(new Polygon(Polygon.box(28,28))); p2.space = space;
-const pj = new PivotJoint(p1, p2,
-  p1.worldPointToLocal(new Vec2(350,100)),
-  p2.worldPointToLocal(new Vec2(350,100)));
-pj.stiff = false; pj.frequency = 20; pj.damping = 1; pj.space = space;
-addBox(p1, 0x58a6ff); addBox(p2, 0x58a6ff);
-
-function loop() {
-  space.step(1/60, 8, 3);
-  for (const { mesh, body } of meshes) {
-    mesh.position.set(body.position.x, -body.position.y, 0);
-    mesh.rotation.z = -body.rotation;
-  }
-  renderer.render(scene, camera);
-  requestAnimationFrame(loop);
-}
-loop();`,
 };
+
