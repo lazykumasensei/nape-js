@@ -55,6 +55,75 @@ let _lastCamY = 0;
 let _nonCanvasRenderer = false; // true when render3d or renderPixi is active
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function addStaticBox(space, cx, cy, w, h) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  b.shapes.add(new Polygon(Polygon.box(w, h)));
+  b.space = space;
+  return b;
+}
+
+function addOneWay(space, cx, cy, w, platformTag) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  const shape = new Polygon(Polygon.box(w, 8));
+  shape.cbTypes.add(platformTag);
+  shape.filter.collisionGroup = ONEWAY_GROUP;
+  b.shapes.add(shape);
+  b.space = space;
+  try { b.userData._colorIdx = 4; } catch (_) {}
+  return b;
+}
+
+function addCoin(space, cx, cy, coinTag) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  const shape = new Circle(5);
+  shape.sensorEnabled = true;
+  if (coinTag) shape.cbTypes.add(coinTag);
+  b.shapes.add(shape);
+  b.space = space;
+  try { b.userData._colorIdx = 1; } catch (_) {}
+  return b;
+}
+
+function addBouncePad(space, cx, cy, w) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  // High elasticity material — launches the player upward
+  b.shapes.add(new Polygon(Polygon.box(w, 10), new Material(3, 0.5, 0.5, 1)));
+  b.space = space;
+  try {
+    b.userData._color = { fill: "rgba(248,81,73,0.3)", stroke: "#f85149" };
+    b.userData._isBounce = true;
+  } catch (_) {}
+  return b;
+}
+
+function addIce(space, cx, cy, w) {
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  b.shapes.add(new Polygon(Polygon.box(w, 12)));
+  b.space = space;
+  try {
+    b.userData._color = { fill: "rgba(140,210,255,0.25)", stroke: "#8cd2ff" };
+    b.userData._isIce = true;
+  } catch (_) {}
+  return b;
+}
+
+function addSlopeRamp(space, startX, baseY, length, height, goingDown) {
+  const cx = startX + length / 2;
+  const cy = baseY - height / 2;
+  const angle = Math.atan2(goingDown ? height : -height, length);
+  const len = Math.sqrt(length * length + height * height);
+
+  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  b.shapes.add(new Polygon(Polygon.box(len, 12)));
+  b.rotation = angle;
+  b.space = space;
+  return b;
+}
+
+// ---------------------------------------------------------------------------
 // Demo definition
 // ---------------------------------------------------------------------------
 
@@ -867,72 +936,3 @@ export default {
     ctx.restore();
   },
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function addStaticBox(space, cx, cy, w, h) {
-  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
-  b.shapes.add(new Polygon(Polygon.box(w, h)));
-  b.space = space;
-  return b;
-}
-
-function addOneWay(space, cx, cy, w, platformTag) {
-  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
-  const shape = new Polygon(Polygon.box(w, 8));
-  shape.cbTypes.add(platformTag);
-  shape.filter.collisionGroup = ONEWAY_GROUP;
-  b.shapes.add(shape);
-  b.space = space;
-  try { b.userData._colorIdx = 4; } catch (_) {}
-  return b;
-}
-
-function addCoin(space, cx, cy, coinTag) {
-  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
-  const shape = new Circle(5);
-  shape.sensorEnabled = true;
-  if (coinTag) shape.cbTypes.add(coinTag);
-  b.shapes.add(shape);
-  b.space = space;
-  try { b.userData._colorIdx = 1; } catch (_) {}
-  return b;
-}
-
-function addBouncePad(space, cx, cy, w) {
-  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
-  // High elasticity material — launches the player upward
-  b.shapes.add(new Polygon(Polygon.box(w, 10), new Material(3, 0.5, 0.5, 1)));
-  b.space = space;
-  try {
-    b.userData._color = { fill: "rgba(248,81,73,0.3)", stroke: "#f85149" };
-    b.userData._isBounce = true;
-  } catch (_) {}
-  return b;
-}
-
-function addIce(space, cx, cy, w) {
-  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
-  b.shapes.add(new Polygon(Polygon.box(w, 12)));
-  b.space = space;
-  try {
-    b.userData._color = { fill: "rgba(140,210,255,0.25)", stroke: "#8cd2ff" };
-    b.userData._isIce = true;
-  } catch (_) {}
-  return b;
-}
-
-function addSlopeRamp(space, startX, baseY, length, height, goingDown) {
-  const cx = startX + length / 2;
-  const cy = baseY - height / 2;
-  const angle = Math.atan2(goingDown ? height : -height, length);
-  const len = Math.sqrt(length * length + height * height);
-
-  const b = new Body(BodyType.STATIC, new Vec2(cx, cy));
-  b.shapes.add(new Polygon(Polygon.box(len, 12)));
-  b.rotation = angle;
-  b.space = space;
-  return b;
-}
