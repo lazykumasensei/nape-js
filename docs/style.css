@@ -715,6 +715,20 @@ a:hover { text-decoration: underline; }
 .example-card.expanded .canvas-controls {
   opacity: 1;
 }
+/* Native browser fullscreen — only the canvas, no UI chrome */
+.example-card-canvas.native-fs {
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #0d1117;
+}
+.example-card-canvas.native-fs .canvas-controls,
+.example-card-canvas.native-fs .play-overlay { display: none !important; }
+.example-card-canvas.native-fs canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
 /* Dim backdrop when a card is expanded */
 body.has-expanded-demo::before {
   content: "";

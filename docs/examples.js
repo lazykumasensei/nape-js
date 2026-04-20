@@ -2,60 +2,60 @@
  * nape-js Examples Page — grid of interactive physics demos with play overlay,
  * per-card stats, search/tag filtering, size toggle, outline toggle, and View Code.
  */
-import { VERSION } from "./nape-js.esm.js?v=3.25.1";
-import { installErrorOverlay } from "./renderer.js?v=3.25.1";
-import { DemoRunner } from "./demo-runner.js?v=3.25.1";
-import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.25.1";
-import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.25.1";
-import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.25.1";
-import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.25.1";
+import { VERSION } from "./nape-js.esm.js?v=3.26.0";
+import { installErrorOverlay } from "./renderer.js?v=3.26.0";
+import { DemoRunner } from "./demo-runner.js?v=3.26.0";
+import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.26.0";
+import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.26.0";
+import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.26.0";
+import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.26.0";
 
 // All demos
-import falling     from "./demos/falling.js?v=3.25.1";
-import pyramid     from "./demos/pyramid.js?v=3.25.1";
-import chain       from "./demos/chain.js?v=3.25.1";
-import explosion   from "./demos/explosion.js?v=3.25.1";
-import constraints from "./demos/constraints.js?v=3.25.1";
-import gravity     from "./demos/gravity.js?v=3.25.1";
-import stacking    from "./demos/stacking.js?v=3.25.1";
-import ragdoll     from "./demos/ragdoll.js?v=3.25.1";
-import strandbeast from "./demos/strandbeast.js?v=3.25.1";
-import carSideview    from "./demos/car-sideview.js?v=3.25.1";
-import trackedVehicle from "./demos/tracked-vehicle.js?v=3.25.1";
-import carTopdown     from "./demos/car-topdown.js?v=3.25.1";
-import platformer     from "./demos/platformer.js?v=3.25.1";
-import ropeBridge     from "./demos/rope-bridge.js?v=3.25.1";
-import wreckingBall   from "./demos/wrecking-ball.js?v=3.25.1";
-import newtonsCradle  from "./demos/newtons-cradle.js?v=3.25.1";
-import dominos        from "./demos/dominos.js?v=3.25.1";
-import conveyorBelts  from "./demos/conveyor-belts.js?v=3.25.1";
-import trebuchet      from "./demos/trebuchet.js?v=3.25.1";
-import seesaw         from "./demos/seesaw.js?v=3.25.1";
-import pinball        from "./demos/pinball.js?v=3.25.1";
-import cloth          from "./demos/cloth.js?v=3.25.1";
-import funnel         from "./demos/funnel.js?v=3.25.1";
-import softBody       from "./demos/soft-body.js?v=3.25.1";
-import oneWayPlatforms from "./demos/one-way-platforms.js?v=3.25.1";
-import filteringInteractions from "./demos/filtering-interactions.js?v=3.25.1";
-import bodyFromGraphic    from "./demos/body-from-graphic.js?v=3.25.1";
-import dropImageBody     from "./demos/drop-image-body.js?v=3.25.1";
-import capsule           from "./demos/capsule.js?v=3.25.1";
-import destructibleTerrain from "./demos/destructible-terrain.js?v=3.25.1";
-import webWorker           from "./demos/web-worker.js?v=3.25.1";
-import asteroidField       from "./demos/asteroid-field.js?v=3.25.1";
-import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.25.1";
-import deterministic       from "./demos/deterministic.js?v=3.25.1";
-import subStepping         from "./demos/sub-stepping.js?v=3.25.1";
-import characterController from "./demos/character-controller.js?v=3.25.1";
-import triggerZones        from "./demos/trigger-zones.js?v=3.25.1";
-import fracture            from "./demos/fracture.js?v=3.25.1";
-import slingshot           from "./demos/slingshot.js?v=3.25.1";
-import springJoint         from "./demos/spring-joint.js?v=3.25.1";
-import portals             from "./demos/portals.js?v=3.25.1";
+import falling     from "./demos/falling.js?v=3.26.0";
+import pyramid     from "./demos/pyramid.js?v=3.26.0";
+import chain       from "./demos/chain.js?v=3.26.0";
+import explosion   from "./demos/explosion.js?v=3.26.0";
+import constraints from "./demos/constraints.js?v=3.26.0";
+import gravity     from "./demos/gravity.js?v=3.26.0";
+import stacking    from "./demos/stacking.js?v=3.26.0";
+import ragdoll     from "./demos/ragdoll.js?v=3.26.0";
+import strandbeast from "./demos/strandbeast.js?v=3.26.0";
+import carSideview    from "./demos/car-sideview.js?v=3.26.0";
+import trackedVehicle from "./demos/tracked-vehicle.js?v=3.26.0";
+import carTopdown     from "./demos/car-topdown.js?v=3.26.0";
+import platformer     from "./demos/platformer.js?v=3.26.0";
+import ropeBridge     from "./demos/rope-bridge.js?v=3.26.0";
+import wreckingBall   from "./demos/wrecking-ball.js?v=3.26.0";
+import newtonsCradle  from "./demos/newtons-cradle.js?v=3.26.0";
+import dominos        from "./demos/dominos.js?v=3.26.0";
+import conveyorBelts  from "./demos/conveyor-belts.js?v=3.26.0";
+import trebuchet      from "./demos/trebuchet.js?v=3.26.0";
+import seesaw         from "./demos/seesaw.js?v=3.26.0";
+import pinball        from "./demos/pinball.js?v=3.26.0";
+import cloth          from "./demos/cloth.js?v=3.26.0";
+import funnel         from "./demos/funnel.js?v=3.26.0";
+import softBody       from "./demos/soft-body.js?v=3.26.0";
+import oneWayPlatforms from "./demos/one-way-platforms.js?v=3.26.0";
+import filteringInteractions from "./demos/filtering-interactions.js?v=3.26.0";
+import bodyFromGraphic    from "./demos/body-from-graphic.js?v=3.26.0";
+import dropImageBody     from "./demos/drop-image-body.js?v=3.26.0";
+import capsule           from "./demos/capsule.js?v=3.26.0";
+import destructibleTerrain from "./demos/destructible-terrain.js?v=3.26.0";
+import webWorker           from "./demos/web-worker.js?v=3.26.0";
+import asteroidField       from "./demos/asteroid-field.js?v=3.26.0";
+import fluidBuoyancy       from "./demos/fluid-buoyancy.js?v=3.26.0";
+import deterministic       from "./demos/deterministic.js?v=3.26.0";
+import subStepping         from "./demos/sub-stepping.js?v=3.26.0";
+import characterController from "./demos/character-controller.js?v=3.26.0";
+import triggerZones        from "./demos/trigger-zones.js?v=3.26.0";
+import fracture            from "./demos/fracture.js?v=3.26.0";
+import slingshot           from "./demos/slingshot.js?v=3.26.0";
+import springJoint         from "./demos/spring-joint.js?v=3.26.0";
+import portals             from "./demos/portals.js?v=3.26.0";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
-  carSideview, trackedVehicle, carTopdown, platformer, ropeBridge, wreckingBall, newtonsCradle,
+  carSideview, carTopdown, platformer, ropeBridge, wreckingBall, newtonsCradle,
   dominos, conveyorBelts, trebuchet, seesaw, pinball, cloth, funnel,
   softBody, oneWayPlatforms, filteringInteractions, bodyFromGraphic, dropImageBody, capsule,
   destructibleTerrain,
@@ -70,6 +70,7 @@ const ALL_DEMOS = [
   slingshot,
   springJoint,
   portals,
+  trackedVehicle,
 ];
 
 const gtag = window.gtag || function() {};
@@ -278,6 +279,28 @@ function createCard(demo, { onTagClick } = {}) {
     if (e.key === "Escape" && isExpanded) setExpanded(false);
   });
 
+  // Native browser fullscreen — the canvas only, no UI chrome
+  const nativeFsBtn = document.createElement("button");
+  nativeFsBtn.className = "canvas-fs-btn";
+  nativeFsBtn.title = "Native fullscreen (canvas only)";
+  nativeFsBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="3" width="12" height="10" rx="1"/>
+    <polyline points="6,7 8,5 10,7"/><polyline points="6,11 8,9 10,11" transform="rotate(180 8 10)"/>
+  </svg>`;
+  nativeFsBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      // Wrap canvas in a clean container that hides controls during fullscreen
+      renderWrap.classList.add("native-fs");
+      try { await renderWrap.requestFullscreen(); } catch (_) { renderWrap.classList.remove("native-fs"); }
+    }
+  });
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) renderWrap.classList.remove("native-fs");
+  });
+
   // Worker toggle button (only for workerCompatible demos)
   const workerBtn = document.createElement("button");
   workerBtn.className = "canvas-fs-btn canvas-worker-btn";
@@ -295,7 +318,7 @@ function createCard(demo, { onTagClick } = {}) {
     workerBtn.title = runner.workerMode ? "Worker ON — click to disable" : "Toggle Web Worker physics";
   });
 
-  canvasControls.append(renderToggle, outlineToggleBtn, profilerBtn, workerBtn, resetBtn, fsBtn);
+  canvasControls.append(renderToggle, outlineToggleBtn, profilerBtn, workerBtn, resetBtn, fsBtn, nativeFsBtn);
   renderWrap.appendChild(canvasControls);
 
   runner.wireStats({ fps: fpsEl, step: stepEl, bodies: bodiesEl });

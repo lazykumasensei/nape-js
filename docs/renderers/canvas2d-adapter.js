@@ -111,7 +111,7 @@ export class Canvas2DAdapter {
 
     // HUD overlay (legend, cursor hints, etc.) — drawn in screen space, no camera
     if (overrides?.overlay) {
-      overrides.overlay(ctx, space, W, H);
+      overrides.overlay(ctx, space, W, H, camX, camY);
     }
   }
 
