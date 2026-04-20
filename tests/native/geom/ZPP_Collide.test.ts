@@ -282,7 +282,6 @@ describe("ZPP_Collide", () => {
 // Additional coverage: polyContains
 // ---------------------------------------------------------------------------
 
-import { ZPP_Geom } from "../../../src/native/geom/ZPP_Geom";
 import { FluidProperties } from "../../../src/phys/FluidProperties";
 
 describe("ZPP_Collide — polyContains", () => {
