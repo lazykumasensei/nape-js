@@ -21,6 +21,7 @@ import stacking    from "./demos/stacking.js?v=3.25.1";
 import ragdoll     from "./demos/ragdoll.js?v=3.25.1";
 import strandbeast from "./demos/strandbeast.js?v=3.25.1";
 import carSideview    from "./demos/car-sideview.js?v=3.25.1";
+import trackedVehicle from "./demos/tracked-vehicle.js?v=3.25.1";
 import carTopdown     from "./demos/car-topdown.js?v=3.25.1";
 import platformer     from "./demos/platformer.js?v=3.25.1";
 import ropeBridge     from "./demos/rope-bridge.js?v=3.25.1";
@@ -54,7 +55,7 @@ import portals             from "./demos/portals.js?v=3.25.1";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
-  carSideview, carTopdown, platformer, ropeBridge, wreckingBall, newtonsCradle,
+  carSideview, trackedVehicle, carTopdown, platformer, ropeBridge, wreckingBall, newtonsCradle,
   dominos, conveyorBelts, trebuchet, seesaw, pinball, cloth, funnel,
   softBody, oneWayPlatforms, filteringInteractions, bodyFromGraphic, dropImageBody, capsule,
   destructibleTerrain,
