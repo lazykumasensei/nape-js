@@ -373,7 +373,7 @@ export class DemoRunner {
       if (demoDef.render3dOverlay) {
         // overlay is used by threejs and pixijs modes (canvas2d custom render
         // already includes the legend, so we skip it there to avoid duplication)
-        ro.overlay = (ctx, sp, w, h) => demoDef.render3dOverlay(ctx, sp, w, h);
+        ro.overlay = (ctx, sp, w, h, cx, cy) => demoDef.render3dOverlay(ctx, sp, w, h, cx, cy);
       }
       if (Object.keys(ro).length > 0) {
         demoDef.renderOverrides = ro;

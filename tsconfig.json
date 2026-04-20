@@ -15,7 +15,8 @@
     "resolveJsonModule": true,
     "lib": ["ES2020"],
     "isolatedModules": true,
-    "stripInternal": true
+    "stripInternal": true,
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "tests", "benchmarks"]

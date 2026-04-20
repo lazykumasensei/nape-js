@@ -187,7 +187,7 @@ export class PixiJSAdapter {
     if (this.#overlayCtx) {
       this.#overlayCtx.clearRect(0, 0, W, H);
       if (overrides?.overlay) {
-        overrides.overlay(this.#overlayCtx, space, W, H);
+        overrides.overlay(this.#overlayCtx, space, W, H, camX, camY);
       }
     }
   }

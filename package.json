@@ -129,15 +129,15 @@
   "homepage": "https://newkrok.github.io/nape-js/",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@vitest/coverage-v8": "^3.2.4",
-    "eslint": "^10.0.2",
+    "@vitest/coverage-v8": "^4.1.4",
+    "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
     "madge": "^8.0.0",
-    "prettier": "^3.8.1",
+    "prettier": "^3.8.3",
     "tsup": "^8.4.0",
-    "typedoc": "^0.28.17",
-    "typescript": "^5.7.0",
-    "typescript-eslint": "^8.56.1",
-    "vitest": "^3.0.0"
+    "typedoc": "^0.28.19",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.0",
+    "vitest": "^4.1.4"
   }
 }
