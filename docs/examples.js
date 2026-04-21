@@ -289,18 +289,48 @@ function createCard(demo, { onTagClick } = {}) {
     <rect x="2" y="3" width="12" height="10" rx="1"/>
     <polyline points="6,7 8,5 10,7"/><polyline points="6,11 8,9 10,11" transform="rotate(180 8 10)"/>
   </svg>`;
+  const supportsFullscreenAPI =
+    typeof document.documentElement.requestFullscreen === "function" &&
+    typeof document.exitFullscreen === "function";
+
+  let pseudoFs = false;
+  function setPseudoFs(on) {
+    pseudoFs = on;
+    renderWrap.classList.toggle("native-fs", on);
+    renderWrap.classList.toggle("pseudo-fs", on);
+    document.body.classList.toggle("has-pseudo-fs", on);
+    document.body.style.overflow = on ? "hidden" : "";
+    if (on) {
+      // Nudge Safari to minimize the address bar
+      setTimeout(() => window.scrollTo(0, 1), 50);
+    }
+  }
+
   nativeFsBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
+    if (supportsFullscreenAPI) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        renderWrap.classList.add("native-fs");
+        try {
+          await renderWrap.requestFullscreen();
+        } catch (_) {
+          // API exists but rejected (e.g. iPadOS quirks) → fall back to pseudo
+          renderWrap.classList.remove("native-fs");
+          setPseudoFs(true);
+        }
+      }
     } else {
-      // Wrap canvas in a clean container that hides controls during fullscreen
-      renderWrap.classList.add("native-fs");
-      try { await renderWrap.requestFullscreen(); } catch (_) { renderWrap.classList.remove("native-fs"); }
+      // iPhone Safari: no Fullscreen API for non-video elements
+      setPseudoFs(!pseudoFs);
     }
   });
   document.addEventListener("fullscreenchange", () => {
     if (!document.fullscreenElement) renderWrap.classList.remove("native-fs");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && pseudoFs) setPseudoFs(false);
   });
 
   // Worker toggle button (only for workerCompatible demos)
