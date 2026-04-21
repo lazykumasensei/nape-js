@@ -1,7 +1,14 @@
 import {
-  Body, BodyType, Vec2, Circle, Polygon, Material,
+  Body, BodyType, Vec2, Circle, Polygon, Material, InteractionFilter,
   CbType, CbEvent, InteractionListener, InteractionType,
 } from "../nape-js.esm.js";
+
+// Collision groups: 1=default (enemies, base), 2=projectiles, 4=towers, 8=walls.
+// Projectiles pass through walls, towers, and each other — only enemies stop them.
+const GROUP_PROJECTILE = 2;
+const GROUP_TOWER = 4;
+const GROUP_WALL = 8;
+const PROJECTILE_MASK = ~(GROUP_PROJECTILE | GROUP_TOWER | GROUP_WALL);
 
 // ── Path waypoints (winding corridor, spawn→base) ────────────────────────
 const WAYPOINTS = [
@@ -47,9 +54,9 @@ const TOWER_CFG = {
   bomb: {
     name: "Bomb", colorIdx: 1, size: 20, baseCost: 25, label: "B",
     levels: [
-      { range: 200, cooldown: 90, damage: 2, radius: 70,  impulse: 2000, upgradeCost: 30 },
-      { range: 230, cooldown: 70, damage: 3, radius: 90,  impulse: 2800, upgradeCost: 60 },
-      { range: 260, cooldown: 50, damage: 5, radius: 110, impulse: 3600, upgradeCost: 0 },
+      { range: 200, cooldown: 90, damage: 2, radius: 70,  impulse: 20, upgradeCost: 30 },
+      { range: 230, cooldown: 70, damage: 3, radius: 90,  impulse: 28, upgradeCost: 60 },
+      { range: 260, cooldown: 50, damage: 5, radius: 110, impulse: 36, upgradeCost: 0 },
     ],
   },
 };
@@ -101,51 +108,152 @@ function distSq(ax, ay, bx, by) {
   return dx * dx + dy * dy;
 }
 
-function addWall(space, x1, y1, x2, y2) {
-  // Two parallel walls hugging the corridor, extended by HW at each end
-  // so overlapping pieces seal the corners automatically.
-  const dx = x2 - x1, dy = y2 - y1;
+function addWallSegment(space, ax, ay, bx, by) {
+  // Axis-aligned-or-rotated thin quad from (ax,ay) to (bx,by), centered on that line.
+  const dx = bx - ax, dy = by - ay;
   const len = Math.hypot(dx, dy);
+  if (len < 0.5) return;
   const ux = dx / len, uy = dy / len;
   const nx = -uy, ny = ux;
-  const hl = (len + 2 * HW) / 2;
+  const hl = len / 2;
   const hw = WT / 2;
+  const cx = (ax + bx) / 2, cy = (ay + by) / 2;
+  const verts = [
+    new Vec2(-ux * hl - nx * hw, -uy * hl - ny * hw),
+    new Vec2( ux * hl - nx * hw,  uy * hl - ny * hw),
+    new Vec2( ux * hl + nx * hw,  uy * hl + ny * hw),
+    new Vec2(-ux * hl + nx * hw, -uy * hl + ny * hw),
+  ];
+  const wall = new Body(BodyType.STATIC, new Vec2(cx, cy));
+  // Omit Material for Polygon — P53 bug: Polygon + explicit Material tunnels.
+  const wallShape = new Polygon(verts);
+  wallShape.filter = new InteractionFilter(GROUP_WALL, -1);
+  wall.shapes.add(wallShape);
+  wall.cbTypes.add(_cbWall);
+  wall.space = space;
+}
 
-  for (const side of [1, -1]) {
-    const offset = side * (HW + WT / 2);
-    const cx = (x1 + x2) / 2 + nx * offset;
-    const cy = (y1 + y2) / 2 + ny * offset;
-    // Pre-rotated local vertices so we don't rely on body.rotation for statics
-    const verts = [
-      new Vec2(-ux * hl - nx * hw, -uy * hl - ny * hw),
-      new Vec2( ux * hl - nx * hw,  uy * hl - ny * hw),
-      new Vec2( ux * hl + nx * hw,  uy * hl + ny * hw),
-      new Vec2(-ux * hl + nx * hw, -uy * hl + ny * hw),
-    ];
-    const wall = new Body(BodyType.STATIC, new Vec2(cx, cy));
-    wall.shapes.add(new Polygon(verts, new Material(0.2, 0.3, 0.4, 1)));
-    wall.cbTypes.add(_cbWall);
-    wall.space = space;
+// Build one continuous wall chain offset by `side * HW` from the waypoint path.
+// Corner vertices are the intersection of the two parallel-offset lines, so the
+// chain never pokes into neighboring corridors and never leaves a gap at turns.
+function buildSide(space, side) {
+  const pts = [];
+  for (let i = 0; i < WAYPOINTS.length; i++) {
+    const p = WAYPOINTS[i];
+
+    // Segment directions at this waypoint
+    const prev = i > 0 ? WAYPOINTS[i - 1] : null;
+    const next = i < WAYPOINTS.length - 1 ? WAYPOINTS[i + 1] : null;
+
+    let inUx = 0, inUy = 0, outUx = 0, outUy = 0;
+    if (prev) {
+      const d = Math.hypot(p.x - prev.x, p.y - prev.y) || 1;
+      inUx = (p.x - prev.x) / d;
+      inUy = (p.y - prev.y) / d;
+    }
+    if (next) {
+      const d = Math.hypot(next.x - p.x, next.y - p.y) || 1;
+      outUx = (next.x - p.x) / d;
+      outUy = (next.y - p.y) / d;
+    }
+
+    // Offset normals (pointing away from the path on `side`)
+    const inNx = -inUy * side, inNy = inUx * side;
+    const outNx = -outUy * side, outNy = outUx * side;
+
+    if (!prev) {
+      // Path start — cap perpendicular to the first segment
+      pts.push({ x: p.x + outNx * HW, y: p.y + outNy * HW });
+    } else if (!next) {
+      // Path end — cap perpendicular to the last segment
+      pts.push({ x: p.x + inNx * HW, y: p.y + inNy * HW });
+    } else {
+      // Interior waypoint — intersect the two offset lines.
+      // Line A: point (p + inN*HW), direction (inU)
+      // Line B: point (p + outN*HW), direction (outU)
+      const Ax = p.x + inNx * HW, Ay = p.y + inNy * HW;
+      const Bx = p.x + outNx * HW, By = p.y + outNy * HW;
+      // Solve Ax + t*inU = Bx + s*outU  →  t*inU - s*outU = Bx - Ax
+      const det = inUx * (-outUy) - inUy * (-outUx);
+      if (Math.abs(det) < 1e-6) {
+        // Collinear — just use the offset point
+        pts.push({ x: Ax, y: Ay });
+      } else {
+        const rhsX = Bx - Ax, rhsY = By - Ay;
+        const t = (rhsX * (-outUy) - rhsY * (-outUx)) / det;
+        pts.push({ x: Ax + inUx * t, y: Ay + inUy * t });
+      }
+    }
   }
+
+  // Cap the ends with perpendicular closing walls so projectiles/enemies
+  // can't escape past the spawn/base.
+  const start = WAYPOINTS[0];
+  const end = WAYPOINTS[WAYPOINTS.length - 1];
+  const firstU = { x: WAYPOINTS[1].x - start.x, y: WAYPOINTS[1].y - start.y };
+  const firstLen = Math.hypot(firstU.x, firstU.y) || 1;
+  firstU.x /= firstLen; firstU.y /= firstLen;
+  const lastU = {
+    x: end.x - WAYPOINTS[WAYPOINTS.length - 2].x,
+    y: end.y - WAYPOINTS[WAYPOINTS.length - 2].y,
+  };
+  const lastLen = Math.hypot(lastU.x, lastU.y) || 1;
+  lastU.x /= lastLen; lastU.y /= lastLen;
+
+  // Shift the start and end points slightly "outward" along the path axis
+  // so a perpendicular cap won't overlap the first/last offset segment.
+  const capBack = WT;
+  pts[0] = { x: pts[0].x - firstU.x * capBack, y: pts[0].y - firstU.y * capBack };
+  pts[pts.length - 1] = {
+    x: pts[pts.length - 1].x + lastU.x * capBack,
+    y: pts[pts.length - 1].y + lastU.y * capBack,
+  };
+
+  for (let i = 0; i < pts.length - 1; i++) {
+    addWallSegment(space, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
+  }
+  return pts;
 }
 
 function buildPath(space) {
-  for (let i = 0; i < WAYPOINTS.length - 1; i++) {
-    const a = WAYPOINTS[i], b = WAYPOINTS[i + 1];
-    addWall(space, a.x, a.y, b.x, b.y);
-  }
+  const left = buildSide(space, 1);
+  const right = buildSide(space, -1);
+  // End caps — close the spawn opening and seal around the base.
+  // Spawn cap at WAYPOINTS[0]
+  addWallSegment(space, left[0].x, left[0].y, right[0].x, right[0].y);
+  // Base cap at the last waypoint
+  const li = left.length - 1, ri = right.length - 1;
+  addWallSegment(space, left[li].x, left[li].y, right[ri].x, right[ri].y);
 }
 
 function spawnEnemy(space, kind) {
   const start = WAYPOINTS[0];
-  const r = kind === "boss" ? 16 : kind === "horde" ? 7 : 10;
-  const hp = kind === "boss" ? 12 : kind === "horde" ? 1 : 3;
-  const reward = kind === "boss" ? 5 : 1;
-  const speed = kind === "boss" ? ENEMY_SPEED * 0.7 : kind === "horde" ? ENEMY_SPEED * 1.15 : ENEMY_SPEED;
+  const r = kind === "boss" ? 16 : kind === "horde" ? 7 : kind === "fast" ? 8 : 10;
+  // HP scales linearly with wave so upgrades become mandatory late-game.
+  // normal: 6 → +3 per wave; horde: 2 → +1 per wave; boss: 24 → +12 per wave (after W5).
+  // fast: 60% of normal HP — glass cannons that punish slow towers.
+  const w = Math.max(0, _wave - 1);
+  const baseHp = kind === "boss" ? 24 : kind === "horde" ? 2 : 6;
+  const hpBonus = kind === "boss" ? Math.floor(w / 5) * 12 : kind === "horde" ? w : w * 3;
+  let hp = baseHp + hpBonus;
+  if (kind === "fast") hp = Math.max(1, Math.round(hp * 0.6));
+  const reward = kind === "boss" ? 5 + Math.floor(w / 3) : 1 + Math.floor(w / 4);
+  // Base speed per kind, then a +1% bonus per wave compounding the challenge.
+  const speedMul = 1 + w * 0.01;
+  const speed = speedMul * (
+    kind === "boss" ? ENEMY_SPEED * 0.7 :
+    kind === "horde" ? ENEMY_SPEED * 1.15 :
+    kind === "fast" ? ENEMY_SPEED * 2 :
+    ENEMY_SPEED
+  );
 
-  const body = new Body(BodyType.DYNAMIC, new Vec2(start.x, start.y));
+  // Jitter spawn position so burst-spawned mobs don't overlap exactly —
+  // biased left along the first corridor (which runs westward from the spawn).
+  const jitterX = -Math.random() * 24;
+  const jitterY = (Math.random() - 0.5) * (HW - r) * 1.2;
+  const body = new Body(BodyType.DYNAMIC, new Vec2(start.x + jitterX, start.y + jitterY));
   body.shapes.add(new Circle(r, undefined, new Material(0.3, 0.3, 0.4, 1)));
-  body.userData._colorIdx = kind === "boss" ? 4 : 3;
+  body.userData._colorIdx = kind === "boss" ? 4 : kind === "fast" ? 5 : 3;
   body.userData._enemy = true;
   body.userData._hp = hp;
   body.userData._maxHp = hp;
@@ -212,7 +320,11 @@ function fireArrow(space, tower, target) {
   const sy = tower.body.position.y + ny * off;
 
   const arrow = new Body(BodyType.DYNAMIC, new Vec2(sx, sy));
-  arrow.shapes.add(new Polygon(Polygon.box(10, 3), new Material(0.1, 0.1, 0.1, 0.5)));
+  // Circle (not Polygon) to dodge the P53 Polygon+Material tunneling bug.
+  // Ultra-light density → negligible impulse transfer, so arrows don't knock enemies back.
+  const arrowShape = new Circle(3, undefined, new Material(0.1, 0.1, 0.1, 0.01));
+  arrowShape.filter = new InteractionFilter(GROUP_PROJECTILE, PROJECTILE_MASK);
+  arrow.shapes.add(arrowShape);
   arrow.rotation = Math.atan2(dy, dx);
   arrow.isBullet = true;
   arrow.userData._colorIdx = 2;
@@ -236,7 +348,9 @@ function fireBomb(space, tower, target) {
   const sy = tower.body.position.y + ny * off;
 
   const bomb = new Body(BodyType.DYNAMIC, new Vec2(sx, sy));
-  bomb.shapes.add(new Circle(5, undefined, new Material(0.1, 0.1, 0.1, 1)));
+  const bombShape = new Circle(5, undefined, new Material(0.1, 0.1, 0.1, 1));
+  bombShape.filter = new InteractionFilter(GROUP_PROJECTILE, PROJECTILE_MASK);
+  bomb.shapes.add(bombShape);
   bomb.isBullet = true;
   bomb.userData._colorIdx = 1;
   bomb.userData._bomb = true;
@@ -323,7 +437,9 @@ function buildTower(spotIdx, type) {
   if (spot.towerIdx != null) return false;
 
   const body = new Body(BodyType.STATIC, new Vec2(spot.x, spot.y));
-  body.shapes.add(new Polygon(Polygon.box(cfg.size, cfg.size)));
+  const towerShape = new Polygon(Polygon.box(cfg.size, cfg.size));
+  towerShape.filter = new InteractionFilter(GROUP_TOWER, -1);
+  body.shapes.add(towerShape);
   body.userData._colorIdx = cfg.colorIdx;
   body.userData._tower = true;
   body.space = _space;
@@ -359,12 +475,20 @@ function startWave() {
   _waveActive = true;
   _hordeHint = 0;
 
+  // Every 5 waves, add one more enemy to the wave total.
+  const fiveTier = Math.floor((_wave - 1) / 5);
+
   if (_wave % 5 === 0) {
-    // Horde wave
-    _toSpawn = 25 + (_wave / 5 - 1) * 5;
-    _spawnInterval = 12;
+    // Horde wave — quintets burst at once for chaotic pile-ups.
+    // The +1 is reserved for the boss that closes the wave.
+    _toSpawn = 30 + (_wave / 5 - 1) * 8 + fiveTier + 1;
+    _spawnInterval = 40;
+  } else if (_wave % 3 === 0) {
+    // Fast wave — fewer HP, double speed; tighter spacing to keep pressure up.
+    _toSpawn = 8 + Math.floor(_wave / 2) + fiveTier;
+    _spawnInterval = Math.max(30, 60 - _wave * 2);
   } else {
-    _toSpawn = 8 + Math.floor(_wave / 2);
+    _toSpawn = 8 + Math.floor(_wave / 2) + fiveTier;
     _spawnInterval = Math.max(45, 90 - _wave * 3);
   }
   _spawnTimer = 0;
@@ -377,9 +501,19 @@ function spawnForWave() {
   _spawnTimer = _spawnInterval;
 
   if (_wave % 5 === 0) {
-    // Horde: last one is a boss
-    const kind = _toSpawn === 1 ? "boss" : "horde";
-    spawnEnemy(_space, kind);
+    // Horde: spawn in packs of 5. Reserve the final slot for the boss so
+    // a burst never overshoots it.
+    if (_toSpawn === 1) {
+      spawnEnemy(_space, "boss");
+      _toSpawn = 0;
+      return;
+    }
+    const burst = Math.min(5, _toSpawn - 1);
+    for (let i = 0; i < burst; i++) spawnEnemy(_space, "horde");
+    _toSpawn -= burst;
+    return;
+  } else if (_wave % 3 === 0) {
+    spawnEnemy(_space, "fast");
   } else {
     spawnEnemy(_space, "normal");
   }
@@ -558,8 +692,9 @@ function drawTopHUD(ctx, W) {
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.font = "12px system-ui, sans-serif";
     ctx.textAlign = "right";
-    const isHorde = (_wave + 1) % 5 === 0;
-    ctx.fillText(`${isHorde ? "HORDE" : "Next wave"} in ${s}s`, W - 10, 14);
+    const next = _wave + 1;
+    const nextLabel = next % 5 === 0 ? "HORDE" : next % 3 === 0 ? "FAST" : "Next wave";
+    ctx.fillText(`${nextLabel} in ${s}s`, W - 10, 14);
   }
 }
 
@@ -587,8 +722,8 @@ export default {
   featured: true,
   featuredOrder: 4,
   desc:
-    "Build <b>archer</b> (single-target) and <b>bomb</b> (AOE + knockback) towers to defend the base. Enemies are physics bodies — bombs scatter them against walls, and they fight their way back on track. <b>Click</b> empty spot to build, <b>click</b> tower to upgrade. Every 5th wave is a horde.",
-  walls: true,
+    "Build <b>archer</b> (single-target) and <b>bomb</b> (AOE + knockback) towers to defend the base. Enemies are physics bodies — bombs scatter them against walls, and they fight their way back on track. <b>Click</b> empty spot to build, <b>click</b> tower to upgrade. Enemy HP scales with wave; every 3rd wave brings fast runners, every 5th wave is a horde that pours in 5-at-a-time.",
+  walls: false,
   workerCompatible: false,
 
   setup(space, W, H) {
@@ -647,20 +782,7 @@ export default {
       },
     ));
 
-    // Arrow hits wall — queue removal
-    space.listeners.add(new InteractionListener(
-      CbEvent.BEGIN, InteractionType.COLLISION, _cbArrow, _cbWall,
-      (cb) => {
-        const b1 = bodyFromInt(cb.int1), b2 = bodyFromInt(cb.int2);
-        const arrow = b1?.userData?._arrow ? b1 : b2?.userData?._arrow ? b2 : null;
-        if (arrow?.space && !arrow.userData._spent) {
-          arrow.userData._spent = true;
-          _pending.removeArrow.push(arrow);
-        }
-      },
-    ));
-
-    // Bomb contact — queue detonation
+    // Bomb contact — queue detonation (walls are excluded by collision mask)
     const bombQueue = (cb) => {
       const b1 = bodyFromInt(cb.int1), b2 = bodyFromInt(cb.int2);
       const bomb = b1?.userData?._bomb ? b1 : b2?.userData?._bomb ? b2 : null;
@@ -671,9 +793,6 @@ export default {
     };
     space.listeners.add(new InteractionListener(
       CbEvent.BEGIN, InteractionType.COLLISION, _cbBomb, _cbEnemy, bombQueue,
-    ));
-    space.listeners.add(new InteractionListener(
-      CbEvent.BEGIN, InteractionType.COLLISION, _cbBomb, _cbWall, bombQueue,
     ));
 
     // Enemy reaches base — queue base hit
