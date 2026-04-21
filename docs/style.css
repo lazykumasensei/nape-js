@@ -729,6 +729,23 @@ a:hover { text-decoration: underline; }
   display: block;
 }
 
+/* Pseudo-fullscreen fallback for iPhone Safari (no Fullscreen API for non-<video> elements).
+   Pins the canvas to the viewport; scroll-to-1 nudge minimizes the URL bar. */
+.example-card-canvas.pseudo-fs {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 10000 !important;
+  background: #0d1117;
+}
+body.has-pseudo-fs {
+  overflow: hidden !important;
+  /* Disable overscroll/pull-to-refresh while pseudo-fullscreen is active */
+  overscroll-behavior: none;
+}
+
 /* Dim backdrop when a card is expanded */
 body.has-expanded-demo::before {
   content: "";
