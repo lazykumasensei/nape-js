@@ -715,6 +715,20 @@ a:hover { text-decoration: underline; }
 .example-card.expanded .canvas-controls {
   opacity: 1;
 }
+
+/* On small screens, hide the info panel (title/description/tags/code panel)
+   when either the lightbox-expand or the iOS pseudo-fullscreen mode is
+   active. Stats bar is not touched — it retains its existing layout.
+   Native FS hides the info automatically since it's outside the
+   fullscreened render wrap. */
+@media (max-width: 600px) {
+  body.has-expanded-demo .example-card-info,
+  body.has-expanded-demo .card-code-panel,
+  body.has-pseudo-fs .example-card-info,
+  body.has-pseudo-fs .card-code-panel {
+    display: none !important;
+  }
+}
 /* Native browser fullscreen — only the canvas, no UI chrome */
 .example-card-canvas.native-fs {
   width: 100vw !important;
