@@ -19,16 +19,19 @@ const PLAYER_BULLET_MASK = GROUP_WALL | GROUP_ENEMY;
 const ENEMY_BULLET_MASK = GROUP_WALL | GROUP_PLAYER;
 
 // Arena (matches CW×CH in examples.js). 28px top HUD reserved.
-const W = 900, H = 500;
+// Named SCREEN_W/SCREEN_H (not W/H) to avoid colliding with the CodePen
+// runtime template, which declares `const W = canvas.width, H = canvas.height`
+// at the top of its generated script and would throw SyntaxError otherwise.
+const SCREEN_W = 900, SCREEN_H = 500;
 const HUD_H = 28;
 const WT = 6;
 
 // Spawn points — 4 corners, inset from arena edge.
 const SPAWN_POINTS = [
-  { x: 60,      y: HUD_H + 40 },
-  { x: W - 60,  y: HUD_H + 40 },
-  { x: 60,      y: H - 40 },
-  { x: W - 60,  y: H - 40 },
+  { x: 60,             y: HUD_H + 40 },
+  { x: SCREEN_W - 60,  y: HUD_H + 40 },
+  { x: 60,             y: SCREEN_H - 40 },
+  { x: SCREEN_W - 60,  y: SCREEN_H - 40 },
 ];
 
 // Interior cover walls — short L-shapes + two straight walls.
@@ -119,8 +122,8 @@ const WAVE_BREAK = 180;
 const START_HP = PLAYER_MAX_HP;
 
 // Virtual joystick (mobile) — bottom-left quadrant activates it.
-const STICK_ZONE_W = W * 0.45;   // left 45% of canvas
-const STICK_ZONE_Y = HUD_H + H * 0.5; // below vertical center
+const STICK_ZONE_W = SCREEN_W * 0.45;   // left 45% of canvas
+const STICK_ZONE_Y = HUD_H + SCREEN_H * 0.5; // below vertical center
 const STICK_MAX_R = 60;
 
 // Detected once at setup — coarse pointer / touch-capable = show mobile stick.
@@ -205,10 +208,10 @@ function addWallSegment(space, ax, ay, bx, by) {
 function buildArena(space) {
   // Outer perimeter — sealed box inside the HUD strip.
   const top = HUD_H;
-  addWallSegment(space, 0, top, W, top);
-  addWallSegment(space, W, top, W, H);
-  addWallSegment(space, W, H, 0, H);
-  addWallSegment(space, 0, H, 0, top);
+  addWallSegment(space, 0, top, SCREEN_W, top);
+  addWallSegment(space, SCREEN_W, top, SCREEN_W, SCREEN_H);
+  addWallSegment(space, SCREEN_W, SCREEN_H, 0, SCREEN_H);
+  addWallSegment(space, 0, SCREEN_H, 0, top);
 
   // Interior cover pieces.
   for (const chain of COVER_WALLS) {
@@ -219,7 +222,7 @@ function buildArena(space) {
 }
 
 function spawnPlayer(space) {
-  const body = new Body(BodyType.DYNAMIC, new Vec2(W / 2, HUD_H + (H - HUD_H) / 2));
+  const body = new Body(BodyType.DYNAMIC, new Vec2(SCREEN_W / 2, HUD_H + (SCREEN_H - HUD_H) / 2));
   const shape = new Circle(PLAYER_R, undefined, new Material(0.3, 0.3, 0.4, 1));
   shape.filter = new InteractionFilter(GROUP_PLAYER, -1);
   body.shapes.add(shape);
@@ -905,7 +908,7 @@ function drawPowerups(ctx) {
 
 function drawTopHUD(ctx) {
   ctx.fillStyle = "rgba(13,17,23,0.82)";
-  ctx.fillRect(0, 0, W, HUD_H);
+  ctx.fillRect(0, 0, SCREEN_W, HUD_H);
   ctx.fillStyle = "#c9d1d9";
   ctx.font = "13px system-ui, sans-serif";
   ctx.textAlign = "left";
@@ -940,12 +943,12 @@ function drawTopHUD(ctx) {
     const nextLabel = next % 5 === 0 ? "BOSS" : "Next wave";
     ctx.fillStyle = next % 5 === 0 ? "#f85149" : "rgba(255,255,255,0.6)";
     ctx.textAlign = "right";
-    ctx.fillText(`${nextLabel} in ${s}s`, W - 10, 14);
+    ctx.fillText(`${nextLabel} in ${s}s`, SCREEN_W - 10, 14);
   } else if (_waveActive && _wave % 5 === 0 && _bossPending) {
     ctx.fillStyle = "#f85149";
     ctx.font = "bold 13px system-ui, sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText("⚠ BOSS WAVE", W - 10, 14);
+    ctx.fillText("⚠ BOSS WAVE", SCREEN_W - 10, 14);
   }
 }
 
@@ -953,7 +956,7 @@ function drawJoystick(ctx) {
   if (!_isTouch) return;
   if (!_stickActive) {
     // Dim hint in bottom-left corner so mobile users know where to press.
-    const cx = 70, cy = H - 70;
+    const cx = 70, cy = SCREEN_H - 70;
     ctx.beginPath();
     ctx.arc(cx, cy, STICK_MAX_R, 0, Math.PI * 2);
     ctx.strokeStyle = "rgba(255,255,255,0.12)";
@@ -1028,17 +1031,17 @@ function drawChargingOutlines(ctx) {
 function drawGameOver(ctx) {
   if (!_gameOver) return;
   ctx.fillStyle = "rgba(0,0,0,0.6)";
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
   ctx.fillStyle = "#f85149";
   ctx.font = "bold 36px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("Game Over", W / 2, H / 2 - 18);
+  ctx.fillText("Game Over", SCREEN_W / 2, SCREEN_H / 2 - 18);
   ctx.fillStyle = "#c9d1d9";
   ctx.font = "14px system-ui, sans-serif";
-  ctx.fillText(`Survived ${_wave} wave${_wave === 1 ? "" : "s"} — Score ${_score}`, W / 2, H / 2 + 10);
+  ctx.fillText(`Survived ${_wave} wave${_wave === 1 ? "" : "s"} — Score ${_score}`, SCREEN_W / 2, SCREEN_H / 2 + 10);
   ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText("Click / tap anywhere to restart", W / 2, H / 2 + 36);
+  ctx.fillText("Click / tap anywhere to restart", SCREEN_W / 2, SCREEN_H / 2 + 36);
 }
 
 // ── Demo definition ──────────────────────────────────────────────────────
