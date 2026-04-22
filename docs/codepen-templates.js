@@ -806,6 +806,7 @@ const NAPE_IMPORTS = `import {
   Material, FluidProperties, InteractionFilter, InteractionGroup, AABB, MarchingSquares,
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
   CharacterController, fractureBody, UserConstraint, TriggerZone,
+  Ray, RayResult,
 } from "${NAPE_CDN}";`;
 
 /**
