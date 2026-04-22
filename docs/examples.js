@@ -53,6 +53,7 @@ import slingshot           from "./demos/slingshot.js?v=3.26.0";
 import springJoint         from "./demos/spring-joint.js?v=3.26.0";
 import portals             from "./demos/portals.js?v=3.26.0";
 import towerDefense        from "./demos/tower-defense.js?v=3.26.0";
+import topDownShooter      from "./demos/top-down-shooter.js?v=3.26.0";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -73,6 +74,7 @@ const ALL_DEMOS = [
   portals,
   trackedVehicle,
   towerDefense,
+  topDownShooter,
 ];
 
 const gtag = window.gtag || function() {};
