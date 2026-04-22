@@ -99,23 +99,37 @@ const RAY_WALL_FILTER = new InteractionFilter(1, GROUP_WALL);
 const POWERUP_DROP_CHANCE = 0.40;
 const POWERUP_DURATION = 600;   // 10s @ 60fps
 const POWERUP_LIFETIME = 720;   // despawn after 12s on ground
-const POWERUP_TYPES = ["double", "triple", "knockback", "heal"];
+const POWERUP_TYPES = ["double", "triple", "knockback", "explode", "rapid", "heal"];
 const POWERUP_COLORS = {
   double:    "#58a6ff",
   triple:    "#3fb950",
   knockback: "#f85149",
+  explode:   "#ff8c42",
+  rapid:     "#bc8cff",
   heal:      "#d29922",
 };
 const POWERUP_LABELS = {
   double:    "2x",
   triple:    "3x",
   knockback: "KB",
+  explode:   "EX",
+  rapid:     "RF",
   heal:      "HP",
 };
 
 // Knockback projectile config (replaces normal bullet while mod active)
 const KB_RADIUS = 90;
 const KB_IMPULSE = 60;
+
+// Explosive projectile — damages every enemy in radius, small knockback only.
+// Deals EX_DAMAGE at the center, tapering linearly to 0 at EX_RADIUS.
+const EX_RADIUS = 75;
+const EX_DAMAGE = 3;
+const EX_IMPULSE = 18;
+
+// Rapid-fire: player shot cooldown while this mod is active. Normal cooldown
+// is PLAYER_SHOT_COOLDOWN (12 frames → ~5/sec); rapid drops it to ~12/sec.
+const RAPID_SHOT_COOLDOWN = 5;
 
 // ── Waves ────────────────────────────────────────────────────────────────
 const WAVE_BREAK = 180;
@@ -163,7 +177,7 @@ let _cbPlayer, _cbEnemy, _cbPlayerBullet, _cbEnemyBullet, _cbWall, _cbPowerup;
 const _pending = {
   enemyHit: [],        // { enemy, damage }
   removeBullet: [],    // bullet body
-  explodeKnockback: [],// bullet body
+  aoeDetonate: [],     // player bullet body (knockback or explode)
   playerHit: [],       // { damage }
   pickupPowerup: [],   // powerup body
   removePowerup: [],   // powerup body (expired)
@@ -551,11 +565,14 @@ function spawnPlayerBullet(dx, dy) {
   bullet.shapes.add(shape);
   bullet.rotation = Math.atan2(dy, dx);
   bullet.isBullet = true;
-  bullet.userData._colorIdx = 2;
+  bullet.userData._colorIdx = _playerMod.type === "explode" ? 1
+                            : _playerMod.type === "knockback" ? 4
+                            : 2;
   bullet.userData._playerBullet = true;
   bullet.userData._damage = 1;
   bullet.userData._life = 90;
   bullet.userData._knockback = _playerMod.type === "knockback";
+  bullet.userData._explode   = _playerMod.type === "explode";
   bullet.cbTypes.add(_cbPlayerBullet);
   bullet.velocity = new Vec2(nx * 600, ny * 600);
   bullet.space = _space;
@@ -616,9 +633,13 @@ function fireBossShotgun(boss, pellets) {
   }
 }
 
-function explodeKnockback(bullet) {
+// Radial AOE around `bullet`. Every dynamic body in range gets an outward
+// impulse scaled by `impulse`, and enemies also take `damage` — both taper
+// linearly to zero at the edge. Used by both knockback (big shove, 1 dmg)
+// and explode (small shove, area damage) power-ups.
+function explodeBullet(bullet, radius, damage, impulse) {
   const bx = bullet.position.x, by = bullet.position.y;
-  const r2 = KB_RADIUS * KB_RADIUS;
+  const r2 = radius * radius;
   const affected = [];
   for (const body of _space.bodies) {
     if (body.isStatic()) continue;
@@ -630,10 +651,12 @@ function explodeKnockback(bullet) {
   }
   for (const { body, dx, dy, d } of affected) {
     const dd = d || 1;
-    const falloff = 1 - dd / KB_RADIUS;
-    body.applyImpulse(new Vec2((dx / dd) * KB_IMPULSE * falloff, (dy / dd) * KB_IMPULSE * falloff));
-    if (body.userData?._enemy) {
-      body.userData._hp -= 1;
+    const falloff = 1 - dd / radius;
+    if (impulse > 0) {
+      body.applyImpulse(new Vec2((dx / dd) * impulse * falloff, (dy / dd) * impulse * falloff));
+    }
+    if (body.userData?._enemy && damage > 0) {
+      body.userData._hp -= damage * falloff;
       if (body.userData._hp <= 0) killEnemy(body);
     }
   }
@@ -688,10 +711,16 @@ function processPending() {
   }
   _pending.removeBullet.length = 0;
 
-  for (const bullet of _pending.explodeKnockback) {
-    if (bullet.space) explodeKnockback(bullet);
+  for (const bullet of _pending.aoeDetonate) {
+    if (!bullet.space) continue;
+    if (bullet.userData._explode) {
+      explodeBullet(bullet, EX_RADIUS, EX_DAMAGE, EX_IMPULSE);
+    } else {
+      // knockback
+      explodeBullet(bullet, KB_RADIUS, 1, KB_IMPULSE);
+    }
   }
-  _pending.explodeKnockback.length = 0;
+  _pending.aoeDetonate.length = 0;
 
   if (_pending.playerHit.length > 0 && _player?.space && _playerInvuln <= 0 && !_gameOver) {
     let dmg = 0;
@@ -789,7 +818,7 @@ function resetGame(space) {
   _moveDir.x = 0; _moveDir.y = 0;
   _pending.enemyHit.length = 0;
   _pending.removeBullet.length = 0;
-  _pending.explodeKnockback.length = 0;
+  _pending.aoeDetonate.length = 0;
   _pending.playerHit.length = 0;
   _pending.pickupPowerup.length = 0;
   _pending.removePowerup.length = 0;
@@ -1052,7 +1081,7 @@ export default {
   featured: true,
   featuredOrder: 5,
   desc:
-    "Top-down survival shooter — enemies pour in from 4 spawn points, every 5th wave closes with a <b>boss</b>. <b>Melee</b> chase you, <b>ranged</b> keep distance and snipe. Movement: <b>WASD</b> or bottom-left virtual stick (mobile). <b>Auto-fire</b> targets the nearest enemy; walls block bullets. 5% enemy drop chance for 10s power-ups: <b>2x</b> / <b>3x</b> spread, <b>KB</b> knockback blast, <b>HP</b> instant heal.",
+    "Top-down survival shooter — enemies pour in from 4 spawn points, every 5th wave closes with a <b>boss</b> that rushes, drops mines and fires shotguns. <b>Melee</b> chase you with burst rushes, <b>ranged</b> keep distance and snipe. Movement: <b>WASD</b> or bottom-left virtual stick (mobile). <b>Auto-fire</b> targets the nearest enemy; walls block bullets. 40% enemy drop chance for 10s power-ups: <b>2x</b> / <b>3x</b> spread, <b>KB</b> knockback blast, <b>EX</b> explosive AOE bullets, <b>RF</b> rapid fire, <b>HP</b> instant heal.",
   walls: false,
   workerCompatible: false,
 
@@ -1087,7 +1116,7 @@ export default {
     for (const k in _keys) delete _keys[k];
     _pending.enemyHit.length = 0;
     _pending.removeBullet.length = 0;
-    _pending.explodeKnockback.length = 0;
+    _pending.aoeDetonate.length = 0;
     _pending.playerHit.length = 0;
     _pending.pickupPowerup.length = 0;
     _pending.removePowerup.length = 0;
@@ -1101,7 +1130,7 @@ export default {
       (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0)
     );
 
-    // Player bullet hits enemy → damage + (possibly) knockback AOE.
+    // Player bullet hits enemy → AOE detonate (knockback/explode) or normal damage.
     space.listeners.add(new InteractionListener(
       CbEvent.BEGIN, InteractionType.COLLISION, _cbPlayerBullet, _cbEnemy,
       (cb) => {
@@ -1111,8 +1140,8 @@ export default {
         const enemy = b1.userData?._enemy ? b1 : b2;
         if (!bullet.space || !enemy.space || bullet.userData._spent) return;
         bullet.userData._spent = true;
-        if (bullet.userData._knockback) {
-          _pending.explodeKnockback.push(bullet);
+        if (bullet.userData._knockback || bullet.userData._explode) {
+          _pending.aoeDetonate.push(bullet);
         } else {
           _pending.removeBullet.push(bullet);
           _pending.enemyHit.push({ enemy, damage: bullet.userData._damage });
@@ -1120,7 +1149,7 @@ export default {
       },
     ));
 
-    // Player bullet hits wall → remove (or detonate knockback).
+    // Player bullet hits wall → remove or detonate (knockback/explode).
     space.listeners.add(new InteractionListener(
       CbEvent.BEGIN, InteractionType.COLLISION, _cbPlayerBullet, _cbWall,
       (cb) => {
@@ -1128,8 +1157,11 @@ export default {
         const bullet = b1?.userData?._playerBullet ? b1 : b2?.userData?._playerBullet ? b2 : null;
         if (!bullet?.space || bullet.userData._spent) return;
         bullet.userData._spent = true;
-        if (bullet.userData._knockback) _pending.explodeKnockback.push(bullet);
-        else _pending.removeBullet.push(bullet);
+        if (bullet.userData._knockback || bullet.userData._explode) {
+          _pending.aoeDetonate.push(bullet);
+        } else {
+          _pending.removeBullet.push(bullet);
+        }
       },
     ));
 
@@ -1218,7 +1250,11 @@ export default {
     // Auto-fire — cooldown only advances when we actually shot.
     if (_playerShotCooldown > 0) _playerShotCooldown--;
     if (_playerShotCooldown <= 0 && _player?.space) {
-      if (firePlayerShot()) _playerShotCooldown = PLAYER_SHOT_COOLDOWN;
+      if (firePlayerShot()) {
+        _playerShotCooldown = _playerMod.type === "rapid"
+          ? RAPID_SHOT_COOLDOWN
+          : PLAYER_SHOT_COOLDOWN;
+      }
     }
 
     // Wave flow
