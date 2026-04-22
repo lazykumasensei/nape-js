@@ -125,7 +125,7 @@ const KB_IMPULSE = 60;
 // Deals EX_DAMAGE at the center, tapering linearly to 0 at EX_RADIUS.
 const EX_RADIUS = 75;
 const EX_DAMAGE = 3;
-const EX_IMPULSE = 72;
+const EX_IMPULSE = 144;
 
 // Rapid-fire: player shot cooldown while this mod is active. Normal cooldown
 // is PLAYER_SHOT_COOLDOWN (12 frames → ~5/sec); rapid drops it to ~12/sec.
