@@ -716,21 +716,26 @@ a:hover { text-decoration: underline; }
   opacity: 1;
 }
 
-/* Hide the info panel (title/description/tags/code panel) whenever any
-   fullscreen flavor is active:
+/* Hide the info panel (title/description/tags/code panel) on touch
+   devices (mobile/tablet) whenever any fullscreen flavor is active.
+   `pointer: coarse` matches touch input regardless of viewport width
+   (iPhone landscape 844px would escape a max-width:600px query).
+   Desktop keeps the info visible in lightbox so mouse users still
+   have context.
+
+   Covers:
    - .has-expanded-demo : in-page lightbox expand
    - .has-pseudo-fs     : iOS/iPadOS pseudo fullscreen (no Fullscreen API)
-   - :has(:fullscreen)  : native Fullscreen API (covers Android/Desktop)
-   Stats bar is left untouched; it keeps its normal placement under the
-   canvas. On desktop the dim backdrop + canvas already dominate the
-   viewport in lightbox mode, so hiding info doesn't hurt the UX. */
-body.has-expanded-demo .example-card-info,
-body.has-expanded-demo .card-code-panel,
-body.has-pseudo-fs .example-card-info,
-body.has-pseudo-fs .card-code-panel,
-body:has(:fullscreen) .example-card-info,
-body:has(:fullscreen) .card-code-panel {
-  display: none !important;
+   - :has(:fullscreen)  : native Fullscreen API (Android Chrome) */
+@media (pointer: coarse) {
+  body.has-expanded-demo .example-card-info,
+  body.has-expanded-demo .card-code-panel,
+  body.has-pseudo-fs .example-card-info,
+  body.has-pseudo-fs .card-code-panel,
+  body:has(:fullscreen) .example-card-info,
+  body:has(:fullscreen) .card-code-panel {
+    display: none !important;
+  }
 }
 /* Native browser fullscreen — only the canvas, no UI chrome */
 .example-card-canvas.native-fs {
