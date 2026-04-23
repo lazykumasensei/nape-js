@@ -1,7 +1,113 @@
 import {
   Body, BodyType, Vec2, Circle, Polygon, Material, InteractionFilter,
-  CbType, CbEvent, InteractionListener, InteractionType,
+  CbType, CbEvent, InteractionListener, InteractionType, Ray,
 } from "../nape-js.esm.js";
+
+// ── Pálya geometry ───────────────────────────────────────────────────────
+// Two right-triangle islands meeting along the world's anti-diagonal. The
+// triangles are nudged apart perpendicular to that diagonal so a straight
+// MID corridor runs between them. The perimeter + the two triangle
+// hypotenuses form the walls of three lane corridors:
+//
+//   ┌─────────────────────────┐
+//   │ top perimeter lane      │
+//   │  ┌──────────────┐       │   Triangle A (upper-left) fills the
+//   │  │\\            │       │     top-left of the interior, shifted
+//   │  │  \\  TRI A   │       │     slightly down-right into the box.
+//   │  │    \\        │ BL→TR │   Triangle B (lower-right) fills the
+//   │  │ MID  \\      │       │     bottom-right, shifted up-left.
+//   │  │        \\    │       │   The two hypotenuses are parallel
+//   │  │   TRI B  \\  │       │     anti-diagonals, MID_CORRIDOR apart.
+//   │  └────────────\─┘       │
+//   │            bot perim.   │
+//   └─────────────────────────┘
+const WORLD_W = 1800;
+const WORLD_H = 1000;
+const GEOM_OUTER = 210;     // top/bot L-corridor padding from perimeter
+const GEOM_MID_HALF = 80;   // each triangle is offset this far off-diagonal
+const GEOM_DX = WORLD_W - 2 * GEOM_OUTER;
+const GEOM_DY = -(WORLD_H - 2 * GEOM_OUTER);
+const GEOM_DL = Math.hypot(GEOM_DX, GEOM_DY);
+const GEOM_NX = -GEOM_DY / GEOM_DL;
+const GEOM_NY = GEOM_DX / GEOM_DL;
+const GEOM_IX0 = GEOM_OUTER, GEOM_IY0 = GEOM_OUTER;
+const GEOM_IX1 = WORLD_W - GEOM_OUTER, GEOM_IY1 = WORLD_H - GEOM_OUTER;
+
+function _shiftTri(verts, sx, sy) {
+  return verts.map((v) => ({ x: v.x + sx, y: v.y + sy }));
+}
+const TRIANGLE_A = _shiftTri(
+  [
+    { x: GEOM_IX0, y: GEOM_IY0 },
+    { x: GEOM_IX1, y: GEOM_IY0 },
+    { x: GEOM_IX0, y: GEOM_IY1 },
+  ],
+  -GEOM_NX * GEOM_MID_HALF, -GEOM_NY * GEOM_MID_HALF,
+);
+const TRIANGLE_B = _shiftTri(
+  [
+    { x: GEOM_IX1, y: GEOM_IY1 },
+    { x: GEOM_IX0, y: GEOM_IY1 },
+    { x: GEOM_IX1, y: GEOM_IY0 },
+  ],
+  GEOM_NX * GEOM_MID_HALF, GEOM_NY * GEOM_MID_HALF,
+);
+
+const BLUE_ANCIENT = { x: 75, y: 925 };
+const RED_ANCIENT  = { x: 1725, y: 75 };
+
+const TOWER_DEFS = [
+  // Blue side — closer to the blue (bottom-left) corner.
+  { side: "blue", lane: "top", x:   40, y: 700 },
+  { side: "blue", lane: "top", x:  140, y: 400 },
+  { side: "blue", lane: "mid", x:  440, y: 680 },
+  { side: "blue", lane: "mid", x:  720, y: 625 },
+  { side: "blue", lane: "bot", x:  460, y: 965 },
+  { side: "blue", lane: "bot", x:  760, y: 895 },
+  // Red side — closer to the red (top-right) corner.
+  { side: "red", lane: "top", x: 1080, y: 105 },
+  { side: "red", lane: "top", x: 1380, y:  35 },
+  { side: "red", lane: "mid", x: 1080, y: 445 },
+  { side: "red", lane: "mid", x: 1360, y: 320 },
+  { side: "red", lane: "bot", x: 1760, y: 700 },
+  { side: "red", lane: "bot", x: 1660, y: 400 },
+];
+
+const LANES = {
+  top: [
+    { x: 90, y: WORLD_H - 90 },
+    { x: 90, y: 70 },
+    { x: WORLD_W - 90, y: 70 },
+  ],
+  mid: [
+    { x: 150, y: WORLD_H - 150 },
+    { x: GEOM_IX0, y: GEOM_IY1 },
+    { x: GEOM_IX1, y: GEOM_IY0 },
+    { x: WORLD_W - 150, y: 150 },
+  ],
+  bot: [
+    { x: 90, y: WORLD_H - 70 },
+    { x: WORLD_W - 90, y: WORLD_H - 70 },
+    { x: WORLD_W - 90, y: 90 },
+  ],
+};
+
+function triangleWallSegments(tri) {
+  return [
+    { a: tri[0], b: tri[1] },
+    { a: tri[1], b: tri[2] },
+    { a: tri[2], b: tri[0] },
+  ];
+}
+
+function perimeterWallSegments() {
+  return [
+    { a: { x: 0, y: 0 }, b: { x: WORLD_W, y: 0 } },
+    { a: { x: WORLD_W, y: 0 }, b: { x: WORLD_W, y: WORLD_H } },
+    { a: { x: WORLD_W, y: WORLD_H }, b: { x: 0, y: WORLD_H } },
+    { a: { x: 0, y: WORLD_H }, b: { x: 0, y: 0 } },
+  ];
+}
 
 // ── Collision groups ─────────────────────────────────────────────────────
 // Units of each team share a group so they collide with everything by default.
@@ -12,81 +118,43 @@ const GROUP_RED = 4;
 const GROUP_BLUE_PROJ = 8;
 const GROUP_RED_PROJ = 16;
 const GROUP_WALL = 32;
-// Buildings wear both a team bit AND a wall bit so projectiles stop on their
-// own towers too (reduces accidental cross-lane sniping through a tower).
+// Buildings (towers + ancients) wear this extra bit so the raycast used for
+// creep obstacle avoidance can detect them (walls alone aren't enough — creeps
+// got stuck on their own buildings because the ray passed right through).
+const GROUP_BUILDING = 64;
 const BLUE_UNIT_MASK = -1;
 const RED_UNIT_MASK = -1;
 const BLUE_PROJ_MASK = GROUP_RED | GROUP_WALL;
 const RED_PROJ_MASK = GROUP_BLUE | GROUP_WALL;
 
 // ── World ────────────────────────────────────────────────────────────────
-const WORLD_W = 1800;
-const WORLD_H = 1000;
+// WORLD_W / WORLD_H / BLUE_ANCIENT / RED_ANCIENT defined above in geometry.
 const VIEW_W = 900;
 const VIEW_H = 500;
 const HUD_H = 32;
 const WT = 4;
 
-// ── Lanes (blue-to-red waypoints; red creeps walk them in reverse) ───────
-const LANES = {
-  top: [
-    { x: 220, y: 820 },
-    { x: 220, y: 180 },
-    { x: 1580, y: 180 },
-  ],
-  mid: [
-    { x: 220, y: 820 },
-    { x: 900, y: 500 },
-    { x: 1580, y: 180 },
-  ],
-  bot: [
-    { x: 220, y: 820 },
-    { x: 1580, y: 820 },
-    { x: 1580, y: 180 },
-  ],
-};
-
 // ── Buildings ────────────────────────────────────────────────────────────
-const BLUE_ANCIENT = { x: 150, y: 890 };
-const RED_ANCIENT = { x: 1650, y: 110 };
-const ANCIENT_HP = 40;
+const ANCIENT_HP = 400;
 const ANCIENT_SIZE = 70;
 const ANCIENT_RANGE = 160;
 const ANCIENT_DAMAGE = 4;
 const ANCIENT_COOLDOWN = 45;
 
-const TOWER_SIZE = 32;
-const TOWER_HP = 18;
+const TOWER_SIZE = 48;
+const TOWER_HP = 180;
 const TOWER_RANGE = 200;
 const TOWER_DAMAGE = 3;
 const TOWER_COOLDOWN = 45;
 
-// Tower positions — 2 per lane per side, roughly along each lane.
-// Top lane runs along x=220 column, then across the top. Bot mirrors.
-// Mid is diagonal so towers sit near the two-thirds marks.
-const TOWER_DEFS = [
-  // Blue side
-  { side: "blue", lane: "top", x: 220, y: 640 },
-  { side: "blue", lane: "top", x: 220, y: 380 },
-  { side: "blue", lane: "mid", x: 400, y: 700 },
-  { side: "blue", lane: "mid", x: 630, y: 580 },
-  { side: "blue", lane: "bot", x: 560, y: 820 },
-  { side: "blue", lane: "bot", x: 960, y: 820 },
-  // Red side
-  { side: "red", lane: "top", x: 1160, y: 180 },
-  { side: "red", lane: "top", x: 1420, y: 180 },
-  { side: "red", lane: "mid", x: 1170, y: 420 },
-  { side: "red", lane: "mid", x: 1400, y: 300 },
-  { side: "red", lane: "bot", x: 1580, y: 420 },
-  { side: "red", lane: "bot", x: 1580, y: 680 },
-];
+// TOWER_DEFS defined above in the geometry block.
 
 // ── Creep config ─────────────────────────────────────────────────────────
 const CREEP_MELEE = {
-  hp: 7, damage: 1, speed: 55, range: 32, cooldown: 48, radius: 10, colorIdx: null,
+  hp: 11, damage: 1, speed: 55, range: 32, cooldown: 48, radius: 10, colorIdx: null,
 };
 const CREEP_RANGED = {
-  hp: 5, damage: 1, speed: 50, range: 140, cooldown: 70, radius: 9, colorIdx: null,
+  hp: 8, damage: 1, speed: 50, range: 140, cooldown: 70, radius: 9, colorIdx: null,
 };
 const CREEPS_PER_WAVE = { melee: 3, ranged: 1 };
 const WAVE_INTERVAL = 900;      // 15s @ 60fps
@@ -94,27 +162,30 @@ const WAVE_SPAWN_STAGGER = 18;  // frames between units in one wave
 
 // ── Hero config ──────────────────────────────────────────────────────────
 const HERO_RADIUS = 13;
-const HERO_BASE_HP = 120;
-const HERO_BASE_DAMAGE = 9;
-const HERO_HP_PER_LVL = 18;
-const HERO_DMG_PER_LVL = 2;
+const HERO_BASE_HP = 60;
+const HERO_BASE_DAMAGE = 2;
+const HERO_HP_PER_LVL = 9;
+const HERO_DMG_PER_LVL = 1;
 const HERO_RANGE = 170;
 const HERO_ATTACK_COOLDOWN = 28;
 const HERO_SPEED = 190;
 const HERO_PROJ_SPEED = 640;
-const HERO_XP_PER_CREEP = 14;
-const HERO_XP_PER_TOWER = 60;
-const HERO_XP_PER_HERO = 140;
-const HERO_XP_CURVE = [0, 80, 210, 400, 650, 960]; // lvl 1..6 thresholds
-const HERO_MAX_LEVEL = 6;
+const HERO_XP_PER_CREEP = 7;
+const HERO_XP_PER_TOWER = 30;
+const HERO_XP_PER_HERO = 70;
+// Level-up XP thresholds (cumulative total XP to reach level index i+1).
+// Curve ramps up so the last few levels feel like a real climb.
+const HERO_XP_CURVE = [0, 100, 260, 490, 800, 1200, 1700, 2300, 3000, 3800];
+const HERO_MAX_LEVEL = 10;
 const HERO_RESPAWN_FRAMES = 420; // 7s
 
 // ── Abilities ────────────────────────────────────────────────────────────
-const MINE_RADIUS = 85;
-const MINE_DAMAGE = 28;
 const MINE_FUSE = 120;        // 2s arm→detonate
-const MINE_IMPULSE = 45;
 const MINE_COOLDOWN = 420;    // 7s
+const MINE_PELLETS = 10;      // radial bullets fired on detonation
+const MINE_PELLET_DAMAGE = 4;
+const MINE_PELLET_SPEED = 520;
+const MINE_PELLET_LIFE = 50;  // frames before self-destructing
 const DASH_DISTANCE = 230;
 const DASH_DURATION = 12;
 const DASH_IFRAMES = 16;
@@ -122,23 +193,23 @@ const DASH_COOLDOWN = 480;    // 8s
 
 // ── Economy ──────────────────────────────────────────────────────────────
 const GOLD_START = 0;
-const GOLD_PER_CREEP = 2;
-const GOLD_PER_TOWER = 20;
-const GOLD_PER_HERO = 60;
-const GOLD_PER_ANCIENT = 100;
-const GOLD_PASSIVE_INTERVAL = 120; // 2s
+const GOLD_PER_CREEP = 1;
+const GOLD_PER_TOWER = 10;
+const GOLD_PER_HERO = 30;
+const GOLD_PER_ANCIENT = 50;
+const GOLD_PASSIVE_INTERVAL = 240; // 4s (was 2s)
 const GOLD_PASSIVE = 1;
 
 const SHOP_ITEMS = {
-  dmg:  { cost: 30, gain: 3,  label: "+3 DMG", color: "#f85149" },
-  heal: { cost: 25, gain: 50, label: "Heal 50", color: "#3fb950" },
+  dmg:  { cost: 40, gain: 3,  label: "+3 DMG", color: "#f85149" },
+  heal: { cost: 30, gain: 50, label: "Heal 50", color: "#3fb950" },
 };
 
 // ── Input ────────────────────────────────────────────────────────────────
 const STICK_MAX_R = 60;
 
 // ── Tower/ancient targeting priorities ──────────────────────────────────
-// Prefer creeps first, then towers, then heroes (dota-esque aggro table).
+// Prefer creeps first, then towers, then heroes (MOBA-esque aggro table).
 const PRIORITY = { creep: 0, tower: 1, ancient: 2, hero: 3 };
 
 // ── Module state (all reset in setup/reset) ─────────────────────────────
@@ -152,10 +223,9 @@ let _victory = null; // "blue" | "red" | null
 let _waveTimer = 120; // delay first wave slightly
 let _goldTimer = GOLD_PASSIVE_INTERVAL;
 
-// Hero records — one per side. Body may be null during respawn countdown.
+// Hero record for the player (blue). Body may be null during respawn countdown.
 const _heroes = {
   blue: null,
-  red: null,
 };
 
 // Listener callback types
@@ -223,11 +293,28 @@ function filterForProj(side) {
 }
 
 function filterForBuilding(side) {
-  // Buildings wear ONLY the team bit (no wall bit) — otherwise friendly
-  // projectiles whose mask includes GROUP_WALL would collide with their own
-  // team's buildings. Opposite-team projectiles still hit via the team bit.
+  // Buildings wear the team bit + a BUILDING bit. The team bit lets opposing
+  // projectiles hit them; the BUILDING bit is what creep raycasts look for
+  // so they steer around their own towers instead of wedging into them.
   const teamBit = side === "blue" ? GROUP_BLUE : GROUP_RED;
-  return new InteractionFilter(teamBit, -1);
+  return new InteractionFilter(teamBit | GROUP_BUILDING, -1);
+}
+
+// Raycast filter used by creep obstacle-avoidance probes. Matches walls and
+// any building — so creeps steer around lane barriers AND around the tower
+// they may be crashing into (whether friendly or enemy), instead of only
+// around walls.
+const RAY_OBSTACLE_FILTER = new InteractionFilter(1, GROUP_WALL | GROUP_BUILDING);
+// Feeler geometry for creep avoidance (see steerCreeps).
+const AVOID_PROBE_LEN = 55;
+const AVOID_SIDE_ANGLE = Math.PI / 4;
+
+function probeObstacleDistance(ox, oy, dx, dy) {
+  const ray = new Ray(new Vec2(ox, oy), new Vec2(dx, dy));
+  ray.maxDistance = AVOID_PROBE_LEN;
+  const hit = _space.rayCast(ray, false, RAY_OBSTACLE_FILTER);
+  if (!hit) return AVOID_PROBE_LEN + 1;
+  return hit.distance ?? hit.zpp_inner?.distance ?? 0;
 }
 
 // Horizontal or vertical axis-aligned thin wall used for the arena perimeter.
@@ -257,18 +344,27 @@ function addWallSegment(space, ax, ay, bx, by) {
 }
 
 function buildArenaWalls(space) {
-  // Outer perimeter only; lanes themselves are open terrain.
-  addWallSegment(space, 0, 0, WORLD_W, 0);
-  addWallSegment(space, WORLD_W, 0, WORLD_W, WORLD_H);
-  addWallSegment(space, WORLD_W, WORLD_H, 0, WORLD_H);
-  addWallSegment(space, 0, WORLD_H, 0, 0);
+  // Perimeter + two triangle islands (Triangle A upper-left, Triangle B
+  // lower-right). The gap between the triangles' parallel hypotenuses IS
+  // the mid lane; the gaps between each triangle's catheti and the
+  // perimeter are the top / bot L-corridors.
+  for (const seg of perimeterWallSegments()) {
+    addWallSegment(space, seg.a.x, seg.a.y, seg.b.x, seg.b.y);
+  }
+  for (const seg of triangleWallSegments(TRIANGLE_A)) {
+    addWallSegment(space, seg.a.x, seg.a.y, seg.b.x, seg.b.y);
+  }
+  for (const seg of triangleWallSegments(TRIANGLE_B)) {
+    addWallSegment(space, seg.a.x, seg.a.y, seg.b.x, seg.b.y);
+  }
 }
+
 
 // ── Entity spawning ──────────────────────────────────────────────────────
 function spawnAncient(side) {
   const pos = side === "blue" ? BLUE_ANCIENT : RED_ANCIENT;
   const body = new Body(BodyType.STATIC, new Vec2(pos.x, pos.y));
-  const shape = new Polygon(Polygon.box(ANCIENT_SIZE, ANCIENT_SIZE));
+  const shape = new Circle(ANCIENT_SIZE / 2);
   shape.filter = filterForBuilding(side);
   body.shapes.add(shape);
   body.userData._colorIdx = sideColorIdx(side);
@@ -288,7 +384,7 @@ function spawnAncient(side) {
 
 function spawnTower(def) {
   const body = new Body(BodyType.STATIC, new Vec2(def.x, def.y));
-  const shape = new Polygon(Polygon.box(TOWER_SIZE, TOWER_SIZE));
+  const shape = new Circle(TOWER_SIZE / 2);
   shape.filter = filterForBuilding(def.side);
   body.shapes.add(shape);
   body.userData._colorIdx = sideColorIdx(def.side);
@@ -368,7 +464,7 @@ function makeHeroRecord(side) {
     maxHp: HERO_BASE_HP,
     hp: HERO_BASE_HP,
     damage: HERO_BASE_DAMAGE,
-    gold: side === "blue" ? GOLD_START : 0,
+    gold: GOLD_START,
     attackCd: 0,
     mineCd: 0,
     dashCd: 0,
@@ -377,10 +473,6 @@ function makeHeroRecord(side) {
     dashDirY: 0,
     iframes: 0,
     respawnTimer: 0,
-    // Enemy AI state
-    aiLane: side === "red" ? "mid" : null,
-    aiState: "lane", // "lane" | "flee"
-    aiLaneReassign: 0,
   };
 }
 
@@ -448,12 +540,88 @@ function pickTarget(fromX, fromY, mySide, range, priorityOverride = null) {
   return best;
 }
 
-// Tower/ancient targeting — dota-esque: creeps first, heroes last unless a
+// Tower/ancient targeting — MOBA-esque: creeps first, heroes last unless a
 // hero is the only thing in range or is directly attacking an ally. We don't
 // track ally-attack state, so heroes are simply lowest priority.
 function pickBuildingTarget(building) {
   const ud = building.userData;
   return pickTarget(building.position.x, building.position.y, ud._side, ud._range);
+}
+
+// Feeler-based obstacle avoidance for creeps. Casts forward + ±45° probes
+// against walls AND buildings, steering toward whichever side is clearer.
+// Sticky left/right preference prevents oscillation at corners. Only used
+// when the creep has no engage target (i.e. it's walking waypoints).
+function avoidObstacles(body, ud, dx, dy) {
+  const ox = body.position.x, oy = body.position.y;
+  const fwd = probeObstacleDistance(ox, oy, dx, dy);
+  const clearLimit = AVOID_PROBE_LEN * 0.7;
+
+  if (fwd >= clearLimit) {
+    if (ud._avoidHold > 0) ud._avoidHold--;
+    if (ud._avoidHold <= 0) ud._avoidDir = 0;
+    return [dx, dy];
+  }
+
+  const cosA = Math.cos(AVOID_SIDE_ANGLE), sinA = Math.sin(AVOID_SIDE_ANGLE);
+  const lx = dx * cosA + dy * sinA;
+  const ly = -dx * sinA + dy * cosA;
+  const rx = dx * cosA - dy * sinA;
+  const ry = dx * sinA + dy * cosA;
+  const lDist = probeObstacleDistance(ox, oy, lx, ly);
+  const rDist = probeObstacleDistance(ox, oy, rx, ry);
+
+  let chosen;
+  if (ud._avoidHold > 0 && ud._avoidDir !== 0) {
+    const keepLeft = ud._avoidDir === -1;
+    const keepDist = keepLeft ? lDist : rDist;
+    const otherDist = keepLeft ? rDist : lDist;
+    if (otherDist > keepDist + 20) ud._avoidDir = keepLeft ? 1 : -1;
+    chosen = ud._avoidDir === -1 ? [lx, ly] : [rx, ry];
+    ud._avoidHold--;
+  } else {
+    if (lDist > rDist) { ud._avoidDir = -1; chosen = [lx, ly]; }
+    else if (rDist > lDist) { ud._avoidDir = 1; chosen = [rx, ry]; }
+    else {
+      ud._avoidDir = Math.random() < 0.5 ? -1 : 1;
+      chosen = ud._avoidDir === -1 ? [lx, ly] : [rx, ry];
+    }
+    ud._avoidHold = 30;
+  }
+  return chosen;
+}
+
+// Radial push that every building emits toward nearby units. Without this,
+// creeps jammed into a tower face can't slip sideways because STATIC bodies
+// don't give way and the per-frame velocity override overrides any contact
+// nudge. We compute a gentle outward velocity bias proportional to how deep
+// the unit is inside the push ring, then blend it into the AI-chosen
+// velocity. A unit that's actively attacking this specific building gets no
+// push (so melee creeps can still reach attack distance).
+const BUILDING_PUSH_PAD = 18;       // extra clearance beyond radius
+const BUILDING_PUSH_SPEED = 90;     // max outward speed (world units / sec)
+
+function applyBuildingPush(body, ud, engagedTarget, velX, velY) {
+  let pvx = 0, pvy = 0;
+  for (const other of _space.bodies) {
+    const oud = other.userData;
+    if (!oud) continue;
+    if (oud._kind !== "tower" && oud._kind !== "ancient") continue;
+    if (other === engagedTarget) continue; // don't push away from our target
+    const dx = body.position.x - other.position.x;
+    const dy = body.position.y - other.position.y;
+    const r = (oud._kind === "ancient" ? ANCIENT_SIZE : TOWER_SIZE) / 2
+      + (ud._kind === "creep_melee" || ud._kind === "creep_ranged"
+          ? body.shapes.at(0).castCircle.radius : 0)
+      + BUILDING_PUSH_PAD;
+    const d2 = dx * dx + dy * dy;
+    if (d2 >= r * r) continue;
+    const d = Math.sqrt(d2) || 1;
+    const falloff = 1 - d / r;
+    pvx += (dx / d) * BUILDING_PUSH_SPEED * falloff;
+    pvy += (dy / d) * BUILDING_PUSH_SPEED * falloff;
+  }
+  return [velX + pvx, velY + pvy];
 }
 
 // ── Creep AI ─────────────────────────────────────────────────────────────
@@ -464,6 +632,7 @@ function steerCreeps() {
     if (!ud || (ud._kind !== "creep_melee" && ud._kind !== "creep_ranged")) continue;
 
     if (ud._attackTimer > 0) ud._attackTimer--;
+    if (ud._avoidHold == null) { ud._avoidHold = 0; ud._avoidDir = 0; }
 
     // Target scan — creeps aggro onto the nearest enemy within attack range
     // (slightly extended so they pause early before bumping).
@@ -487,12 +656,18 @@ function steerCreeps() {
         }
         continue;
       }
-      // Move toward the target if slightly out of range.
+      // Move toward the target. Direct line — obstacle avoidance is
+      // deliberately skipped here because the target itself is often the
+      // obstacle (enemy tower), and we don't want the creep to veer off of
+      // the thing it's trying to attack. Building-push is still applied
+      // (bypassed only for the specific tower we're engaging).
       const nx = dx / d, ny = dy / d;
       const speed = ud._speed;
+      const desiredX = nx * speed, desiredY = ny * speed;
+      const [tvx, tvy] = applyBuildingPush(body, ud, target, desiredX, desiredY);
       const v = body.velocity;
       const blend = 0.08;
-      body.velocity = new Vec2(v.x + (nx * speed - v.x) * blend, v.y + (ny * speed - v.y) * blend);
+      body.velocity = new Vec2(v.x + (tvx - v.x) * blend, v.y + (tvy - v.y) * blend);
       continue;
     }
 
@@ -513,26 +688,59 @@ function steerCreeps() {
       continue;
     }
     const d = Math.sqrt(d2) || 1;
-    const nx = dx / d, ny = dy / d;
+    const [sx, sy] = avoidObstacles(body, ud, dx / d, dy / d);
     const speed = ud._speed;
+    const desiredX = sx * speed, desiredY = sy * speed;
+    const [tvx, tvy] = applyBuildingPush(body, ud, null, desiredX, desiredY);
     const v = body.velocity;
     const blend = 0.06;
-    body.velocity = new Vec2(v.x + (nx * speed - v.x) * blend, v.y + (ny * speed - v.y) * blend);
+    body.velocity = new Vec2(v.x + (tvx - v.x) * blend, v.y + (tvy - v.y) * blend);
   }
   for (const b of toRemove) { if (b.space) b.space = null; }
 }
 
 // ── Tower / Ancient AI ───────────────────────────────────────────────────
+// Ancients fire at up to 4 distinct targets per volley; regular towers
+// keep their single-target behaviour.
+const ANCIENT_SALVO = 4;
+
+function pickBuildingTargets(building, n) {
+  const ud = building.userData;
+  const fromX = building.position.x, fromY = building.position.y;
+  const r2 = ud._range * ud._range;
+  // Collect all valid hostile targets in range, tagged with priority + d².
+  const candidates = [];
+  for (const b of _space.bodies) {
+    const bud = b.userData;
+    if (!bud || !bud._side) continue;
+    if (bud._side === ud._side) continue;
+    if (bud._kind !== "creep_melee" && bud._kind !== "creep_ranged"
+      && bud._kind !== "tower" && bud._kind !== "ancient" && bud._kind !== "hero") continue;
+    const d2 = distSq(fromX, fromY, b.position.x, b.position.y);
+    if (d2 > r2) continue;
+    candidates.push({ body: b, prio: bud._priority, d2 });
+  }
+  candidates.sort((a, b) => (a.prio - b.prio) || (a.d2 - b.d2));
+  return candidates.slice(0, n).map((c) => c.body);
+}
+
 function tickBuildings() {
   for (const body of _space.bodies) {
     const ud = body.userData;
     if (!ud) continue;
     if (ud._kind !== "tower" && ud._kind !== "ancient") continue;
     if (ud._attackTimer > 0) { ud._attackTimer--; continue; }
-    const target = pickBuildingTarget(body);
-    if (!target) continue;
-    fireProjectile(body, target, ud._damage);
-    ud._attackTimer = ud._cooldown;
+    if (ud._kind === "ancient") {
+      const targets = pickBuildingTargets(body, ANCIENT_SALVO);
+      if (targets.length === 0) continue;
+      for (const t of targets) fireProjectile(body, t, ud._damage);
+      ud._attackTimer = ud._cooldown;
+    } else {
+      const target = pickBuildingTarget(body);
+      if (!target) continue;
+      fireProjectile(body, target, ud._damage);
+      ud._attackTimer = ud._cooldown;
+    }
   }
 }
 
@@ -552,34 +760,33 @@ function spawnMine(hero) {
   body.space = _space;
 }
 
+// Detonation: spawn MINE_PELLETS radial bullets that fly outward. They use
+// the same projectile kind + collision listener as normal ranged shots, so
+// any existing hit-resolution code handles them automatically.
 function detonateMine(mine) {
   const ms = mine.userData._side;
   const bx = mine.position.x, by = mine.position.y;
-  const r2 = MINE_RADIUS * MINE_RADIUS;
-  const targets = [];
-  for (const body of _space.bodies) {
-    const ud = body.userData;
-    if (!ud || !ud._side) continue;
-    if (ud._side === ms) continue;
-    if (ud._kind !== "creep_melee" && ud._kind !== "creep_ranged"
-      && ud._kind !== "tower" && ud._kind !== "ancient" && ud._kind !== "hero") continue;
-    const dx = body.position.x - bx, dy = body.position.y - by;
-    const d2 = dx * dx + dy * dy;
-    if (d2 > r2) continue;
-    targets.push({ body, dx, dy, d: Math.sqrt(d2) });
-  }
-  for (const { body, dx, dy, d } of targets) {
-    const dd = d || 1;
-    const falloff = 1 - dd / MINE_RADIUS;
-    // Only dynamic bodies get knocked back (towers/ancients are static).
-    if (!body.isStatic() && MINE_IMPULSE > 0) {
-      body.applyImpulse(new Vec2((dx / dd) * MINE_IMPULSE * falloff, (dy / dd) * MINE_IMPULSE * falloff));
-    }
-    _pending.damage.push({
-      victim: body,
-      amount: Math.round(MINE_DAMAGE * falloff),
-      attackerSide: ms,
-    });
+  // Random angular phase so consecutive mines don't pattern-lock.
+  const phase = Math.random() * Math.PI * 2;
+  for (let i = 0; i < MINE_PELLETS; i++) {
+    const ang = phase + (i / MINE_PELLETS) * Math.PI * 2;
+    const nx = Math.cos(ang), ny = Math.sin(ang);
+    const body = new Body(
+      BodyType.DYNAMIC,
+      new Vec2(bx + nx * 12, by + ny * 12), // spawn just outside the mine
+    );
+    const shape = new Circle(3, undefined, new Material(0.1, 0.1, 0.1, 0.01));
+    shape.filter = filterForProj(ms);
+    body.shapes.add(shape);
+    body.isBullet = true;
+    body.userData._colorIdx = sideColorIdx(ms);
+    body.userData._side = ms;
+    body.userData._kind = "proj";
+    body.userData._damage = MINE_PELLET_DAMAGE;
+    body.userData._life = MINE_PELLET_LIFE;
+    body.cbTypes.add(cbForProj(ms));
+    body.velocity = new Vec2(nx * MINE_PELLET_SPEED, ny * MINE_PELLET_SPEED);
+    body.space = _space;
   }
   mine.space = null;
 }
@@ -654,116 +861,6 @@ function addHeroXP(hero, amount) {
     hero.hp = Math.min(hero.maxHp, hero.hp + hpGain); // heal on level-up
     hero.damage += HERO_DMG_PER_LVL;
   }
-}
-
-// ── Enemy hero AI ────────────────────────────────────────────────────────
-// Extremely simple: pick a lane, walk it toward the enemy base following the
-// waypoint chain, auto-attack. Dash to flee when low HP; drop a mine when
-// engaged with at least one enemy unit nearby.
-function pickAILane(hero) {
-  const lanes = ["top", "mid", "bot"];
-  return lanes[Math.floor(Math.random() * lanes.length)];
-}
-
-function nearestAlliedCreep(hero) {
-  let best = null, bestD2 = Infinity;
-  for (const body of _space.bodies) {
-    const ud = body.userData;
-    if (!ud || ud._side !== hero.side) continue;
-    if (ud._kind !== "creep_melee" && ud._kind !== "creep_ranged") continue;
-    const d2 = distSq(hero.body.position.x, hero.body.position.y, body.position.x, body.position.y);
-    if (d2 < bestD2) { bestD2 = d2; best = body; }
-  }
-  return best;
-}
-
-function runEnemyHeroAI(hero) {
-  if (!hero.body?.space) return;
-  const body = hero.body;
-
-  // Reassign lane periodically for variety.
-  hero.aiLaneReassign--;
-  if (!hero.aiLane || hero.aiLaneReassign <= 0) {
-    hero.aiLane = pickAILane(hero);
-    hero.aiLaneReassign = 900; // ~15s
-  }
-
-  // HP-triggered flee
-  if (hero.hp < hero.maxHp * 0.3) hero.aiState = "flee";
-  else if (hero.hp > hero.maxHp * 0.75) hero.aiState = "lane";
-
-  const lane = LANES[hero.aiLane];
-  // Red hero travels lane in reverse; blue AI (not used) would go forward.
-  const forward = hero.side === "blue" ? 1 : -1;
-
-  // Base target: nearest enemy within attack range (for auto-attack).
-  const enemy = pickTarget(body.position.x, body.position.y, hero.side, HERO_RANGE * 1.2);
-
-  // Desired movement direction
-  let dx = 0, dy = 0;
-  if (hero.aiState === "flee") {
-    // Dash if possible, else walk toward own base.
-    const home = hero.side === "blue" ? BLUE_ANCIENT : RED_ANCIENT;
-    dx = home.x - body.position.x;
-    dy = home.y - body.position.y;
-    const mag = Math.hypot(dx, dy) || 1;
-    dx /= mag; dy /= mag;
-    if (hero.dashCd <= 0 && hero.dashTimer <= 0) tryCastDash(hero, dx, dy);
-  } else {
-    // Lane push — find the furthest-advanced own creep on this lane, walk
-    // toward its position but nudged further down the lane; if no creep,
-    // aim for the next waypoint.
-    const ally = nearestAlliedCreep(hero);
-    if (ally && ally.userData._lane === hero.aiLane) {
-      dx = ally.position.x - body.position.x;
-      dy = ally.position.y - body.position.y;
-    } else {
-      // Walk from current position toward the lane's end.
-      const endIdx = hero.side === "blue" ? lane.length - 1 : 0;
-      const tgt = lane[endIdx];
-      dx = tgt.x - body.position.x;
-      dy = tgt.y - body.position.y;
-    }
-    const mag = Math.hypot(dx, dy) || 1;
-    dx /= mag; dy /= mag;
-
-    // If currently in a fight (enemy within range) and a melee target is
-    // close, drop a mine right now — it arms in 2s, so by then the creeps
-    // will have clustered around the hero.
-    if (enemy && hero.mineCd <= 0) {
-      const enemyIsClose = distSq(body.position.x, body.position.y, enemy.position.x, enemy.position.y)
-        < (HERO_RANGE * 0.6) * (HERO_RANGE * 0.6);
-      if (enemyIsClose) tryCastMine(hero);
-    }
-
-    // Back off a touch if too close to an enemy tower (heuristic: stay out
-    // of tower range when no allied creeps are around to tank).
-    const enemyTower = pickTarget(body.position.x, body.position.y, hero.side, TOWER_RANGE + 30,
-      (ud) => (ud._kind === "tower" || ud._kind === "ancient") ? 0 : 999);
-    if (enemyTower) {
-      const allyInLane = ally && ally.userData._lane === hero.aiLane
-        && distSq(body.position.x, body.position.y, ally.position.x, ally.position.y) < 140 * 140;
-      if (!allyInLane) {
-        // Retreat a bit along the lane (opposite of forward).
-        const retreat = hero.side === "blue" ? 0 : lane.length - 1;
-        const tgt = lane[retreat];
-        const rdx = tgt.x - body.position.x;
-        const rdy = tgt.y - body.position.y;
-        const rmag = Math.hypot(rdx, rdy) || 1;
-        dx = rdx / rmag; dy = rdy / rmag;
-      }
-    }
-  }
-
-  // Apply velocity (unless currently dashing — tryCastDash handles that).
-  if (hero.dashTimer <= 0) {
-    const speed = HERO_SPEED * 0.85; // AI slightly slower than player, keeps it fair
-    const v = body.velocity;
-    const blend = 0.2;
-    body.velocity = new Vec2(v.x + (dx * speed - v.x) * blend, v.y + (dy * speed - v.y) * blend);
-  }
-  // Silence unused var — forward direction is implicit in lane-end selection.
-  void forward;
 }
 
 // ── Player input → movement ──────────────────────────────────────────────
@@ -871,16 +968,14 @@ function processPending() {
 
 // ── Hero respawn ─────────────────────────────────────────────────────────
 function tickHeroRespawns() {
-  for (const side of ["blue", "red"]) {
-    const hero = _heroes[side];
-    if (!hero || hero.body) continue;
-    if (hero.respawnTimer > 0) {
-      hero.respawnTimer--;
-      if (hero.respawnTimer <= 0) {
-        hero.body = spawnHero(side);
-        hero.hp = hero.maxHp;
-        hero.iframes = 60; // brief respawn i-frames
-      }
+  const hero = _heroes.blue;
+  if (!hero || hero.body) return;
+  if (hero.respawnTimer > 0) {
+    hero.respawnTimer--;
+    if (hero.respawnTimer <= 0) {
+      hero.body = spawnHero("blue");
+      hero.hp = hero.maxHp;
+      hero.iframes = 60; // brief respawn i-frames
     }
   }
 }
@@ -948,7 +1043,6 @@ function tickPassiveGold() {
   _goldTimer--;
   if (_goldTimer <= 0) {
     if (_heroes.blue) _heroes.blue.gold += GOLD_PASSIVE;
-    if (_heroes.red) _heroes.red.gold += GOLD_PASSIVE;
     _goldTimer = GOLD_PASSIVE_INTERVAL;
   }
 }
@@ -998,13 +1092,10 @@ function resetGame(space) {
   spawnAncient("red");
   for (const def of TOWER_DEFS) spawnTower(def);
 
-  // Heroes.
+  // Hero (player only — no enemy hero).
   _heroes.blue = makeHeroRecord("blue");
-  _heroes.red = makeHeroRecord("red");
   _heroes.blue.body = spawnHero("blue");
   _heroes.blue.hp = _heroes.blue.maxHp;
-  _heroes.red.body = spawnHero("red");
-  _heroes.red.hp = _heroes.red.maxHp;
 
   _gameOver = false;
   _victory = null;
@@ -1024,7 +1115,7 @@ function resetGame(space) {
 
 // ── Rendering ────────────────────────────────────────────────────────────
 function drawLaneVisuals(ctx) {
-  // Faint lane ribbons (decorative) under the bodies.
+  // Faint lane ribbons along each corridor center — makes the path readable.
   for (const laneKey of Object.keys(LANES)) {
     const waypoints = LANES[laneKey];
     ctx.strokeStyle = "rgba(255,255,255,0.05)";
@@ -1036,13 +1127,6 @@ function drawLaneVisuals(ctx) {
     for (let i = 1; i < waypoints.length; i++) ctx.lineTo(waypoints[i].x, waypoints[i].y);
     ctx.stroke();
   }
-  // River — diagonal band through the center (purely visual).
-  ctx.save();
-  ctx.translate(WORLD_W / 2, WORLD_H / 2);
-  ctx.rotate(-Math.PI / 4);
-  ctx.fillStyle = "rgba(80, 140, 220, 0.09)";
-  ctx.fillRect(-WORLD_W, -50, WORLD_W * 2, 100);
-  ctx.restore();
   ctx.lineCap = "butt";
   ctx.lineJoin = "miter";
 }
@@ -1173,7 +1257,6 @@ function drawBuildingBadge(ctx, body) {
 // ── Screen-space HUD ─────────────────────────────────────────────────────
 function drawTopHUD(ctx) {
   const hero = _heroes.blue;
-  const enemy = _heroes.red;
   ctx.fillStyle = "rgba(13,17,23,0.88)";
   ctx.fillRect(0, 0, VIEW_W, HUD_H);
   // Hero gold/level
@@ -1202,33 +1285,36 @@ function drawTopHUD(ctx) {
   ctx.fillStyle = hero.hp <= hero.maxHp * 0.3 ? "#f85149" : "#3fb950";
   ctx.fillText(`${Math.max(0, Math.round(hero.hp))}/${hero.maxHp}`, 235, HUD_H / 2);
 
-  // Ancient HP bars (right side)
-  const barW = 90, barH = 10;
+  // Ancient HP bars (right side). Layout: [Blue★ ▮▮▮▮]  [Red★ ▮▮▮▮]
+  // Each pair is one contiguous block; the two blocks sit side-by-side with
+  // a clear gap so no label overlaps the neighbouring bar.
+  const barW = 80, barH = 10;
+  const labelW = 40;     // space reserved for each label (left of its bar)
+  const pairGap = 16;    // gap between the Blue pair and the Red pair
+  const pairW = labelW + barW;
+  const rightEdge = VIEW_W - 10;
+  const redPairX  = rightEdge - pairW;
+  const bluePairX = redPairX - pairGap - pairW;
   ctx.font = "10px system-ui, sans-serif";
-  ctx.textAlign = "right";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
   // Blue Ancient
   ctx.fillStyle = "#c9d1d9";
-  ctx.fillText("Blue ★", VIEW_W - 200, HUD_H / 2);
+  ctx.fillText("Blue ★", bluePairX, HUD_H / 2);
   const blueHP = _findAncientHP("blue");
   ctx.fillStyle = "rgba(255,255,255,0.15)";
-  ctx.fillRect(VIEW_W - 195, HUD_H / 2 - barH / 2, barW, barH);
+  ctx.fillRect(bluePairX + labelW, HUD_H / 2 - barH / 2, barW, barH);
   ctx.fillStyle = "#58a6ff";
-  ctx.fillRect(VIEW_W - 195, HUD_H / 2 - barH / 2, barW * (blueHP / ANCIENT_HP), barH);
+  ctx.fillRect(bluePairX + labelW, HUD_H / 2 - barH / 2, barW * (blueHP / ANCIENT_HP), barH);
   // Red Ancient
   ctx.fillStyle = "#c9d1d9";
-  ctx.fillText("Red ★", VIEW_W - 100, HUD_H / 2);
+  ctx.fillText("Red ★", redPairX, HUD_H / 2);
   const redHP = _findAncientHP("red");
   ctx.fillStyle = "rgba(255,255,255,0.15)";
-  ctx.fillRect(VIEW_W - 95, HUD_H / 2 - barH / 2, barW, barH);
+  ctx.fillRect(redPairX + labelW, HUD_H / 2 - barH / 2, barW, barH);
   ctx.fillStyle = "#f85149";
-  ctx.fillRect(VIEW_W - 95, HUD_H / 2 - barH / 2, barW * (redHP / ANCIENT_HP), barH);
+  ctx.fillRect(redPairX + labelW, HUD_H / 2 - barH / 2, barW * (redHP / ANCIENT_HP), barH);
 
-  // Enemy hero indicator
-  if (enemy) {
-    ctx.fillStyle = "#f85149";
-    ctx.textAlign = "center";
-    ctx.fillText(`Enemy Lv ${enemy.level}`, VIEW_W / 2, HUD_H / 2);
-  }
 }
 
 function _findAncientHP(side) {
@@ -1380,15 +1466,74 @@ function inStickZone(sx, sy) {
   return sx <= VIEW_W * 0.42 && sy >= VIEW_H * 0.55;
 }
 
+// ── Minimal body drawing (mirror of renderer.js's drawBody with custom
+// styling tweaks so the demo reads cleanly without the shared grid). ────
+function drawBodySimple(ctx, body, showOutlines) {
+  const ud = body.userData;
+  const isProj = ud?._kind === "proj";
+  const isMine = ud?._kind === "mine";
+  if (isMine) return; // mines are drawn in drawMines with extra effects
+  let fill, stroke;
+  if (ud?._side === "blue") {
+    fill = "rgba(88,166,255,0.22)"; stroke = "#58a6ff";
+  } else if (ud?._side === "red") {
+    fill = "rgba(248,81,73,0.22)"; stroke = "#f85149";
+  } else if (ud?._wall) {
+    fill = "rgba(120,160,200,0.15)"; stroke = "#607888";
+  } else {
+    fill = "rgba(120,160,200,0.15)"; stroke = "#607888";
+  }
+  const x = body.position.x, y = body.position.y;
+  const rot = body.rotation;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  for (const shape of body.shapes) {
+    const circle = shape.castCircle;
+    const polygon = shape.castPolygon;
+    if (circle) {
+      ctx.beginPath();
+      ctx.arc(0, 0, circle.radius, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      if (showOutlines || isProj) {
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = isProj ? 1 : 1.5;
+        ctx.stroke();
+      }
+    } else if (polygon) {
+      const verts = polygon.localVerts;
+      const len = verts.length;
+      if (len < 3) continue;
+      ctx.beginPath();
+      const v0 = verts.at(0);
+      ctx.moveTo(v0.x, v0.y);
+      for (let i = 1; i < len; i++) {
+        const v = verts.at(i);
+        ctx.lineTo(v.x, v.y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      if (showOutlines) {
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
 // ── Demo definition ──────────────────────────────────────────────────────
 export default {
-  id: "dota",
-  label: "Dota-lite",
+  id: "moba-lite",
+  label: "MOBA-lite",
   tags: ["Gameplay", "Callbacks", "AOE", "Camera", "Mobile", "MOBA"],
   featured: true,
   featuredOrder: 6,
   desc:
-    "Rough MOBA sketch — three lanes, creep waves, 12 towers and two Ancients. Move with <b>WASD</b> (or bottom-left virtual stick); auto-attack fires at the nearest enemy in range. <b>Q</b> drops a 2s <b>mine</b>, <b>E</b> is a <b>dash</b> with short i-frames. The enemy hero (red) pushes a random lane and flees at low HP. Shop buttons at the top-left buy <b>+3 DMG</b> or <b>heal 50</b>. Destroy the red Ancient ★ to win; lose if the blue Ancient falls. Camera follows the player across the 1800×1000 world.",
+    "Rough MOBA sketch — three lanes through a triangle-island maze, creep waves, 12 towers and two Ancients. Move with <b>WASD</b> (or bottom-left virtual stick); auto-attack fires at the nearest enemy in range. <b>Q</b> drops a 2s <b>mine</b> that bursts into 10 radial bullets, <b>E</b> is a <b>dash</b> with short i-frames. Earn gold + XP by killing creeps/towers; level up to 10. Shop buttons at the top-left buy <b>+3 DMG</b> or <b>heal 50</b>. Destroy the red Ancient ★ to win; lose if the blue Ancient falls. Camera follows the player across the 1800×1000 world.",
   walls: false,
   workerCompatible: false,
   canvas2dOnly: true,
@@ -1408,8 +1553,8 @@ export default {
     buildArenaWalls(space);
     resetGame(space);
 
-    // Camera follows the player hero with a small deadzone so tiny moves
-    // don't jitter the viewport.
+    // Camera follows the player hero. No deadzone — demo-runner's deadzone
+    // math can cause back-and-forth overshoot that looks like screen shake.
     this.camera = {
       follow: () => {
         const h = _heroes.blue;
@@ -1419,8 +1564,7 @@ export default {
         return { x: BLUE_ANCIENT.x, y: BLUE_ANCIENT.y };
       },
       bounds: { minX: 0, minY: 0, maxX: WORLD_W, maxY: WORLD_H },
-      lerp: 0.12,
-      deadzone: { halfW: 60, halfH: 50 },
+      lerp: 0.18,
     };
 
     _isTouch = typeof window !== "undefined" && (
@@ -1501,18 +1645,11 @@ export default {
     processPending();
     tickHeroRespawns();
 
-    // Player & enemy hero upkeep
     updateHeroTimers(_heroes.blue);
-    updateHeroTimers(_heroes.red);
 
     computeMoveDir();
     applyPlayerVelocity();
     heroAutoAttack(_heroes.blue);
-
-    if (_heroes.red.body?.space) {
-      runEnemyHeroAI(_heroes.red);
-      heroAutoAttack(_heroes.red);
-    }
 
     steerCreeps();
     tickBuildings();
@@ -1604,7 +1741,6 @@ export default {
       }
     }
     if (_heroes.blue) drawHeroHpBar(ctx, _heroes.blue);
-    if (_heroes.red) drawHeroHpBar(ctx, _heroes.red);
 
     ctx.restore();
 
@@ -1617,65 +1753,5 @@ export default {
     void W; void H;
   },
 };
-
-// ── Minimal body drawing (mirror of renderer.js's drawBody with custom
-// styling tweaks so the demo reads cleanly without the shared grid). ────
-function drawBodySimple(ctx, body, showOutlines) {
-  const ud = body.userData;
-  const isProj = ud?._kind === "proj";
-  const isMine = ud?._kind === "mine";
-  if (isMine) return; // mines are drawn in drawMines with extra effects
-  let fill, stroke;
-  if (ud?._side === "blue") {
-    fill = "rgba(88,166,255,0.22)"; stroke = "#58a6ff";
-  } else if (ud?._side === "red") {
-    fill = "rgba(248,81,73,0.22)"; stroke = "#f85149";
-  } else if (ud?._wall) {
-    fill = "rgba(120,160,200,0.15)"; stroke = "#607888";
-  } else {
-    fill = "rgba(120,160,200,0.15)"; stroke = "#607888";
-  }
-  const x = body.position.x, y = body.position.y;
-  const rot = body.rotation;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rot);
-  for (const shape of body.shapes) {
-    const circle = shape.castCircle;
-    const polygon = shape.castPolygon;
-    if (circle) {
-      ctx.beginPath();
-      ctx.arc(0, 0, circle.radius, 0, Math.PI * 2);
-      ctx.fillStyle = fill;
-      ctx.fill();
-      if (showOutlines || isProj) {
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = isProj ? 1 : 1.5;
-        ctx.stroke();
-      }
-    } else if (polygon) {
-      const verts = polygon.localVerts;
-      ctx.beginPath();
-      let first = true;
-      for (const v of verts) {
-        if (first) { ctx.moveTo(v.x, v.y); first = false; }
-        else ctx.lineTo(v.x, v.y);
-      }
-      ctx.closePath();
-      ctx.fillStyle = fill;
-      ctx.fill();
-      if (showOutlines) {
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-    }
-  }
-  ctx.restore();
-}
-
-
-
-
 
 
