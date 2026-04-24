@@ -17,7 +17,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const docs = resolve(root, "docs");
 
-const { version } = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+const { version } = JSON.parse(
+  readFileSync(resolve(root, "packages/nape-js/package.json"), "utf8"),
+);
+const { version: pixiVersion } = JSON.parse(
+  readFileSync(resolve(root, "packages/nape-pixi/package.json"), "utf8"),
+);
 const v = `v=${version}`;
 
 /**
@@ -56,11 +61,11 @@ for (const htmlFile of ["index.html", "examples.html"]) {
 }
 
 // --- JS files: stamp ES import paths for local modules ---
-for (const jsFile of ["app.js", "examples.js"]) {
+for (const jsFile of ["app.js", "examples.js", "renderers/pixijs-adapter.js"]) {
   stamp(resolve(docs, jsFile), [
-    // from "./nape-js.esm.js" or from "./renderer.js"
+    // from "./nape-js.esm.js" or from "../nape-pixi.esm.js" or from "./renderer.js"
     [
-      /from\s+"(\.\/[^"]+\.js)(\?v=[^"]*)?"/g,
+      /from\s+"(\.\.?\/[^"]+\.js)(\?v=[^"]*)?"/g,
       (_m, ref) => `from "${stripV(ref)}?${v}"`,
     ],
   ]);
@@ -71,6 +76,10 @@ stamp(resolve(docs, "codepen-templates.js"), [
   [
     /https:\/\/cdn\.jsdelivr\.net\/npm\/@newkrok\/nape-js(@[^/]*)?\/dist\/index\.js/g,
     `https://cdn.jsdelivr.net/npm/@newkrok/nape-js@${version}/dist/index.js`,
+  ],
+  [
+    /https:\/\/cdn\.jsdelivr\.net\/npm\/@newkrok\/nape-pixi(@[^/]*)?\/dist\/index\.js/g,
+    `https://cdn.jsdelivr.net/npm/@newkrok/nape-pixi@${pixiVersion}/dist/index.js`,
   ],
 ]);
 

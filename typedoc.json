@@ -1,5 +1,6 @@
 {
-  "entryPoints": ["src/index.ts"],
+  "entryPoints": ["packages/nape-js/src/index.ts"],
+  "tsconfig": "packages/nape-js/tsconfig.json",
   "out": "docs/api",
   "skipErrorChecking": true,
   "excludeInternal": true,

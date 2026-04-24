@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>nape-pixi playground</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0d1117;
+        color: #c9d1d9;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      #menu {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+        background: rgba(22, 27, 34, 0.85);
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 13px;
+      }
+      #menu a {
+        color: #58a6ff;
+        margin-right: 10px;
+        text-decoration: none;
+      }
+      #menu a.active {
+        color: #fff;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="menu">
+      <strong>examples:</strong>
+      <a href="?example=01" data-ex="01">01 basic</a>
+      <a href="?example=02" data-ex="02">02 interpolation</a>
+      <a href="?example=03" data-ex="03">03 worker</a>
+    </div>
+    <script type="module" src="/playground.ts"></script>
+  </body>
+</html>

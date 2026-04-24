@@ -21,10 +21,21 @@ Fully typed, tree-shakeable 2D physics engine — a modern TypeScript rewrite of
 - Originally created in Haxe by Luca Deltodesco
 - Ported to TypeScript by Istvan Krisztian Somoracz
 
+## Packages
+
+This repo is an npm-workspaces monorepo:
+
+| Package | What it is |
+|---------|------------|
+| [`@newkrok/nape-js`](packages/nape-js) | The physics engine itself — rigid bodies, constraints, collision, fluids, deterministic multiplayer. |
+| [`@newkrok/nape-pixi`](packages/nape-pixi) | PixiJS v8 integration — `BodySpriteBinding`, `FixedStepper` (render interpolation), `PixiDebugDraw`, `WorkerBridge`. |
+
 ## Installation
 
 ```bash
 npm install @newkrok/nape-js
+# optional: PixiJS v8 integration
+npm install @newkrok/nape-pixi pixi.js
 ```
 
 ## Quick Start
@@ -183,10 +194,15 @@ present, with automatic `postMessage` fallback otherwise.
 
 ```bash
 npm install
-npm run build      # tsup → dist/ (ESM + CJS + DTS)
-npm test           # vitest — 4773 tests across 208 files
+npm run build      # tsup → packages/*/dist/ (ESM + CJS + DTS)
+npm test           # vitest — 5275 engine tests + 71 pixi-adapter tests
 npm run benchmark  # Performance benchmarks
 ```
+
+Releases are automated: see [`docs/guides/workflow.md`](docs/guides/workflow.md#cicd-pipelines)
+for the per-package auto-release pipeline. Run
+`node scripts/ci/release.mjs --dry-run` from the repo root to preview what
+would publish on the next master merge.
 
 ## License
 

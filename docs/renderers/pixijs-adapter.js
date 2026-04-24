@@ -1,10 +1,12 @@
 /**
  * PixiJSAdapter — PixiJS renderer for nape-js demos.
  *
- * Uses Sprite + generateTexture pattern: shapes are drawn into a temporary
- * Graphics, baked into a GPU texture, then rendered as batched Sprite quads.
- * This is how real PixiJS games work — far more efficient than per-frame
- * Graphics tessellation.
+ * This adapter is a thin runner-facing wrapper around the public
+ * `@newkrok/nape-pixi` package. The package supplies the reusable bits
+ * (PixiDebugDraw for body shapes + constraint lines); this file keeps
+ * the demo-specific glue: attach/detach lifecycle, a 2D HUD overlay,
+ * the `userData._color`/`_colorIdx`/`_isZone` conventions, and the
+ * transform-buffer render path used by worker-mode demos.
  */
 
 // ---------------------------------------------------------------------------
@@ -27,7 +29,8 @@ export function getPixi() {
 import {
   BODY_COLORS_HEX, STATIC_COLOR_HEX, CONSTRAINT_COLOR_HEX,
   bodyColorHex, bodyFillAlpha,
-} from "./shared-colors.js";
+} from "./shared-colors.js?v=3.30.0";
+import { PixiDebugDraw } from "../nape-pixi.esm.js?v=3.30.0";
 
 // Aliases for backward compatibility
 const FILL_COLORS = BODY_COLORS_HEX;
@@ -47,15 +50,23 @@ export class PixiJSAdapter {
   #H = 0;
   #showOutlines = true;
   #app = null;
-  #bodySprites = new Map(); // Body|number -> PIXI.Sprite
 
-  // Background grid + constraint lines
+  // The nape-pixi debug draw handles body shapes + constraint lines.
+  // Owns its own Container which we add to the stage.
+  #debug = null;
+
+  // Background grid
   #gridGfx = null;
-  #constraintGfx = null;
 
   // 2D overlay canvas for HUD (legend, cursor hints, etc.)
   #overlay = null;
   #overlayCtx = null;
+
+  // Worker-mode state (shapeDescs + transforms) — kept here because it
+  // uses a demo-specific protocol that `@newkrok/nape-pixi`'s WorkerBridge
+  // doesn't cover.
+  #workerSprites = new Map(); // number -> PIXI.Graphics
+  #lastWorkerDescs = null;
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -100,9 +111,20 @@ export class PixiJSAdapter {
     this.#gridGfx.stroke({ color: 0x1a2030, width: 0.5 });
     this.#app.stage.addChildAt(this.#gridGfx, 0);
 
-    // Constraint lines overlay (reused each frame)
-    this.#constraintGfx = new _PIXI.Graphics();
-    this.#app.stage.addChild(this.#constraintGfx);
+    // Shape + constraint rendering delegated to the public package.
+    // The demo palette / static+sleeping colours and the `_isZone` alpha
+    // quirk are wired through the resolver hooks.
+    this.#debug = new PixiDebugDraw({
+      pixi: { Container: _PIXI.Container, Graphics: _PIXI.Graphics },
+      palette: BODY_COLORS_HEX,
+      staticColor: STATIC_FILL,
+      constraintColor: CONSTRAINT_COLOR_HEX,
+      showOutlines: this.#showOutlines,
+      outlineAlpha: OUTLINE_ALPHA,
+      colorResolver: (body) => bodyColorHex(body),
+      alphaResolver: (body) => bodyFillAlpha(body),
+    });
+    this.#app.stage.addChild(this.#debug.container);
 
     // 2D overlay canvas for HUD (legend, density labels, etc.)
     this.#overlay = document.createElement("canvas");
@@ -120,14 +142,18 @@ export class PixiJSAdapter {
       this.#overlay = null;
       this.#overlayCtx = null;
     }
+    if (this.#debug) {
+      this.#debug.dispose();
+      this.#debug = null;
+    }
     if (this.#app && this.#container) {
       this.#container.removeChild(this.#app.canvas);
       this.#app.destroy(true);
       this.#app = null;
     }
     this.#gridGfx = null;
-    this.#constraintGfx = null;
-    this.#bodySprites.clear();
+    this.#workerSprites.clear();
+    this.#lastWorkerDescs = null;
     this.#container = null;
   }
 
@@ -139,21 +165,36 @@ export class PixiJSAdapter {
   // Per-demo hooks
   // ---------------------------------------------------------------------------
 
-  onDemoLoad(space, _W, _H) {
-    if (!this.#app) return;
-    // Build sprites for all existing bodies
-    for (const body of space.bodies) {
-      this.#addBodySprite(body);
-    }
+  onDemoLoad(_space, _W, _H) {
+    // PixiDebugDraw auto-discovers bodies on the first render() call.
   }
 
   onDemoUnload() {
-    if (!this.#app) return;
-    for (const [, gfx] of this.#bodySprites) {
-      this.#app.stage.removeChild(gfx);
+    // Clear cached per-body graphics so the next demo starts clean.
+    if (this.#debug) {
+      // Rebuilding is achieved by toggling showOutlines off/on, which
+      // re-runs drawBodyShapes — but we also need to drop cached entries
+      // whose bodies are gone. The simplest way: dispose + recreate.
+      this.#app.stage.removeChild(this.#debug.container);
+      this.#debug.dispose();
+      this.#debug = new PixiDebugDraw({
+        pixi: { Container: _PIXI.Container, Graphics: _PIXI.Graphics },
+        palette: BODY_COLORS_HEX,
+        staticColor: STATIC_FILL,
+        constraintColor: CONSTRAINT_COLOR_HEX,
+        showOutlines: this.#showOutlines,
+        outlineAlpha: OUTLINE_ALPHA,
+        colorResolver: (body) => bodyColorHex(body),
+        alphaResolver: (body) => bodyFillAlpha(body),
+      });
+      this.#app.stage.addChild(this.#debug.container);
+    }
+    for (const [, gfx] of this.#workerSprites) {
+      this.#app?.stage.removeChild(gfx);
       gfx.destroy();
     }
-    this.#bodySprites.clear();
+    this.#workerSprites.clear();
+    this.#lastWorkerDescs = null;
   }
 
   // ---------------------------------------------------------------------------
@@ -166,20 +207,11 @@ export class PixiJSAdapter {
     if (overrides?.pixijs) {
       overrides.pixijs(this, space, W, H, showOutlines, camX, camY);
     } else {
-      // Sync bodies: add new, remove stale
-      this.#syncBodies(space);
-
-      // Update positions
-      for (const [body, sprite] of this.#bodySprites) {
-        sprite.x = body.position.x;
-        sprite.y = body.position.y;
-        sprite.rotation = body.rotation;
+      // Keep debug-draw's outline toggle in sync.
+      if (this.#debug && this.#debug.showOutlines !== showOutlines) {
+        this.#debug.showOutlines = showOutlines;
       }
-
-      // Draw constraint lines between connected bodies
-      this.#drawConstraintLines(space);
-
-      // Ticker is stopped; we drive rendering manually from DemoRunner's rAF loop
+      this.#debug?.render(space);
       this.#app.render();
     }
 
@@ -214,7 +246,7 @@ export class PixiJSAdapter {
     const HEADER = 3;
     const STRIDE = 3;
     const bodyCount = transforms[0] | 0;
-    const entries = [...this.#bodySprites.values()];
+    const entries = [...this.#workerSprites.values()];
     const count = Math.min(bodyCount, entries.length);
 
     for (let i = 0; i < count; i++) {
@@ -238,12 +270,7 @@ export class PixiJSAdapter {
 
   setOutlines(show) {
     this.#showOutlines = show;
-    if (!this.#app) return;
-    // Redraw all Graphics with/without outlines
-    for (const [body, gfx] of this.#bodySprites) {
-      if (typeof body === "number") continue; // worker mode index keys
-      this.#drawBodyShapes(body, gfx, show);
-    }
+    if (this.#debug) this.#debug.showOutlines = show;
   }
 
   // ---------------------------------------------------------------------------
@@ -276,145 +303,27 @@ export class PixiJSAdapter {
     return this.#app?.canvas ?? null;
   }
 
-  /** Sync body graphics with the current space (add new, remove stale, update positions). */
+  /** Sync body graphics with the current space — kept for runner overrides. */
   syncBodies(space) {
-    if (!this.#app) return;
-    this.#syncBodies(space);
-    for (const [body, gfx] of this.#bodySprites) {
-      gfx.x = body.position.x;
-      gfx.y = body.position.y;
-      gfx.rotation = body.rotation;
-    }
+    this.#debug?.render(space);
   }
 
   // ---------------------------------------------------------------------------
-  // Internal: constraint rendering
+  // Internal: worker-mode sprite management
   // ---------------------------------------------------------------------------
-
-  #drawConstraintLines(space) {
-    if (!this.#constraintGfx) return;
-    this.#constraintGfx.clear();
-    try {
-      const raw = space.constraints;
-      const len = raw.length;
-      if (len === 0) return;
-      for (let i = 0; i < len; i++) {
-        const c = raw.at(i);
-        if (c.body1 && c.body2) {
-          this.#constraintGfx.moveTo(c.body1.position.x, c.body1.position.y);
-          this.#constraintGfx.lineTo(c.body2.position.x, c.body2.position.y);
-        }
-      }
-      this.#constraintGfx.stroke({ color: CONSTRAINT_COLOR_HEX, width: 1, alpha: 0.2 });
-    } catch (_) {}
-    // Keep constraints on top of body sprites
-    this.#app.stage.setChildIndex(this.#constraintGfx, this.#app.stage.children.length - 1);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Internal: body graphics management
-  // ---------------------------------------------------------------------------
-
-  #addBodySprite(body) {
-    if (this.#bodySprites.has(body)) return;
-    if (body.userData?._hidden3d) return;
-
-    const gfx = new _PIXI.Graphics();
-    this.#drawBodyShapes(body, gfx, this.#showOutlines);
-
-    gfx.x = body.position.x;
-    gfx.y = body.position.y;
-    gfx.rotation = body.rotation;
-
-    this.#app.stage.addChild(gfx);
-    this.#bodySprites.set(body, gfx);
-  }
-
-  #syncBodies(space) {
-    // Remove stale
-    const spaceBodies = new Set();
-    for (const body of space.bodies) spaceBodies.add(body);
-
-    for (const [body, gfx] of this.#bodySprites) {
-      if (!spaceBodies.has(body)) {
-        this.#app.stage.removeChild(gfx);
-        gfx.destroy();
-        this.#bodySprites.delete(body);
-      }
-    }
-
-    // Add new
-    for (const body of space.bodies) {
-      if (!this.#bodySprites.has(body)) {
-        this.#addBodySprite(body);
-      }
-    }
-  }
-
-  #drawBodyShapes(body, gfx, showOutlines) {
-    gfx.clear();
-
-    for (const shape of body.shapes) {
-      const isFluid = !!shape.fluidEnabled;
-      const isSensor = !!shape.sensorEnabled;
-      const fillColor = isFluid ? 0x1e90ff : bodyColorHex(body);
-      const fillAlpha = isFluid ? 0.25 : isSensor ? 0.08 : bodyFillAlpha(body);
-      if (shape.isCircle()) {
-        const r = shape.castCircle.radius;
-        gfx.circle(0, 0, r);
-        gfx.fill({ color: fillColor, alpha: fillAlpha });
-        if (showOutlines) {
-          gfx.circle(0, 0, r);
-          gfx.stroke({ color: fillColor, width: 1.2, alpha: OUTLINE_ALPHA });
-          // Rotation indicator
-          gfx.moveTo(0, 0);
-          gfx.lineTo(r, 0);
-          gfx.stroke({ color: fillColor, width: 1, alpha: 0.4 });
-        }
-      } else if (shape.isPolygon()) {
-        const verts = shape.castPolygon.localVerts;
-        const len = verts.length;
-        if (len < 3) continue;
-
-        const points = [];
-        for (let i = 0; i < len; i++) {
-          points.push(verts.at(i).x, verts.at(i).y);
-        }
-        gfx.poly(points, true);
-        gfx.fill({ color: fillColor, alpha: fillAlpha });
-        if (showOutlines) {
-          gfx.poly(points, true);
-          gfx.stroke({ color: fillColor, width: 1.2, alpha: OUTLINE_ALPHA });
-        }
-      } else if (shape.isCapsule()) {
-        const cap = shape.castCapsule;
-        const hl = cap.halfLength;
-        const r = cap.radius;
-
-        gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r);
-        gfx.fill({ color: fillColor, alpha: fillAlpha });
-        if (showOutlines) {
-          gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r);
-          gfx.stroke({ color: fillColor, width: 1.2, alpha: OUTLINE_ALPHA });
-        }
-      }
-    }
-  }
-
-  #lastWorkerDescs = null;
 
   #ensureWorkerGfx(shapeDescs) {
     // Rebuild all graphics when shapeDescs changes (body order may shift)
     if (this.#lastWorkerDescs !== shapeDescs) {
       this.#lastWorkerDescs = shapeDescs;
-      for (const [, gfx] of this.#bodySprites) {
+      for (const [, gfx] of this.#workerSprites) {
         this.#app.stage.removeChild(gfx);
         gfx.destroy();
       }
-      this.#bodySprites.clear();
+      this.#workerSprites.clear();
     }
 
-    const entries = [...this.#bodySprites.values()];
+    const entries = [...this.#workerSprites.values()];
     for (let i = entries.length; i < shapeDescs.length; i++) {
       const sd = shapeDescs[i];
       const gfx = new _PIXI.Graphics();
@@ -439,7 +348,7 @@ export class PixiJSAdapter {
       }
 
       this.#app.stage.addChild(gfx);
-      this.#bodySprites.set(i, gfx);
+      this.#workerSprites.set(i, gfx);
     }
   }
 }

@@ -2,8 +2,20 @@
 
 ## Completed Items
 
-Done: P21-P28, P30-P33, P35, P37-P43, P45-P48, P50-P55, P57, P63, P64, P66-P68.
+Done: P21-P28, P30-P33, P35, P37-P43, P44, P45-P48, P50-P55, P57, P63, P64, P66-P68.
 Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — superseded by P52), P49 (ECS adapter — trivial pattern).
+
+### P44 — PixiJS integration (`@newkrok/nape-pixi` 0.1.0)
+
+Shipped as a sibling workspace package. Published to npm on first master
+merge via the independent per-package auto-release pipeline
+(`scripts/ci/release.mjs`).
+
+- `BodySpriteBinding` — body → PIXI display sync, body-local offsets, auto-cleanup on space removal, sub-step interpolation via `FixedStepper`.
+- `FixedStepper` — fixed-timestep driver, spiral-of-death cap, before/after hooks, `alpha ∈ [0, 1)` for render interpolation.
+- `PixiDebugDraw` — on-demand shape + constraint overlay. Per-body Graphics cache with togglable layers. Zero `pixi.js` build coupling (structural `GraphicsLike` / `ContainerLike` with user-injected PIXI factory).
+- `WorkerBridge` + transform protocol — off-thread physics helper. `SharedArrayBuffer` when available, `postMessage` fallback otherwise. Doesn't prescribe the worker script — provides the wire format + the main-thread glue.
+- 71 tests, ~10 KB minified ESM, 17 KB d.ts, PIXI v8 peer-dep.
 
 ---
 
@@ -12,7 +24,6 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | #   | Priority                         | Effort | Impact   | Status                                                         |
 | --- | -------------------------------- | ------ | -------- | -------------------------------------------------------------- |
 | P29 | Test coverage >= 80%             | L      | safety   | :diamonds: ~55% (4895 tests)                                   |
-| P44 | PixiJS integration — npm package | M      | adoption | :diamonds: Phase 1 done (demos), Phase 2 pending (npm package) |
 | P56 | Interactive playground           | S-M    | adoption | :white_square_button: Not started                              |
 
 ---
@@ -52,7 +63,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 
 ### Phase 1 — Finish what's started + onboarding (next)
 
-1. **P44 Phase 2** — Ship `@newkrok/nape-pixi` npm package (auto-sync transforms, typed API, TSDoc)
+1. ~~**P44 Phase 2** — Ship `@newkrok/nape-pixi` npm package~~ ✅ done (0.1.0)
 2. **P56** — Interactive playground (StackBlitz/CodeSandbox template, editable examples)
 
 ### Phase 2 — Wow-factor + ecosystem

@@ -14,33 +14,69 @@ A fully typed TypeScript 2D physics engine — modernized rewrite of the origina
 - **Serialization** — JSON + binary for save/load/multiplayer rollback
 - **Debug draw** — abstract `DebugDraw` interface, reference impls for Canvas/Three.js/PixiJS/p5.js
 - **Character controller** — geometric collide-and-slide (`CharacterController` class)
-- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 4773 tests
+- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 5275 engine tests + 71 pixi-adapter tests
+
+## Repo Layout (npm workspaces)
+
+```
+packages/
+  nape-js/        # @newkrok/nape-js — published physics engine (src/, tests/, dist/)
+  nape-pixi/      # @newkrok/nape-pixi — PixiJS v8 integration
+                  #   BodySpriteBinding, FixedStepper, PixiDebugDraw,
+                  #   WorkerBridge + transform protocol. 0.1.0 ready to ship.
+benchmarks/       # cross-package perf suite
+docs/             # GitHub Pages site + demos
+scripts/          # repo-wide tooling
+  ci/release.mjs  # independent per-package auto-release driver
+```
+
+Root `package.json` is a private workspaces manifest. Scripts fan out with
+`npm run <x> --workspaces --if-present`. Each published package (nape-js,
+nape-pixi) owns its own `package.json`, `tsconfig.json`, build config, and
+test suite.
 
 ## Build & Test
 
 ```bash
-npm run build        # tsup → dist/
-npm test             # vitest
-npm run lint         # eslint + prettier
+npm run build        # tsup → packages/*/dist/ (both packages)
+npm test             # vitest across both workspaces
+npm run lint         # eslint across both workspaces
+npm run format:check # prettier across both workspaces
 ```
 
 ## Pre-push Checklist
 
 **Before every `git push`, always run all four:**
 
-1. `npm run format:check` — must pass (Prettier code style)
-2. `npm run lint` — must pass (catches unused vars, ESLint rules)
-3. `npm test` — all tests must pass
+1. `npm run format:check` — must pass (Prettier code style, both packages)
+2. `npm run lint` — must pass (ESLint, both packages)
+3. `npm test` — all tests must pass (5275 + 71)
 4. `npm run build` — DTS generation must succeed (catches type errors vitest misses)
+
+## Release (per-package, auto)
+
+Release is driven by `.github/workflows/release.yml` → `scripts/ci/release.mjs`.
+On push to `master` with green CI, the script walks every public workspace and
+independently decides whether to bump + tag + publish:
+
+- A package releases only when commits since its **own** last tag touched
+  files under `packages/<name>/`.
+- Bump level comes from those commits' conventional prefixes
+  (`feat:` / `fix:` / `refactor:` / `!:` / `BREAKING`).
+- Tag format: `<short>-v<ver>` (e.g. `nape-js-v3.30.1`, `nape-pixi-v0.1.0`).
+  Legacy `v*` tags on nape-js are accepted as a baseline for the first run.
+- Skip-self-loop: commit subjects starting with `release` don't retrigger CI.
+
+Use `node scripts/ci/release.mjs --dry-run` to preview what would publish.
 
 ## Architecture
 
 ```
-Public API wrappers (src/{phys,shape,constraint,callbacks,dynamics,geom,space}/)
+Public API wrappers (packages/nape-js/src/{phys,shape,constraint,callbacks,dynamics,geom,space}/)
         ↕
-Internal ZPP_* classes (src/native/)  — 85 classes
+Internal ZPP_* classes (packages/nape-js/src/native/)  — 85 classes
         ↕
-Engine bootstrap (src/core/engine.ts → ZPPRegistry.ts + bootstrap.ts)
+Engine bootstrap (packages/nape-js/src/core/engine.ts → ZPPRegistry.ts + bootstrap.ts)
 ```
 
 ## Detailed Guides
