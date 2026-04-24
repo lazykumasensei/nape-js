@@ -47,4 +47,4 @@ export {
 } from "./workerProtocol.js";
 export type { TransformsBuffer } from "./workerProtocol.js";
 
-export const VERSION = "0.1.0-alpha.0";
+export const VERSION = "0.1.0";
