@@ -29,13 +29,18 @@
   ],
   "scripts": {
     "build": "tsup",
-    "lint": "eslint src/",
-    "format": "prettier --write src/",
-    "format:check": "prettier --check src/"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ tests/",
+    "format": "prettier --write src/ tests/",
+    "format:check": "prettier --check src/ tests/"
   },
   "peerDependencies": {
     "@newkrok/nape-js": "^3.30.0",
     "pixi.js": "^8.0.0"
+  },
+  "devDependencies": {
+    "@newkrok/nape-js": "*"
   },
   "repository": {
     "type": "git",

@@ -10,12 +10,12 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "npm run build -w @newkrok/nape-js",
-    "test": "npm run test -w @newkrok/nape-js",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "test:watch": "npm run test:watch -w @newkrok/nape-js",
-    "lint": "npm run lint -w @newkrok/nape-js",
-    "format": "npm run format -w @newkrok/nape-js",
-    "format:check": "npm run format:check -w @newkrok/nape-js",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "npm run format --workspaces --if-present",
+    "format:check": "npm run format:check --workspaces --if-present",
     "check:circular": "npm run check:circular -w @newkrok/nape-js",
     "benchmark": "npm run build && node benchmarks/run.mjs",
     "benchmark:json": "npm run build && node benchmarks/run.mjs --json",
