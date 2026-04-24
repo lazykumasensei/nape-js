@@ -1536,7 +1536,6 @@ export default {
     "Rough MOBA sketch — three lanes through a triangle-island maze, creep waves, 12 towers and two Ancients. Move with <b>WASD</b> (or bottom-left virtual stick); auto-attack fires at the nearest enemy in range. <b>Q</b> drops a 2s <b>mine</b> that bursts into 10 radial bullets, <b>E</b> is a <b>dash</b> with short i-frames. Earn gold + XP by killing creeps/towers; level up to 10. Shop buttons at the top-left buy <b>+3 DMG</b> or <b>heal 50</b>. Destroy the red Ancient ★ to win; lose if the blue Ancient falls. Camera follows the player across the 1800×1000 world.",
   walls: false,
   workerCompatible: false,
-  canvas2dOnly: true,
 
   camera: null,
 
@@ -1706,15 +1705,17 @@ export default {
     _stickVec = { x: 0, y: 0 };
   },
 
-  // Custom canvas2d render — camera-transformed world, then screen-space HUD.
+  // Custom canvas2d render — camera-transformed world only. Screen-space HUD
+  // and world-space gameplay overlays are drawn by render3dOverlay below
+  // (which the canvas2d adapter calls after this render function runs), so
+  // the same overlay code path is used across all three render modes.
   render(ctx, space, W, H, showOutlines, camX = 0, camY = 0) {
     _lastCamX = camX;
     _lastCamY = camY;
 
-    // ── World space ──
     ctx.save();
     ctx.translate(-camX, -camY);
-    // Faint grid + lane ribbons
+    // Dark arena fill + faint lane ribbons.
     ctx.fillStyle = "#0d1117";
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
     drawLaneVisuals(ctx);
@@ -1724,8 +1725,57 @@ export default {
     for (const body of space.bodies) {
       drawBodySimple(ctx, body, showOutlines);
     }
+    ctx.restore();
+    void W; void H;
+  },
 
-    // World-space overlays (HP bars, mines, attack flashes, aim line)
+  // PixiJS: default adapter renders body sprites; we just translate the stage
+  // to follow the camera and add a world-space Graphics layer for the lane
+  // ribbons behind everything. All gameplay overlays (HP bars, mines, flashes,
+  // aim line, HUD) are drawn in render3dOverlay on the 2D overlay canvas.
+  renderPixi(adapter, space, _W, _H, _showOutlines, camX = 0, camY = 0) {
+    _lastCamX = camX;
+    _lastCamY = camY;
+
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    adapter.syncBodies(space);
+
+    // Lazy-create lane ribbon graphics behind the bodies.
+    if (!app.stage._mobaLaneGfx) {
+      const gfx = new PIXI.Graphics();
+      app.stage.addChildAt(gfx, 0); // behind grid if any, behind body sprites
+      for (const laneKey of Object.keys(LANES)) {
+        const wps = LANES[laneKey];
+        gfx.moveTo(wps[0].x, wps[0].y);
+        for (let i = 1; i < wps.length; i++) gfx.lineTo(wps[i].x, wps[i].y);
+      }
+      gfx.stroke({ color: 0xffffff, width: 60, alpha: 0.05, cap: "round", join: "round" });
+      app.stage._mobaLaneGfx = gfx;
+    }
+
+    // Camera offset — move the stage so the hero stays centred.
+    app.stage.x = -camX;
+    app.stage.y = -camY;
+
+    app.render();
+  },
+
+  // No custom render3d — the default Three.js adapter handles body meshes
+  // and camera offset. render3dOverlay below draws gameplay layers + HUD.
+
+  // World-space gameplay overlays (HP bars, mines, attack flashes, aim line,
+  // building badges) + screen-space HUD. Runs in ALL render modes — the
+  // canvas2d adapter calls this after render(), and the pixijs/threejs
+  // adapters call this after their body rendering.
+  render3dOverlay(ctx, space, W, H, camX = 0, camY = 0) {
+    _lastCamX = camX;
+    _lastCamY = camY;
+
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
     drawAttackFlashes(ctx);
     drawMines(ctx);
     drawAimLine(ctx);
@@ -1744,7 +1794,6 @@ export default {
 
     ctx.restore();
 
-    // ── Screen space ──
     drawTopHUD(ctx);
     drawShopAndAbilities(ctx);
     drawJoystick(ctx);
