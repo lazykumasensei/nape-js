@@ -7,10 +7,15 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   {
-    ignores: ["dist/", "docs/", "src/core/nape-compiled.js", "benchmarks/"],
+    ignores: [
+      "**/dist/",
+      "docs/",
+      "packages/nape-js/src/core/nape-compiled.js",
+      "benchmarks/",
+    ],
   },
   {
-    files: ["src/**/*.ts", "tests/**/*.ts"],
+    files: ["packages/*/src/**/*.ts", "packages/*/tests/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": [
@@ -26,13 +31,13 @@ export default tseslint.config(
   {
     // Haxe-ported internal classes — patterns inherent to code generation
     files: [
-      "src/native/dynamics/ZPP_SpaceArbiterList.ts",
-      "src/native/geom/ZPP_Collide.ts",
-      "src/native/geom/ZPP_SweepDistance.ts",
-      "src/native/space/ZPP_AABBTree.ts",
-      "src/native/space/ZPP_Broadphase.ts",
-      "src/native/space/ZPP_DynAABBPhase.ts",
-      "src/native/space/ZPP_Space.ts",
+      "packages/nape-js/src/native/dynamics/ZPP_SpaceArbiterList.ts",
+      "packages/nape-js/src/native/geom/ZPP_Collide.ts",
+      "packages/nape-js/src/native/geom/ZPP_SweepDistance.ts",
+      "packages/nape-js/src/native/space/ZPP_AABBTree.ts",
+      "packages/nape-js/src/native/space/ZPP_Broadphase.ts",
+      "packages/nape-js/src/native/space/ZPP_DynAABBPhase.ts",
+      "packages/nape-js/src/native/space/ZPP_Space.ts",
     ],
     rules: {
       "no-useless-assignment": "off",

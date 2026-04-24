@@ -11,7 +11,7 @@
  *   node benchmarks/run.mjs --json  # JSON output for CI comparison
  */
 
-import { Space, Body, BodyType, Vec2, Circle, Polygon, PivotJoint } from "../dist/index.js";
+import { Space, Body, BodyType, Vec2, Circle, Polygon, PivotJoint } from "../packages/nape-js/dist/index.js";
 
 const JSON_MODE = process.argv.includes("--json");
 

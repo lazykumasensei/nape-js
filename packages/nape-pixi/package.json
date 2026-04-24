@@ -1,0 +1,64 @@
+{
+  "name": "@newkrok/nape-pixi",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PixiJS v8 renderer integration for @newkrok/nape-js — body-sprite binding, interpolation, debug draw, worker bridge.",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.map"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/"
+  },
+  "peerDependencies": {
+    "@newkrok/nape-js": "^3.30.0",
+    "pixi.js": "^8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NewKrok/nape-js",
+    "directory": "packages/nape-pixi"
+  },
+  "keywords": [
+    "nape",
+    "nape-js",
+    "pixi",
+    "pixijs",
+    "physics",
+    "2d",
+    "typescript",
+    "renderer",
+    "sprite-binding",
+    "debug-draw",
+    "game-engine"
+  ],
+  "author": "Istvan Krisztian Somoracz",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/NewKrok/nape-js/issues"
+  },
+  "homepage": "https://newkrok.github.io/nape-js/"
+}

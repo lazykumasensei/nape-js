@@ -14,13 +14,28 @@ A fully typed TypeScript 2D physics engine — modernized rewrite of the origina
 - **Serialization** — JSON + binary for save/load/multiplayer rollback
 - **Debug draw** — abstract `DebugDraw` interface, reference impls for Canvas/Three.js/PixiJS/p5.js
 - **Character controller** — geometric collide-and-slide (`CharacterController` class)
-- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 4773 tests
+- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 5275 tests
+
+## Repo Layout (npm workspaces)
+
+```
+packages/
+  nape-js/        # @newkrok/nape-js — published physics engine (src/, tests/, dist/)
+  nape-pixi/      # @newkrok/nape-pixi — PixiJS v8 integration (scaffolded, Phase 1+)
+benchmarks/       # cross-package perf suite
+docs/             # GitHub Pages site + demos
+scripts/          # repo-wide tooling
+```
+
+Root `package.json` is a private workspaces manifest; published package lives at
+`packages/nape-js/package.json`. Root scripts (`npm run build`, `npm test`, …)
+delegate into the nape-js workspace.
 
 ## Build & Test
 
 ```bash
-npm run build        # tsup → dist/
-npm test             # vitest
+npm run build        # tsup → packages/nape-js/dist/
+npm test             # vitest (runs in packages/nape-js/)
 npm run lint         # eslint + prettier
 ```
 
@@ -36,11 +51,11 @@ npm run lint         # eslint + prettier
 ## Architecture
 
 ```
-Public API wrappers (src/{phys,shape,constraint,callbacks,dynamics,geom,space}/)
+Public API wrappers (packages/nape-js/src/{phys,shape,constraint,callbacks,dynamics,geom,space}/)
         ↕
-Internal ZPP_* classes (src/native/)  — 85 classes
+Internal ZPP_* classes (packages/nape-js/src/native/)  — 85 classes
         ↕
-Engine bootstrap (src/core/engine.ts → ZPPRegistry.ts + bootstrap.ts)
+Engine bootstrap (packages/nape-js/src/core/engine.ts → ZPPRegistry.ts + bootstrap.ts)
 ```
 
 ## Detailed Guides

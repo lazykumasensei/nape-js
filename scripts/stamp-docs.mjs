@@ -17,7 +17,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const docs = resolve(root, "docs");
 
-const { version } = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+const { version } = JSON.parse(
+  readFileSync(resolve(root, "packages/nape-js/package.json"), "utf8"),
+);
 const v = `v=${version}`;
 
 /**

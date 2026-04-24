@@ -93,12 +93,14 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           BUMP="${{ steps.bump.outputs.bump }}"
+          PKG_JSON="packages/nape-js/package.json"
 
           # Compute what the next version would be and check if its tag already exists.
           # This prevents "fatal: tag already exists" when a previous run created the
           # tag but the version-bump commit didn't land on master.
-          NEXT_VERSION=$(npm version "$BUMP" --no-git-tag-version)
-          git checkout -- package.json package-lock.json 2>/dev/null || true
+          npm version "$BUMP" --no-git-tag-version -w @newkrok/nape-js >/dev/null
+          NEXT_VERSION="v$(node -p "require('./$PKG_JSON').version")"
+          git checkout -- "$PKG_JSON" package-lock.json 2>/dev/null || true
 
           while git rev-parse "refs/tags/$NEXT_VERSION" >/dev/null 2>&1; do
             echo "Tag $NEXT_VERSION already exists — deleting stale remote tag"
@@ -107,7 +109,12 @@ jobs:
             break
           done
 
-          NEW_VERSION=$(npm version "$BUMP" -m "release: v%s")
+          # Bump and commit manually: `npm version -w` does not git-commit in workspaces.
+          npm version "$BUMP" --no-git-tag-version -w @newkrok/nape-js >/dev/null
+          NEW_VERSION="v$(node -p "require('./$PKG_JSON').version")"
+          git add "$PKG_JSON" package-lock.json
+          git commit -m "release: $NEW_VERSION"
+          git tag "$NEW_VERSION"
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION"
 
@@ -120,7 +127,7 @@ jobs:
       # Publish to npm
       - name: Publish to npm
         if: steps.bump.outputs.bump != 'none'
-        run: npm publish --access public
+        run: npm publish --access public -w @newkrok/nape-js
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
