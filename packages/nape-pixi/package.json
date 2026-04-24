@@ -30,6 +30,7 @@
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
+    "dev": "vite",
     "lint": "eslint src/ tests/",
     "format": "prettier --write src/ tests/",
     "format:check": "prettier --check src/ tests/"
@@ -39,7 +40,9 @@
     "pixi.js": "^8.0.0"
   },
   "devDependencies": {
-    "@newkrok/nape-js": "*"
+    "@newkrok/nape-js": "*",
+    "pixi.js": "^8.18.1",
+    "vite": "^8.0.10"
   },
   "repository": {
     "type": "git",

@@ -9,7 +9,8 @@
  *  2. Auto-generation from demo hooks (setup/step/click/drag/release) via .toString()
  */
 
-const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js@3.26.0/dist/index.js";
+const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js@3.30.0/dist/index.js";
+const NAPE_PIXI_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-pixi@0.1.0/dist/index.js";
 const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
 
 // =========================================================================
@@ -356,85 +357,29 @@ function syncBodies3D(space) {
 // ── End Three.js Renderer ───────────────────────────────────────────────────
 `;
 
-const RENDERER_PIXI = `// ── PixiJS Renderer (Graphics-based) ────────────────────────────────────────
+const RENDERER_PIXI = `// ── PixiJS Renderer (via @newkrok/nape-pixi) ────────────────────────────────
+// PixiDebugDraw handles body shapes + constraint lines. We pick the colour
+// from userData._colorIdx so multiple demos look consistent.
 const FILL_COLORS = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0xdbabff];
 const STATIC_FILL = 0x607888;
-let _showOutlinesPixi = __OUTLINES__;
-const bodySprites = new Map();
 
-function bodyFill(body) {
-  if (body.isStatic()) return STATIC_FILL;
-  const idx = (body.userData?._colorIdx ?? 0) % FILL_COLORS.length;
-  return FILL_COLORS[idx];
-}
+const _debug = new PixiDebugDraw({
+  pixi: { Container: PIXI.Container, Graphics: PIXI.Graphics },
+  palette: FILL_COLORS,
+  staticColor: STATIC_FILL,
+  showOutlines: __OUTLINES__,
+  colorResolver: (body) => {
+    if (body.isStatic()) return STATIC_FILL;
+    const idx = body.userData?._colorIdx;
+    if (idx != null && idx >= 0) return FILL_COLORS[idx % FILL_COLORS.length];
+    return null;
+  },
+});
+app.stage.addChild(_debug.container);
 
-function drawBodyGfx(body, gfx) {
-  gfx.clear();
-  const color = bodyFill(body);
-  const alpha = body.isStatic() ? 0.15 : 0.25;
-  for (const shape of body.shapes) {
-    if (shape.isCircle()) {
-      const r = shape.castCircle.radius;
-      gfx.circle(0, 0, r);
-      gfx.fill({ color, alpha });
-      if (_showOutlinesPixi) {
-        gfx.circle(0, 0, r);
-        gfx.stroke({ color, width: 1.2, alpha: 0.8 });
-        gfx.moveTo(0, 0); gfx.lineTo(r, 0);
-        gfx.stroke({ color, width: 1, alpha: 0.4 });
-      }
-    } else if (shape.isPolygon()) {
-      const verts = shape.castPolygon.localVerts;
-      const len = verts.length; if (len < 3) continue;
-      const pts = [];
-      for (let i = 0; i < len; i++) pts.push(verts.at(i).x, verts.at(i).y);
-      gfx.poly(pts, true);
-      gfx.fill({ color, alpha });
-      if (_showOutlinesPixi) { gfx.poly(pts, true); gfx.stroke({ color, width: 1.2, alpha: 0.8 }); }
-    } else if (shape.isCapsule()) {
-      const cap = shape.castCapsule;
-      const hl = cap.halfLength, r = cap.radius;
-      gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r);
-      gfx.fill({ color, alpha });
-      if (_showOutlinesPixi) { gfx.roundRect(-hl - r, -r, (hl + r) * 2, r * 2, r); gfx.stroke({ color, width: 1.2, alpha: 0.8 }); }
-    }
-  }
-}
+function syncBodies(space) { _debug.render(space); }
 
-function addGfx(body) {
-  if (bodySprites.has(body)) return bodySprites.get(body);
-  const gfx = new PIXI.Graphics();
-  drawBodyGfx(body, gfx);
-  gfx.x = body.position.x;
-  gfx.y = body.position.y;
-  gfx.rotation = body.rotation;
-  app.stage.addChild(gfx);
-  bodySprites.set(body, gfx);
-  return gfx;
-}
-
-function syncBodies(space) {
-  const alive = new Set();
-  for (const body of space.bodies) alive.add(body);
-  for (const [body, gfx] of bodySprites) {
-    if (!alive.has(body)) {
-      app.stage.removeChild(gfx); gfx.destroy();
-      bodySprites.delete(body);
-    }
-  }
-  for (const body of space.bodies) {
-    const gfx = addGfx(body);
-    gfx.x = body.position.x;
-    gfx.y = body.position.y;
-    gfx.rotation = body.rotation;
-  }
-  if (constraintGfx) app.stage.addChild(constraintGfx);
-}
-
-function redrawAllOutlines() {
-  for (const [body, gfx] of bodySprites) drawBodyGfx(body, gfx);
-}
-
+// Background grid.
 let gridGfx = null;
 function drawGrid() {
   if (gridGfx) return;
@@ -445,22 +390,8 @@ function drawGrid() {
   app.stage.addChildAt(gridGfx, 0);
 }
 
-let constraintGfx = null;
-function drawConstraintLines() {
-  if (!constraintGfx) { constraintGfx = new PIXI.Graphics(); app.stage.addChild(constraintGfx); }
-  constraintGfx.clear();
-  try {
-    const raw = space.constraints;
-    for (let i = 0; i < raw.length; i++) {
-      const c = raw.at(i);
-      if (c.body1 && c.body2) {
-        constraintGfx.moveTo(c.body1.position.x, c.body1.position.y);
-        constraintGfx.lineTo(c.body2.position.x, c.body2.position.y);
-      }
-    }
-    constraintGfx.stroke({ color: 0xd29922, width: 1, alpha: 0.2 });
-  } catch(_) {}
-}
+// Constraint lines are drawn by PixiDebugDraw — kept as a no-op for runtime compatibility.
+function drawConstraintLines() {}
 // ── End PixiJS Renderer ─────────────────────────────────────────────────────
 `;
 
@@ -1051,6 +982,7 @@ ${water}${code}`;
       const water = /\bdrawWaterPixi\b/.test(code) ? WATER_HELPERS_PIXI : "";
       if (auto) {
         return `import * as PIXI from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
+import { PixiDebugDraw } from "${NAPE_PIXI_CDN}";
 ${NAPE_IMPORTS}
 
 const container = document.getElementById("container");
@@ -1065,6 +997,7 @@ ${WALLS_HELPER}
 ${water}${code}`;
       }
       return `import * as PIXI from "https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.mjs";
+import { PixiDebugDraw } from "${NAPE_PIXI_CDN}";
 ${NAPE_IMPORTS}
 
 const container = document.getElementById("container");

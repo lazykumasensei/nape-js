@@ -45,11 +45,42 @@ async function main() {
 
   await bridge.ready;
 
-  // Spawn one sprite per body. Slots must match the worker's body order.
   const root = new Container();
   app.stage.addChild(root);
+
+  // Walls are mirrored here as static visuals — the worker owns the
+  // physics bodies; we just draw the same rectangles at the same spots.
+  const drawWall = (x: number, y: number, w: number, h: number, rot = 0) => {
+    const g = new Graphics().rect(-w / 2, -h / 2, w, h).fill(0x30363d);
+    g.x = x;
+    g.y = y;
+    g.rotation = rot;
+    root.addChild(g);
+  };
+  drawWall(400, 590, 800, 20);
+  drawWall(10, 300, 20, 600);
+  drawWall(790, 300, 20, 600);
+  drawWall(220, 260, 280, 14, 0.28);
+  drawWall(560, 380, 280, 14, -0.28);
+  drawWall(320, 500, 320, 14, 0.22);
+
+  // Spawn one sprite per body. Slots must match the worker's body order,
+  // and the shape cycle (i % 3) must match the worker too.
+  const palette = [0x3fb950, 0x58a6ff, 0xbc8cff];
   for (let i = 0; i < BALL_COUNT; i++) {
-    const gfx = new Graphics().circle(0, 0, 8).fill(0x3fb950);
+    const kind = i % 3;
+    let gfx: Graphics;
+    if (kind === 0) {
+      gfx = new Graphics().circle(0, 0, 8).fill(palette[0]);
+    } else if (kind === 1) {
+      gfx = new Graphics().rect(-7, -7, 14, 14).fill(palette[1]);
+    } else {
+      const half = 9;
+      const r = 6;
+      gfx = new Graphics()
+        .roundRect(-half - r, -r, (half + r) * 2, r * 2, r)
+        .fill(palette[2]);
+    }
     root.addChild(gfx);
     bridge.setSprite(i, gfx);
   }

@@ -12,7 +12,7 @@
  */
 
 import { Application, Container, Graphics } from "pixi.js";
-import { Space, Body, BodyType, Circle, Vec2 } from "@newkrok/nape-js";
+import { Space, Body, BodyType, Circle, Polygon, Material, Vec2 } from "@newkrok/nape-js";
 import { BodySpriteBinding, FixedStepper } from "@newkrok/nape-pixi";
 
 async function main() {
@@ -21,22 +21,71 @@ async function main() {
   document.body.appendChild(app.canvas);
 
   const space = new Space(new Vec2(0, 400));
-  const balls: Body[] = [];
-  for (let i = 0; i < 20; i++) {
-    const body = new Body(BodyType.DYNAMIC, new Vec2(100 + i * 30, 50 + (i % 3) * 30));
-    body.shapes.add(new Circle(12));
-    body.space = space;
-    balls.push(body);
-  }
+
+  // Static floor + side walls so the balls stay on-screen.
+  const walls: Array<{ body: Body; w: number; h: number }> = [];
+  const addWall = (x: number, y: number, w: number, h: number) => {
+    const b = new Body(BodyType.STATIC, new Vec2(x, y));
+    b.shapes.add(new Polygon(Polygon.box(w, h)));
+    b.space = space;
+    walls.push({ body: b, w, h });
+  };
+  addWall(400, 590, 800, 20);
+  addWall(10, 300, 20, 600);
+  addWall(790, 300, 20, 600);
+
+  // Three angled plates zig-zag the fall so balls scatter across the floor.
+  const addRamp = (x: number, y: number, rot: number) => {
+    const b = new Body(BodyType.STATIC, new Vec2(x, y));
+    b.shapes.add(new Polygon(Polygon.box(220, 14)));
+    b.rotation = rot;
+    b.space = space;
+    walls.push({ body: b, w: 220, h: 14 });
+  };
+  addRamp(220, 220, 0.3);
+  addRamp(560, 340, -0.3);
+  addRamp(280, 460, 0.25);
+
+  const slippery = new Material(0.3, 0.15, 0.25, 1);
 
   const root = new Container();
   app.stage.addChild(root);
 
+  for (const { body, w, h } of walls) {
+    const gfx = new Graphics().rect(-w / 2, -h / 2, w, h).fill(0x30363d);
+    gfx.x = body.position.x;
+    gfx.y = body.position.y;
+    gfx.rotation = body.rotation;
+    root.addChild(gfx);
+  }
+
   const stepper = new FixedStepper({ hz: 60 });
   const binding = new BodySpriteBinding({ stepper });
 
-  for (const body of balls) {
-    const gfx = new Graphics().circle(0, 0, 12).fill(0xd29922);
+  const palette = [0xd29922, 0x58a6ff, 0xbc8cff];
+  for (let i = 0; i < 45; i++) {
+    const x = 80 + (i % 10) * 64 + ((i * 17) % 23);
+    const y = 30 + Math.floor(i / 10) * 30;
+    const kind = i % 3;
+    const body = new Body(BodyType.DYNAMIC, new Vec2(x, y));
+    let gfx: Graphics;
+    if (kind === 0) {
+      body.shapes.add(new Circle(13, undefined, slippery));
+      gfx = new Graphics().circle(0, 0, 13).fill(palette[0]);
+    } else if (kind === 1) {
+      body.shapes.add(new Polygon(Polygon.box(22, 22)));
+      gfx = new Graphics().rect(-11, -11, 22, 22).fill(palette[1]);
+    } else {
+      const half = 14;
+      const r = 8;
+      body.shapes.add(new Circle(r, new Vec2(-half, 0), slippery));
+      body.shapes.add(new Circle(r, new Vec2(half, 0), slippery));
+      body.shapes.add(new Polygon(Polygon.box(half * 2, r * 2)));
+      gfx = new Graphics()
+        .roundRect(-half - r, -r, (half + r) * 2, r * 2, r)
+        .fill(palette[2]);
+    }
+    body.space = space;
     root.addChild(gfx);
     binding.bind(body, gfx);
   }

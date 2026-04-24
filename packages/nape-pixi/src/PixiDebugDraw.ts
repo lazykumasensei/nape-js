@@ -86,6 +86,12 @@ export interface PixiDebugDrawOptions {
    * static/sleeping/palette logic.
    */
   colorResolver?: (body: Body) => number | null;
+  /**
+   * Override the fill alpha for a body. Return `null` to fall back to the
+   * static/dynamic/sensor/fluid default. Runs after the shape-type alpha
+   * is chosen; return a non-null value to win.
+   */
+  alphaResolver?: (body: Body) => number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +181,7 @@ export class PixiDebugDraw {
   readonly #constraintAlpha: number;
   readonly #constraintLineWidth: number;
   readonly #colorResolver?: (body: Body) => number | null;
+  readonly #alphaResolver?: (body: Body) => number | null;
 
   readonly #shapesLayer: ContainerLike;
   readonly #constraintsGfx: GraphicsLike;
@@ -202,6 +209,7 @@ export class PixiDebugDraw {
     this.#constraintAlpha = opts.constraintAlpha ?? DEFAULTS.constraintAlpha;
     this.#constraintLineWidth = opts.constraintLineWidth ?? DEFAULTS.constraintLineWidth;
     this.#colorResolver = opts.colorResolver;
+    this.#alphaResolver = opts.alphaResolver;
 
     this.container = new this.#pixi.Container();
     this.#shapesLayer = new this.#pixi.Container();
@@ -289,12 +297,18 @@ export class PixiDebugDraw {
     gfx.clear();
     const color = this.#bodyColor(body);
     const baseAlpha = this.#bodyFillAlpha(body);
+    const alphaOverride = this.#alphaResolver ? this.#alphaResolver(body) : null;
 
     for (const shape of body.shapes) {
       const isFluid = shape.fluidEnabled;
       const isSensor = shape.sensorEnabled;
       const fill = isFluid ? this.#fluidColor : color;
-      const alpha = isFluid ? this.#fluidFillAlpha : isSensor ? this.#sensorFillAlpha : baseAlpha;
+      const shapeAlpha = isFluid
+        ? this.#fluidFillAlpha
+        : isSensor
+          ? this.#sensorFillAlpha
+          : baseAlpha;
+      const alpha = alphaOverride ?? shapeAlpha;
 
       if (shape.isCapsule()) {
         const cap = (shape as any).castCapsule;
