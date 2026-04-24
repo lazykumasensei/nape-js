@@ -22,4 +22,12 @@ export type {
   PixiDisplayTarget,
 } from "./BodySpriteBinding.js";
 
+export { PixiDebugDraw } from "./PixiDebugDraw.js";
+export type {
+  ContainerLike,
+  GraphicsLike,
+  PixiDebugDrawOptions,
+  PixiFactory,
+} from "./PixiDebugDraw.js";
+
 export const VERSION = "0.1.0-alpha.0";
