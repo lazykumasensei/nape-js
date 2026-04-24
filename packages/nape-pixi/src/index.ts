@@ -30,4 +30,21 @@ export type {
   PixiFactory,
 } from "./PixiDebugDraw.js";
 
+export { WorkerBridge } from "./WorkerBridge.js";
+export type {
+  WorkerBridgeOptions,
+  WorkerFrameMessage,
+  WorkerLike,
+  WorkerReadyMessage,
+} from "./WorkerBridge.js";
+
+export {
+  TRANSFORM_FLOATS_PER_BODY,
+  TRANSFORM_HEADER,
+  TRANSFORM_HEADER_FLOATS,
+  createTransformsBuffer,
+  writeTransforms,
+} from "./workerProtocol.js";
+export type { TransformsBuffer } from "./workerProtocol.js";
+
 export const VERSION = "0.1.0-alpha.0";
