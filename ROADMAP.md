@@ -12,7 +12,7 @@ Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — sup
 | #   | Priority                         | Effort | Impact   | Status                                                         |
 | --- | -------------------------------- | ------ | -------- | -------------------------------------------------------------- |
 | P29 | Test coverage >= 80%             | L      | safety   | :diamonds: ~55% (4895 tests)                                   |
-| P44 | PixiJS integration — npm package | M      | adoption | :diamonds: Phase 1 done (demos), Phase 2 pending (npm package) |
+| P44 | PixiJS integration — npm package | M      | adoption | :diamonds: Phase 1 done (demos), Phase 2 code-complete (`@newkrok/nape-pixi` 0.1.0-alpha: `BodySpriteBinding`, `FixedStepper`, `PixiDebugDraw`, `WorkerBridge` + protocol, 71 tests, README + 3 examples) — npm publish pending |
 | P56 | Interactive playground           | S-M    | adoption | :white_square_button: Not started                              |
 
 ---

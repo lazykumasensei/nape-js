@@ -11,6 +11,7 @@ export default tseslint.config(
       "**/dist/",
       "docs/",
       "packages/nape-js/src/core/nape-compiled.js",
+      "packages/*/examples/",
       "benchmarks/",
     ],
   },
