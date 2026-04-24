@@ -8,6 +8,8 @@ coverage-native/
 docs/nape-js.esm.js
 docs/chunk-*.js
 docs/api/
+docs/llms.txt
+docs/llms-full.txt
 
 # Tool configs
 .claude/

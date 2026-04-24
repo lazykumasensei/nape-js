@@ -4,28 +4,41 @@
 
 **Framework:** Vitest 3.x with global test APIs (`describe`, `it`, `expect`, `beforeEach`, etc.)
 
-| Setting | Value |
-|---------|-------|
-| Config file | `vitest.config.ts` |
-| Setup file | `tests/setup.ts` |
-| Test timeout | 10 000 ms |
-| Coverage provider | `@vitest/coverage-v8` |
-| Environment | Node.js |
+Each workspace owns its own vitest config and test directory. `npm test`
+at the repo root fans out to every package.
 
-The setup file imports `src/core/bootstrap.ts` and all public API subclass modules —
-this mirrors the side-effect imports that production code gets from `index.ts`.
-Without it, factory callbacks and the `nape` namespace are not wired up.
+| Setting | nape-js | nape-pixi |
+|---------|---------|-----------|
+| Config file | `packages/nape-js/vitest.config.ts` | `packages/nape-pixi/vitest.config.ts` |
+| Setup file | `packages/nape-js/tests/setup.ts` | — |
+| Test timeout | 10 000 ms | 10 000 ms |
+| Coverage provider | `@vitest/coverage-v8` | — |
+| Environment | Node.js | Node.js |
+
+The nape-js setup file imports `packages/nape-js/src/core/bootstrap.ts`
+and all public API subclass modules — this mirrors the side-effect
+imports that production code gets from `index.ts`. Without it, factory
+callbacks and the `nape` namespace are not wired up. nape-pixi has no
+setup file: all public API is pure and tests use structural stubs for
+`PIXI.Container` / `Graphics` and for `Body` / `Space`.
 
 ---
 
 ## Commands
 
 ```bash
-npm test                           # run all tests once (CI mode)
-npm run test:watch                 # watch mode for development
-npm test -- --coverage             # run with v8 coverage report
-npm test -- tests/geom/Vec2.test.ts  # single file
-npm test -- --reporter=verbose     # verbose output
+# Both packages at once, from repo root:
+npm test                            # run all tests once (CI mode)
+
+# Single workspace:
+npm test -w @newkrok/nape-js        # engine suite only
+npm test -w @newkrok/nape-pixi      # adapter suite only
+
+# nape-js specifics (run from packages/nape-js):
+npm run test:watch                  # watch mode (nape-js only)
+npm test -- --coverage              # v8 coverage report
+npm test -- tests/geom/Vec2.test.ts # single file
+npm test -- --reporter=verbose      # verbose output
 ```
 
 ---
@@ -33,7 +46,7 @@ npm test -- --reporter=verbose     # verbose output
 ## Directory Structure
 
 ```
-tests/
+packages/nape-js/tests/
 ├── setup.ts               # bootstrap + subclass imports
 ├── callbacks/             # callback system (8 files)
 ├── constraint/            # joints & constraints (14 files)
@@ -48,13 +61,23 @@ tests/
 ├── shape/                 # Circle, Polygon, Edge shapes
 ├── space/                 # Space simulation & integration (12 files)
 └── util/                  # NapeList, Debug, iterators
+
+packages/nape-pixi/tests/
+├── BodySpriteBinding.test.ts
+├── FixedStepper.test.ts
+├── PixiDebugDraw.test.ts
+├── WorkerBridge.test.ts
+└── workerProtocol.test.ts
 ```
 
-**~4 666 tests across ~204 files.**
+**5275 engine tests across 232 files, plus 71 pixi-adapter tests across 5 files.**
 
 ---
 
 ## Coverage
+
+nape-js only — nape-pixi is new and the coverage target hasn't been
+set yet.
 
 | Metric | Current | Target (P29) |
 |--------|---------|--------------|
@@ -62,8 +85,8 @@ tests/
 | Branches | ~78% | — |
 | Functions | ~86% | — |
 
-**High coverage modules:** `src/core/` (99%), `src/geom/` (83%), `src/helpers/` (88%)
-**Low coverage modules:** `src/native/dynamics/` (40%), `src/worker/` (0%)
+**High coverage modules:** `packages/nape-js/src/core/` (99%), `packages/nape-js/src/geom/` (83%), `packages/nape-js/src/helpers/` (88%)
+**Low coverage modules:** `packages/nape-js/src/native/dynamics/` (40%), `packages/nape-js/src/worker/` (0%)
 
 ---
 

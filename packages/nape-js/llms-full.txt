@@ -7,7 +7,7 @@
 - **API docs**: https://newkrok.github.io/nape-js/api/index.html
 - **Demos**: https://newkrok.github.io/nape-js/examples.html
 - **License**: MIT
-- **Version**: 3.8.1
+- **Version**: 3.30.0
 - **Cookbook**: https://github.com/NewKrok/nape-js/blob/master/docs/guides/cookbook.md
 - **Troubleshooting**: https://github.com/NewKrok/nape-js/blob/master/docs/guides/troubleshooting.md
 - **Anti-Patterns**: https://github.com/NewKrok/nape-js/blob/master/docs/guides/anti-patterns.md

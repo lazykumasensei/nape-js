@@ -3,27 +3,27 @@
 ## Layer Overview
 
 ```
-Public API wrappers (src/{phys,shape,constraint,callbacks,dynamics,geom,space}/)
+Public API wrappers (packages/nape-js/src/{phys,shape,constraint,callbacks,dynamics,geom,space}/)
         ↕
-Internal ZPP_* classes (src/native/)
+Internal ZPP_* classes (packages/nape-js/src/native/)
         ↕
-Engine bootstrap (src/core/engine.ts → ZPPRegistry.ts + bootstrap.ts)
+Engine bootstrap (packages/nape-js/src/core/engine.ts → ZPPRegistry.ts + bootstrap.ts)
 ```
 
-- **85 ZPP\_\* internal classes** in `src/native/`
-- **68 public API classes** in `src/` with direct `zpp_inner` access
+- **85 ZPP\_\* internal classes** in `packages/nape-js/src/native/`
+- **68 public API classes** in `packages/nape-js/src/` with direct `zpp_inner` access
 
 ---
 
 ## Registration Flow
 
-- `src/core/bootstrap.ts` — single place for all `nape.xxx = Foo` assignments and
-  `_createFn`/factory-callback wiring. Imported first from `index.ts` + `tests/setup.ts`.
-- `src/native/util/ZPPRegistry.ts` (`registerZPPClasses`) — registers all 85 ZPP classes,
+- `packages/nape-js/src/core/bootstrap.ts` — single place for all `nape.xxx = Foo` assignments and
+  `_createFn`/factory-callback wiring. Imported first from `packages/nape-js/src/index.ts` and `packages/nape-js/tests/setup.ts`.
+- `packages/nape-js/src/native/util/ZPPRegistry.ts` (`registerZPPClasses`) — registers all 85 ZPP classes,
   initializes the `nape` namespace object, calls `_init()`/`_initStatics()`/`_initEnums()`.
-- `src/native/util/ZNPRegistry.ts` (`registerZNPClasses`) — creates ZNPNode/ZNPList/ZPP_Set
+- `packages/nape-js/src/native/util/ZNPRegistry.ts` (`registerZNPClasses`) — creates ZNPNode/ZNPList/ZPP_Set
   subclass pairs for each element type.
-- `src/core/engine.ts` — lazy `getNape()` + `ensureEnumsReady()`.
+- `packages/nape-js/src/core/engine.ts` — lazy `getNape()` + `ensureEnumsReady()`.
 
 ## Factory Callback Pattern
 
@@ -74,7 +74,7 @@ while (true) {
 }
 ```
 
-`zpp_gl()` is defined on `TypedList.prototype` in `src/util/NapeListFactory.ts` — it computes
+`zpp_gl()` is defined on `TypedList.prototype` in `packages/nape-js/src/util/NapeListFactory.ts` — it computes
 the validated length from `ZPP_PublicList.user_length`.
 
 ## Tree Shaking Constraints

@@ -66,37 +66,40 @@ Claude acts as an **orchestrator** — delegates work to sub-agents to keep the 
 
 ## Build System
 
-**Bundler:** tsup (ESM + CJS, minified, sourcemaps)
+**Bundler:** tsup (ESM + CJS, minified, sourcemaps). Each published
+workspace owns its own `tsup.config.ts` under `packages/<name>/`.
 
-| Entry | Output |
-|-------|--------|
-| `src/index.ts` | `dist/index.js` / `dist/index.cjs` |
-| `src/serialization/index.ts` | `dist/serialization/index.js` / `.cjs` |
-| `src/worker/index.ts` | `dist/worker/index.js` / `.cjs` |
+| Package | Entries | Output |
+|---------|---------|--------|
+| `@newkrok/nape-js` | `packages/nape-js/src/{index,serialization/index,worker/index,profiler/index}.ts` | `packages/nape-js/dist/` |
+| `@newkrok/nape-pixi` | `packages/nape-pixi/src/index.ts` | `packages/nape-pixi/dist/` |
 
 - **Target:** ES2020
-- **Splitting + treeshake** enabled (P47 — CJS dedup)
-- **`__PACKAGE_VERSION__`** injected at build time
-- **Result:** ~87 KB minified ESM, ~16 KB gzip
+- **Splitting + treeshake** enabled on nape-js (P47 — CJS dedup); off on nape-pixi (single-entry)
+- **`__PACKAGE_VERSION__`** injected at build time in nape-js
+- **Sizes:** nape-js ~87 KB ESM (~16 KB gzip), nape-pixi ~10 KB ESM (17 KB d.ts)
+
+Root `npm run build` fans out to every workspace (`--workspaces --if-present`).
 
 ---
 
 ## Linting & Formatting
 
-**ESLint** (`eslint.config.js`):
+**ESLint** (`eslint.config.js` at repo root, covers all workspaces):
 - TypeScript ESLint recommended + Prettier integration
 - `@typescript-eslint/no-explicit-any: off` — allowed per architecture (circular dep prevention)
 - `_`-prefixed unused args allowed
-- Special exemptions for Haxe-ported files in `src/native/` (self-assign, no-var, etc.)
+- Special exemptions for Haxe-ported files in `packages/nape-js/src/native/` (self-assign, no-var, etc.)
+- `packages/*/examples/` ignored (reference code, not production)
 
 **Prettier** (`.prettierrc`):
 - Double quotes, semicolons, trailing commas
 - 100-char line width
 
 ```bash
-npm run format          # auto-fix formatting
+npm run format          # auto-fix formatting across all workspaces
 npm run format:check    # verify (CI mode)
-npm run lint            # lint src/ and tests/
+npm run lint            # lint src/ and tests/ across all workspaces
 ```
 
 ---
@@ -109,27 +112,39 @@ Runs in parallel on Node 22:
 
 | Job | Command |
 |-----|---------|
-| Build | `npm run build` |
-| Tests | `npm test` |
-| Lint | `npm run lint` |
-| Format | `npm run format:check` |
-| Circular deps | `npm run check:circular` (≤27 allowed) |
+| Build | `npm run build` (all workspaces) |
+| Tests | `npm test` (all workspaces) |
+| Lint | `npm run lint` (all workspaces) |
+| Format | `npm run format:check` (all workspaces) |
+| Circular deps | `npm run check:circular` (nape-js only, ≤27 allowed) |
 
-### release.yml — Auto-publish on master
+### release.yml — Independent per-package auto-publish
 
-Triggered by push to `master` (skips release commits to prevent loops):
+Triggered after green CI on master (skips any commit whose subject starts
+with `release`, catching both legacy `release: vX` and new
+`release(pkg): X` forms). Delegates to [`scripts/ci/release.mjs`](../../scripts/ci/release.mjs)
+which handles every public workspace:
 
-1. Reads commit messages since last tag
-2. Determines version bump via conventional commits:
+1. **Discover** — walks `packages/*/package.json`, skips any with `"private": true`.
+2. **Find the package's last tag** — format `<short>-v<ver>` (e.g. `nape-js-v3.30.1`). For nape-js, if no `<short>-v*` tag exists yet, falls back to the legacy `v*` pattern.
+3. **Scope commits to the package** — `git log <last-tag>..HEAD -- packages/<short>/`. Commits whose subjects start with `release` are filtered out.
+4. **Determine bump** from those commits' conventional prefixes:
    - `BREAKING CHANGE` / `!:` → **major**
    - `feat:` → **minor**
-   - `fix:` / `perf:` / `refactor:` / etc. → **patch**
-3. Updates `package.json`, creates git tag, pushes
-4. Publishes to npm, creates GitHub Release
+   - `fix:` / `perf:` / `refactor:` / `build:` / `docs:` / `style:` / `chore:` → **patch**
+   - No commits touching the package → **skip** (no no-op release)
+5. **Bump, commit, tag, push, publish**, then create a GitHub Release.
+
+Run `node scripts/ci/release.mjs --dry-run` to preview locally.
+
+Notes:
+- The CI runs the whole flow in one job; each package's release is sequential so tag creation never races.
+- If nape-js goes **major** the script logs a warning — nape-pixi's `peerDependencies` range may need a manual update in a follow-up commit before the next release run.
 
 ### deploy-pages.yml — Docs site
 
 Runs `npm run build:docs` (tsup + TypeDoc) → deploys `docs/` to GitHub Pages.
+Triggered once at the end of each release run.
 
 ### benchmark.yml — Performance budget
 
@@ -161,7 +176,7 @@ When a PR changes features, APIs, priorities, or versions:
 
 | File | What to update | When |
 |------|----------------|------|
-| `CLAUDE.md` | Test count, key features | New features |
+| `CLAUDE.md` | Test count, key features, package status | New features |
 | `ROADMAP.md` | Priority table, status, competitive analysis | Priority changes |
 | `docs/guides/architecture.md` | Internal patterns, registration flow | Architecture changes |
 | `docs/guides/multiplayer-guide.md` | Server setup, protocol, prediction | Multiplayer changes |
@@ -169,30 +184,35 @@ When a PR changes features, APIs, priorities, or versions:
 | `docs/guides/troubleshooting.md` | Add entry for new gotchas, update fixes | Bug fixes, API gotchas |
 | `docs/guides/anti-patterns.md` | Add entry for new pitfalls | Bug fixes, performance changes |
 | `README.md` | Quick start, API tables, badge versions | Public API changes, releases |
-| `llms.txt` | Class list, links, quick start | Public API additions/removals |
-| `llms-full.txt` | Complete API reference, gotchas, version (line 1) | Any public API change |
-| `package.json` | `version` field | Releases |
+| `packages/nape-pixi/README.md` | Quickstart, API, migration guide | nape-pixi API changes |
+| `packages/nape-js/llms.txt` | Class list, links, quick start | nape-js public API additions/removals |
+| `packages/nape-js/llms-full.txt` | Complete API reference, gotchas, version (line 1) | Any nape-js public API change |
+| `packages/<pkg>/package.json` | `version` field (CI does this automatically) | Releases |
 
 ---
 
 ## Available Scripts
 
+Root-level scripts (run from repo root). `--workspaces --if-present` fans
+out to both nape-js and nape-pixi where applicable.
+
 | Command | Purpose |
 |---------|---------|
-| `npm run build` | tsup → `dist/` |
-| `npm test` | vitest (all tests once) |
-| `npm run test:watch` | vitest watch mode |
-| `npm run lint` | ESLint on `src/` and `tests/` |
-| `npm run format` | Prettier auto-fix |
-| `npm run format:check` | Prettier verify |
-| `npm run check:circular` | madge circular dep check |
-| `npm run benchmark` | Performance benchmark |
+| `npm run build` | tsup → `packages/*/dist/` (both packages) |
+| `npm test` | vitest (both packages) |
+| `npm run test:watch` | vitest watch mode (nape-js only) |
+| `npm run lint` | ESLint (both packages) |
+| `npm run format` | Prettier auto-fix (both packages) |
+| `npm run format:check` | Prettier verify (both packages) |
+| `npm run check:circular` | madge circular dep check (nape-js only; nape-pixi has none) |
+| `npm run benchmark` | Performance benchmark (uses `packages/nape-js/dist/`) |
 | `npm run benchmark:compare` | Compare vs baseline |
 | `npm run benchmark:update-baseline` | Save new baseline |
 | `npm run build:docs` | Build bundle + TypeDoc |
-| `npm run build:typedoc` | TypeDoc only |
+| `npm run build:typedoc` | TypeDoc only (entry: `packages/nape-js/src/index.ts`) |
 | `npm run serve:docs` | Local docs server (port 5500) |
 | `npm run dev:multiplayer` | Docs (5500) + server (3001) |
+| `node scripts/ci/release.mjs --dry-run` | Preview what would publish on next master merge |
 
 ---
 

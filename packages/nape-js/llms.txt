@@ -8,10 +8,11 @@ Install: `npm install @newkrok/nape-js`
 - [npm Package](https://www.npmjs.com/package/@newkrok/nape-js): Published package with TypeScript declarations
 - [API Reference](https://newkrok.github.io/nape-js/api/index.html): Full TypeDoc-generated API docs
 - [Interactive Demos](https://newkrok.github.io/nape-js/examples.html): Live physics demos with source code
-- [Full LLM Documentation](https://raw.githubusercontent.com/NewKrok/nape-js/master/llms-full.txt): Complete API reference in a single file
+- [Full LLM Documentation](https://raw.githubusercontent.com/NewKrok/nape-js/master/packages/nape-js/llms-full.txt): Complete API reference in a single file
 - [Cookbook](https://github.com/NewKrok/nape-js/blob/master/docs/guides/cookbook.md): Task-oriented recipes (platformer, ragdoll, fluid, serialization, etc.)
 - [Troubleshooting](https://github.com/NewKrok/nape-js/blob/master/docs/guides/troubleshooting.md): Common problems and solutions
 - [Anti-Patterns](https://github.com/NewKrok/nape-js/blob/master/docs/guides/anti-patterns.md): Common mistakes to avoid
+- [PixiJS Integration](https://www.npmjs.com/package/@newkrok/nape-pixi) (`@newkrok/nape-pixi`): Sibling package — body/sprite sync, fixed-step render interpolation, debug draw, and off-thread physics bridge. PIXI v8.
 
 ## Quick Start
 
