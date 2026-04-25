@@ -472,7 +472,7 @@ function _loop() {
     ctx.restore();
   }
   // HUD overlay (legend, labels) — same as canvas2d-adapter locally
-  if (_demo.render3dOverlay) _demo.render3dOverlay(ctx, space, W, H);
+  if (_demo.render3dOverlay) _demo.render3dOverlay(ctx, space, W, H, _camX, _camY);
   requestAnimationFrame(_loop);
 }
 _loop();
@@ -600,7 +600,7 @@ function _loop() {
   }
   if (_overlayCtx) {
     _overlayCtx.clearRect(0, 0, W, H);
-    _demo.render3dOverlay(_overlayCtx, space, W, H);
+    _demo.render3dOverlay(_overlayCtx, space, W, H, _camX, _camY);
   }
   requestAnimationFrame(_loop);
 }
@@ -696,7 +696,7 @@ function _loop() {
   }
   if (_overlayCtx) {
     _overlayCtx.clearRect(0, 0, W, H);
-    _demo.render3dOverlay(_overlayCtx, space, W, H);
+    _demo.render3dOverlay(_overlayCtx, space, W, H, _camX, _camY);
   }
   requestAnimationFrame(_loop);
 }

@@ -120,6 +120,10 @@ function commitsSince(pkg, lastTag) {
 /**
  * Pick the maximum semver level among commit subjects. Mirrors the legacy
  * release.yml rules but scoped to one package's commits.
+ *
+ * Only code-affecting prefixes trigger a release: feat / fix / perf / refactor
+ * (plus breaking-change markers). Docs, chore, style, test, build, ci commits
+ * are no-ops even when they touch files under packages/<name>/.
  */
 function determineBump(commits) {
   let bump = "none";
@@ -127,11 +131,10 @@ function determineBump(commits) {
     const s = subject;
     if (/^[^(]+\(.*\)!:|^[^(]+!:|BREAKING CHANGE/i.test(s)) return "major";
     if (/^feat(\(.+\))?:/i.test(s) && bump !== "minor" && bump !== "major") bump = "minor";
-    else if (/^(fix|perf|refactor|build|docs|style|chore)(\(.+\))?:/i.test(s) && bump === "none") {
+    else if (/^(fix|perf|refactor)(\(.+\))?:/i.test(s) && bump === "none") {
       bump = "patch";
     }
   }
-  if (bump === "none" && commits.length > 0) bump = "patch";
   return bump;
 }
 
