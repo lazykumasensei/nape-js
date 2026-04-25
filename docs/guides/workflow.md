@@ -128,10 +128,11 @@ which handles every public workspace:
 1. **Discover** — walks `packages/*/package.json`, skips any with `"private": true`.
 2. **Find the package's last tag** — format `<short>-v<ver>` (e.g. `nape-js-v3.30.1`). For nape-js, if no `<short>-v*` tag exists yet, falls back to the legacy `v*` pattern.
 3. **Scope commits to the package** — `git log <last-tag>..HEAD -- packages/<short>/`. Commits whose subjects start with `release` are filtered out.
-4. **Determine bump** from those commits' conventional prefixes:
+4. **Determine bump** from those commits' conventional prefixes (only code-affecting prefixes count):
    - `BREAKING CHANGE` / `!:` → **major**
    - `feat:` → **minor**
-   - `fix:` / `perf:` / `refactor:` / `build:` / `docs:` / `style:` / `chore:` → **patch**
+   - `fix:` / `perf:` / `refactor:` → **patch**
+   - `docs:` / `chore:` / `style:` / `test:` / `build:` / `ci:` → **no release** (even when files under `packages/<name>/` are touched)
    - No commits touching the package → **skip** (no no-op release)
 5. **Bump, commit, tag, push, publish**, then create a GitHub Release.
 
