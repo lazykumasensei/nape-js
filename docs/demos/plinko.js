@@ -5,7 +5,7 @@ export default {
   label: "Plinko",
   featured: false,
   tags: ["Bouncy", "Static shapes", "Particles"],
-  desc: "200 balls cascade through a dense staggered peg field, settle into slots, and recycle back to the top.",
+  desc: "1000 balls cascade through a dense staggered peg field, settle into slots, and recycle back to the top.",
   walls: true,
   workerCompatible: true,
 
@@ -45,8 +45,8 @@ export default {
       div.space = space;
     }
 
-    const ballR = 7;
-    const ballCount = 200;
+    const ballR = 3.5;
+    const ballCount = 1000;
     for (let i = 0; i < ballCount; i++) {
       const ball = new Body(BodyType.DYNAMIC, new Vec2(
         sideMargin + Math.random() * (W - sideMargin * 2),
