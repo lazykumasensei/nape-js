@@ -55,6 +55,7 @@ import portals             from "./demos/portals.js?v=3.30.0";
 import towerDefense        from "./demos/tower-defense.js?v=3.30.0";
 import topDownShooter      from "./demos/top-down-shooter.js?v=3.30.0";
 import mobaLite            from "./demos/moba-lite.js?v=3.30.0";
+import plinko              from "./demos/plinko.js?v=3.30.0";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -77,6 +78,7 @@ const ALL_DEMOS = [
   towerDefense,
   topDownShooter,
   mobaLite,
+  plinko,
 ];
 
 const gtag = window.gtag || function() {};
