@@ -175,6 +175,23 @@ export class ThreeJSAdapter {
   getScene()    { return this.#scene; }
   getCamera()   { return this.#camera; }
 
+  /**
+   * Reconcile meshes with the current space and sync each mesh's position
+   * and rotation to its body. Mirrors what the default render path does, so
+   * additive `render3d` overrides can keep the standard body rendering and
+   * only add their own extras (trails, overlays, etc.). Counterpart of
+   * PixiJSAdapter#syncBodies.
+   */
+  syncBodies(space) {
+    if (!this.#scene) return;
+    this.#syncBodies(space);
+    this.#drawConstraintLines(space);
+    for (const { mesh, body } of this.#meshes) {
+      mesh.position.set(body.position.x, -body.position.y, 0);
+      mesh.rotation.z = -body.rotation;
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Per-demo hooks
   // ---------------------------------------------------------------------------
