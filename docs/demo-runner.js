@@ -364,7 +364,7 @@ export class DemoRunner {
       if (demoDef.render3d) {
         ro.threejs = (adapter, sp, w, h, outlines, cx, cy) => {
           const r = adapter.getRenderer(), s = adapter.getScene(), c = adapter.getCamera();
-          demoDef.render3d(r, s, c, sp, w, h, cx, cy);
+          demoDef.render3d(r, s, c, sp, w, h, cx, cy, adapter);
         };
       }
       if (demoDef.renderPixi) {

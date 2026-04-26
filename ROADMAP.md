@@ -49,6 +49,7 @@ merge via the independent per-package auto-release pipeline
 | #   | Priority                        | Effort | Impact            | Why                                                                                                                                                                                                                                               |
 | --- | ------------------------------- | ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P62 | **Particle system**             | S-M    | features          | Physics-aware particle emitter — a frequently requested feature by gamedevs                                                                                                                                                                       |
+| P70 | **RadialGravityField helper**   | S      | features          | Point-source gravity (1/r², 1/r, custom falloff) auto-applied each step. Replaces the userland `body.force` loops the orbital-gravity + three-body demos both hand-roll today. Composable: multiple fields, body-anchored or fixed, dynamic-only mask |
 
 ### Tooling & Infrastructure
 

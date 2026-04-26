@@ -1,4 +1,6 @@
 import { Body, BodyType, Vec2, Circle } from "../nape-js.esm.js";
+import { drawBody, drawGrid, drawConstraints } from "../renderer.js";
+import { loadThree } from "../renderers/threejs-adapter.js";
 
 // ===== module state =====
 let _bodies = [];
@@ -9,14 +11,26 @@ let _W = 900, _H = 500;
 let _space = null;
 let _stepCount = 0;
 
-const TRAIL_LEN = 240;
+// Pixi state
+let _lastStagePixi = null;
+let _pixiTrailGfx = null;
 
-const BODY_COLORS = [
-  { core: "#ffd166", glow: "rgba(255,209,102,0.55)" },
-  { core: "#06d6a0", glow: "rgba(6,214,160,0.55)" },
-  { core: "#ef476f", glow: "rgba(239,71,111,0.55)" },
-  { core: "#9b8cff", glow: "rgba(155,140,255,0.55)" },
-];
+// 3D state
+let _THREE = null;
+let _lastScene3d = null;
+let _trails3d = [];   // [{ body, line, geometry, positions, colors, baseColor }]
+
+const TRAIL_LEN = 80;
+
+// Default body palette (matches docs/renderers/shared-colors and the CodePen
+// runtime's MESH_COLORS / FILL_COLORS / COLORS arrays). Inlined so the demo
+// doesn't depend on a helper that only exists in the docs/ build.
+const _PALETTE_HEX = [0x58a6ff, 0xd29922, 0x3fb950, 0xf85149, 0xa371f7, 0xdbabff];
+function _bodyColorHex(body) {
+  if (body.isStatic && body.isStatic()) return 0x607888;
+  const idx = body.userData?._colorIdx ?? 0;
+  return _PALETTE_HEX[idx % _PALETTE_HEX.length];
+}
 
 // ===== presets =====
 // Each preset returns { G, bodies: [{ x, y, vx, vy, r, m, color }, ...] }.
@@ -187,7 +201,6 @@ export default {
   featuredOrder: 6,
   desc: 'Three masses, mutual gravity, no closed-form solution. Switch between the famous <b>figure-8</b> orbit, the rotating <b>Lagrange triangle</b>, a sun + planets system, or pure <b>chaos</b>. <b>Click</b> a body to perturb it.',
   walls: false,
-  canvas2dOnly: true,
   moduleState: `let _bodies = [];
 let _trails = [];
 let _G = 5000;
@@ -195,7 +208,7 @@ let _currentPreset = "figure8";
 let _W = 900, _H = 500;
 let _space = null;
 let _stepCount = 0;
-const TRAIL_LEN = 240;`,
+const TRAIL_LEN = 80;`,
 
   setup(space, W, H) {
     _space = space;
@@ -314,32 +327,27 @@ const TRAIL_LEN = 240;`,
   },
 
   render(ctx, space, W, H, showOutlines) {
-    ctx.fillStyle = "#05080f";
-    ctx.fillRect(0, 0, W, H);
+    // Default scene scaffolding — same look as every other demo
+    drawGrid(ctx, W, H, 0, 0);
+    drawConstraints(ctx, space);
 
-    // Static starfield (deterministic so it doesn't shimmer).
-    ctx.fillStyle = "rgba(255,255,255,0.18)";
-    for (let i = 0; i < 90; i++) {
-      const sx = (i * 9301 + 49297) % W;
-      const sy = (i * 49297 + 9301) % H;
-      ctx.fillRect(sx, sy, 1, 1);
-    }
-
-    // Trails — draw oldest-to-newest with rising alpha for a comet tail.
+    // Trails — drawn under the bodies. Tapered: thin/transparent at the
+    // oldest end, thick/opaque near the body. Colour matches the default
+    // body palette.
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     for (let i = 0; i < _bodies.length; i++) {
       const t = _trails[i];
       if (t.count < 2) continue;
-      const colorIdx = _bodies[i].userData._colorIdx ?? i;
-      const col = BODY_COLORS[colorIdx % BODY_COLORS.length];
-      ctx.strokeStyle = col.core;
-      ctx.lineWidth = 2;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
+      const hex = _bodyColorHex(_bodies[i]);
+      ctx.strokeStyle = "#" + hex.toString(16).padStart(6, "0");
       const start = (t.idx - t.count + TRAIL_LEN) % TRAIL_LEN;
       for (let k = 1; k < t.count; k++) {
         const aIdx = (start + k - 1) % TRAIL_LEN;
         const bIdx = (start + k) % TRAIL_LEN;
-        ctx.globalAlpha = (k / t.count) * 0.7;
+        const u = k / t.count;
+        ctx.globalAlpha = u * 0.425;
+        ctx.lineWidth = 0.5 + u * 3.5;
         ctx.beginPath();
         ctx.moveTo(t.x[aIdx], t.y[aIdx]);
         ctx.lineTo(t.x[bIdx], t.y[bIdx]);
@@ -348,31 +356,150 @@ const TRAIL_LEN = 240;`,
     }
     ctx.globalAlpha = 1;
 
-    // Bodies — radial glow + solid core.
-    for (const body of _bodies) {
-      const colorIdx = body.userData._colorIdx ?? 0;
-      const col = BODY_COLORS[colorIdx % BODY_COLORS.length];
-      const r = body.userData._radius ?? 12;
-      const x = body.position.x, y = body.position.y;
-      const grad = ctx.createRadialGradient(x, y, 0, x, y, r * 4);
-      grad.addColorStop(0, col.glow);
-      grad.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(x, y, r * 4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = col.core;
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-      if (showOutlines) {
-        ctx.strokeStyle = "rgba(255,255,255,0.5)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-    }
+    // Bodies — default rendering (uses _colorIdx from userData)
+    for (const body of space.bodies) drawBody(ctx, body, showOutlines);
 
     // Caption
     ctx.font = "12px system-ui, sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.55)";
     ctx.textAlign = "left";
     ctx.fillText(PRESET_LABELS[_currentPreset] ?? "", 12, 22);
+  },
+
+  render3dOverlay(ctx, space, W, H) {
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.textAlign = "left";
+    ctx.fillText(PRESET_LABELS[_currentPreset] ?? "", 12, 22);
+  },
+
+  renderPixi(adapter, space, W, H) {
+    const { PIXI, app } = adapter.getEngine();
+    if (!PIXI || !app) return;
+
+    // Default body sprites (palette-coloured circles, matching every other demo)
+    adapter.syncBodies(space);
+
+    // Reset trail Graphics if the stage was swapped (e.g. adapter reattach)
+    if (app.stage !== _lastStagePixi) {
+      _pixiTrailGfx = null;
+      _lastStagePixi = app.stage;
+    }
+    if (!_pixiTrailGfx) {
+      _pixiTrailGfx = new PIXI.Graphics();
+      // Insert trail under the body sprites so the bodies stay on top
+      app.stage.addChildAt(_pixiTrailGfx, 0);
+    }
+
+    const trailGfx = _pixiTrailGfx;
+    trailGfx.clear();
+    for (let i = 0; i < _bodies.length; i++) {
+      const t = _trails[i];
+      if (t.count < 2) continue;
+      const hex = _bodyColorHex(_bodies[i]);
+      const start = (t.idx - t.count + TRAIL_LEN) % TRAIL_LEN;
+      for (let k = 1; k < t.count; k++) {
+        const aIdx = (start + k - 1) % TRAIL_LEN;
+        const bIdx = (start + k) % TRAIL_LEN;
+        const u = k / t.count;
+        trailGfx
+          .moveTo(t.x[aIdx], t.y[aIdx])
+          .lineTo(t.x[bIdx], t.y[bIdx])
+          .stroke({ color: hex, width: 0.5 + u * 3.5, alpha: u * 0.425 });
+      }
+    }
+
+    app.render();
+  },
+
+  render3d(renderer, scene, camera, space, W, H, _cx, _cy, adapter) {
+    // Reset trail meshes when the scene reference changes (adapter detach).
+    if (scene !== _lastScene3d) {
+      _trails3d = [];
+      _lastScene3d = scene;
+    }
+
+    if (!_THREE) {
+      loadThree().then((mod) => { _THREE = mod; });
+      renderer.render(scene, camera);
+      return;
+    }
+    const T = _THREE;
+
+    // Default body meshes (sphere per circle body, plus lighting/grid/etc.)
+    // — same path the runner takes when no override is registered.
+    // In docs/, the runner passes the adapter as the 9th arg; in CodePen,
+    // the runtime exposes a global `syncBodies3D` instead.
+    if (adapter?.syncBodies) {
+      adapter.syncBodies(space);
+    } else if (typeof globalThis !== "undefined" && typeof globalThis.syncBodies3D === "function") {
+      globalThis.syncBodies3D(space);
+    }
+
+    // Reconcile trail Lines vs current bodies (presets swap them out wholesale).
+    const liveBodies = new Set(_bodies);
+    for (let i = _trails3d.length - 1; i >= 0; i--) {
+      if (!liveBodies.has(_trails3d[i].body)) {
+        const tr = _trails3d[i];
+        scene.remove(tr.line);
+        tr.line.geometry.dispose();
+        tr.line.material.dispose();
+        _trails3d.splice(i, 1);
+      }
+    }
+    const tracked = new Set(_trails3d.map((tr) => tr.body));
+    for (const body of _bodies) {
+      if (tracked.has(body)) continue;
+      const positions = new Float32Array(TRAIL_LEN * 3);
+      const colors = new Float32Array(TRAIL_LEN * 3);
+      const geometry = new T.BufferGeometry();
+      geometry.setAttribute("position", new T.BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new T.BufferAttribute(colors, 3));
+      const line = new T.Line(
+        geometry,
+        new T.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.45 }),
+      );
+      line.frustumCulled = false;
+      scene.add(line);
+      _trails3d.push({
+        body, line, geometry, positions, colors,
+        baseColor: new T.Color(_bodyColorHex(body)),
+      });
+    }
+
+    // Update trail vertex positions + per-vertex colours every frame.
+    // 2D coords map directly to (x, -y, 0) — the adapter camera looks at
+    // (W/2, -H/2, 0) along -Z, same as every other 3D demo.
+    for (const tr of _trails3d) {
+      const idx = _bodies.indexOf(tr.body);
+      if (idx === -1) continue;
+      const t = _trails[idx];
+      const start = (t.idx - t.count + TRAIL_LEN) % TRAIL_LEN;
+      const padX = tr.body.position.x;
+      const padY = -tr.body.position.y;
+      for (let k = 0; k < TRAIL_LEN; k++) {
+        const o = k * 3;
+        if (k < t.count) {
+          const ri = (start + k) % TRAIL_LEN;
+          tr.positions[o]     = t.x[ri];
+          tr.positions[o + 1] = -t.y[ri];
+          tr.positions[o + 2] = 0;
+          const u = k / Math.max(1, t.count - 1);
+          tr.colors[o]     = tr.baseColor.r * u;
+          tr.colors[o + 1] = tr.baseColor.g * u;
+          tr.colors[o + 2] = tr.baseColor.b * u;
+        } else {
+          tr.positions[o]     = padX;
+          tr.positions[o + 1] = padY;
+          tr.positions[o + 2] = 0;
+          tr.colors[o] = tr.colors[o + 1] = tr.colors[o + 2] = 0;
+        }
+      }
+      tr.geometry.attributes.position.needsUpdate = true;
+      tr.geometry.attributes.color.needsUpdate = true;
+      tr.geometry.setDrawRange(0, Math.max(2, t.count));
+    }
+
+    renderer.render(scene, camera);
   },
 };
