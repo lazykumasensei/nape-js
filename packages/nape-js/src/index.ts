@@ -125,6 +125,13 @@ export {
   type LDtkIntGridLayer,
 } from "./helpers/tilemap";
 export {
+  RadialGravityField,
+  RadialGravityFieldGroup,
+  type RadialGravityFieldOptions,
+  type GravityFalloff,
+  type BodyFilter,
+} from "./helpers/RadialGravityField";
+export {
   computeVoronoi,
   generateFractureSites,
   type VoronoiPoint,

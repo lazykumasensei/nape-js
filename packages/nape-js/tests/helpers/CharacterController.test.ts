@@ -309,4 +309,120 @@ describe("CharacterController", () => {
       cc.destroy();
     });
   });
+
+  // ---- down direction override (radial gravity / planet platformer) ----
+
+  describe("down direction override", () => {
+    it("defaults to (0, 1)", () => {
+      const cc = new CharacterController(space, player);
+      expect(cc.down.x).toBeCloseTo(0, 5);
+      expect(cc.down.y).toBeCloseTo(1, 5);
+      cc.destroy();
+    });
+
+    it("accepts a constructor-time down option (normalized)", () => {
+      const cc = new CharacterController(space, player, {
+        down: new Vec2(2, 0),
+      });
+      expect(cc.down.x).toBeCloseTo(1, 5);
+      expect(cc.down.y).toBeCloseTo(0, 5);
+      cc.destroy();
+    });
+
+    it("normalizes when assigned via the setter", () => {
+      const cc = new CharacterController(space, player);
+      cc.down = new Vec2(0, 5);
+      expect(cc.down.x).toBeCloseTo(0, 5);
+      expect(cc.down.y).toBeCloseTo(1, 5);
+      cc.setDown(3, 4);
+      expect(cc.down.x).toBeCloseTo(0.6, 5);
+      expect(cc.down.y).toBeCloseTo(0.8, 5);
+      cc.destroy();
+    });
+
+    it("ignores zero / near-zero down vectors", () => {
+      const cc = new CharacterController(space, player);
+      cc.down = new Vec2(1, 0);
+      cc.setDown(0, 0);
+      // Last good value should still apply
+      expect(cc.down.x).toBeCloseTo(1, 5);
+      expect(cc.down.y).toBeCloseTo(0, 5);
+      cc.destroy();
+    });
+
+    it("detects ground using a sideways down vector (player on a vertical wall)", () => {
+      // Disable global gravity so the player isn't pulled "down" the screen.
+      space.gravity = new Vec2(0, 0);
+
+      // A vertical "wall" the character treats as ground:
+      const wall = new Body(BodyType.STATIC, new Vec2(150, 250));
+      wall.shapes.add(new Polygon(Polygon.box(20, 400)));
+      wall.space = space;
+
+      // Place player just to the left of the wall (well within charRadius + 4).
+      player.position = new Vec2(150 - 10 - 12, 250); // wall center - half-width - circle radius
+      player.velocity = new Vec2(0, 0);
+
+      const cc = new CharacterController(space, player, {
+        down: new Vec2(1, 0), // "down" points toward the wall
+      });
+      step(space);
+      const result = cc.update();
+      expect(result.grounded).toBe(true);
+      // Ground normal should point opposite to down (i.e. away from wall, -X).
+      expect(result.groundNormal!.x).toBeLessThan(-0.7);
+      cc.destroy();
+    });
+
+    it("does not detect a sideways floor as ground when down is still (0, 1)", () => {
+      space.gravity = new Vec2(0, 0);
+      const wall = new Body(BodyType.STATIC, new Vec2(150, 250));
+      wall.shapes.add(new Polygon(Polygon.box(20, 400)));
+      wall.space = space;
+
+      player.position = new Vec2(150 - 10 - 12, 250);
+      player.velocity = new Vec2(0, 0);
+
+      const cc = new CharacterController(space, player); // default down (0, 1)
+      step(space);
+      const result = cc.update();
+      expect(result.grounded).toBe(false);
+      cc.destroy();
+    });
+
+    it("rotates wall detection with the down direction", () => {
+      // With down pointing right (+X), walls are perpendicular to that — i.e.
+      // up (+Y is "right wall" relative to gravity) and down (-Y is "left wall").
+      // Build a horizontal floor below the player; with down=+X it should
+      // register as a wall, not as ground.
+      space.gravity = new Vec2(0, 0);
+      addFloor(space);
+      player.position = new Vec2(450, 478); // sitting on the floor (12 radius)
+      player.velocity = new Vec2(0, 0);
+
+      const cc = new CharacterController(space, player, {
+        down: new Vec2(1, 0),
+      });
+      step(space);
+      const result = cc.update();
+      // Floor (normal pointing up) is NOT ground when down is sideways.
+      expect(result.grounded).toBe(false);
+      // Floor normal is (0, -1) which projects onto right=(0, -1) with |dot| ≈ 1
+      // -> registered as a wall.
+      expect(result.wallLeft || result.wallRight).toBe(true);
+      cc.destroy();
+    });
+
+    it("can be updated each frame to change down direction (planet-style)", () => {
+      // Simulates choosing a new down direction across frames; verify the
+      // controller picks it up without re-construction.
+      const cc = new CharacterController(space, player);
+      cc.setDown(0, 1);
+      cc.setDown(1, 0);
+      cc.setDown(0, -1);
+      expect(cc.down.x).toBeCloseTo(0, 5);
+      expect(cc.down.y).toBeCloseTo(-1, 5);
+      cc.destroy();
+    });
+  });
 });

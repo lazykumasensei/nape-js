@@ -2,7 +2,7 @@
 
 ## Completed Items
 
-Done: P21-P28, P30-P33, P35, P37-P43, P44, P45-P48, P50-P55, P57, P60, P63, P64, P66-P68.
+Done: P21-P28, P30-P33, P35, P37-P43, P44, P45-P48, P50-P55, P57, P60, P63, P64, P66-P68, P70.
 Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — superseded by P52), P49 (ECS adapter — trivial pattern).
 
 ### P44 — PixiJS integration (`@newkrok/nape-pixi` 0.1.0)
@@ -25,6 +25,17 @@ Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/til
 - `buildTilemapBody(grid, options)` — wraps `meshTilemap` and produces a static (or kinematic / dynamic) `Body` with one `Polygon` per merged rect. Supports custom `tileSize` (square or `{w,h}`), `position`, `material`, `filter`, `cbTypes`, custom `solid` predicate, and appending shapes to an existing `body`.
 - `tiledLayerToGrid(layer)` / `ldtkLayerToGrid(layer)` — zero-dep parsers for Tiled tile layers and LDtk IntGrid layers (only read the `data` / `intGridCsv` + dimension fields).
 - 54 unit tests + an interactive demo (`docs/demos/tilemap.js`) — 36×20 platformer level driven by `CharacterController`, click-to-toggle tiles with live body rebuild, overlay showing the greedy-merged rectangles.
+
+### P70 — RadialGravityField helper
+
+Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/RadialGravityField.ts`).
+
+- `RadialGravityField` — point-source gravity field with configurable falloff (`"inverse-square"` default, plus `"inverse"`, `"constant"`, and custom `(d) => number` functions). Anchor can be a fixed `Vec2` or a `Body` (auto-tracking). Supports `maxRadius` cutoff, `minRadius` clamp (singularity protection), `softening` epsilon, `bodyFilter` predicate, and `scaleByMass` toggle for Newtonian vs constant-acceleration use.
+- `RadialGravityFieldGroup` — composable container; one `apply(space)` runs all member fields. Forces accumulate additively, preserving any userland `body.force` writes.
+- 33 unit tests covering all four falloff laws, edge cases (singularity, zero distance, disabled, filter, static/kinematic), accumulation semantics, and physics integration.
+- **Refactored** `gravity.js` and `three-body.js` demos to use the new helper — three-body's pairwise N² loop becomes one `RadialGravityField` per body with self-exclusion `bodyFilter`.
+- **New demo** `planet-platformer.js` — Mario-Galaxy-style: walk around three planetoids with their own gravity wells, jump between them, collect coins + a star.
+- **Side fix**: `CharacterController` now exposes a runtime-mutable `down: Vec2` direction (default `(0, 1)`) — ground / wall raycasts and slope detection follow it. Makes radial-gravity walking work natively. Default behaviour unchanged.
 
 ---
 
@@ -57,7 +68,6 @@ Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/til
 | #   | Priority                        | Effort | Impact            | Why                                                                                                                                                                                                                                               |
 | --- | ------------------------------- | ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P62 | **Particle system**             | S-M    | features          | Physics-aware particle emitter — a frequently requested feature by gamedevs                                                                                                                                                                       |
-| P70 | **RadialGravityField helper**   | S      | features          | Point-source gravity (1/r², 1/r, custom falloff) auto-applied each step. Replaces the userland `body.force` loops the orbital-gravity + three-body demos both hand-roll today. Composable: multiple fields, body-anchored or fixed, dynamic-only mask |
 
 ### Tooling & Infrastructure
 
