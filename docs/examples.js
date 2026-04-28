@@ -57,6 +57,7 @@ import topDownShooter      from "./demos/top-down-shooter.js?v=3.30.0";
 import mobaLite            from "./demos/moba-lite.js?v=3.30.0";
 import plinko              from "./demos/plinko.js?v=3.30.0";
 import threeBody           from "./demos/three-body.js?v=3.30.0";
+import tilemap             from "./demos/tilemap.js?v=3.30.0";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -81,6 +82,7 @@ const ALL_DEMOS = [
   mobaLite,
   plinko,
   threeBody,
+  tilemap,
 ];
 
 const gtag = window.gtag || function() {};

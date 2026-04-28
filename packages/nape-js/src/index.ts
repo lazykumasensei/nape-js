@@ -111,6 +111,20 @@ export {
 export { TriggerZone, type TriggerZoneOptions, type TriggerHandler } from "./helpers/TriggerZone";
 export { fractureBody, type FractureOptions, type FractureResult } from "./helpers/fractureBody";
 export {
+  buildTilemapBody,
+  meshTilemap,
+  tiledLayerToGrid,
+  ldtkLayerToGrid,
+  type TilemapGrid,
+  type TilemapOptions,
+  type TilemapRect,
+  type TilemapTileSize,
+  type TilemapMergeMode,
+  type TilemapSolidPredicate,
+  type TiledTileLayer,
+  type LDtkIntGridLayer,
+} from "./helpers/tilemap";
+export {
   computeVoronoi,
   generateFractureSites,
   type VoronoiPoint,

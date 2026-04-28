@@ -2,7 +2,7 @@
 
 ## Completed Items
 
-Done: P21-P28, P30-P33, P35, P37-P43, P44, P45-P48, P50-P55, P57, P63, P64, P66-P68.
+Done: P21-P28, P30-P33, P35, P37-P43, P44, P45-P48, P50-P55, P57, P60, P63, P64, P66-P68.
 Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — superseded by P52), P49 (ECS adapter — trivial pattern).
 
 ### P44 — PixiJS integration (`@newkrok/nape-pixi` 0.1.0)
@@ -16,6 +16,15 @@ merge via the independent per-package auto-release pipeline
 - `PixiDebugDraw` — on-demand shape + constraint overlay. Per-body Graphics cache with togglable layers. Zero `pixi.js` build coupling (structural `GraphicsLike` / `ContainerLike` with user-injected PIXI factory).
 - `WorkerBridge` + transform protocol — off-thread physics helper. `SharedArrayBuffer` when available, `postMessage` fallback otherwise. Doesn't prescribe the worker script — provides the wire format + the main-thread glue.
 - 71 tests, ~10 KB minified ESM, 17 KB d.ts, PIXI v8 peer-dep.
+
+### P60 — Tilemap collision helper
+
+Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/tilemap.ts`).
+
+- `meshTilemap(grid, options)` — pure geometry: turns a 2D tile grid into the minimal set of axis-aligned rectangles using `merge: "none" | "rows" | "greedy"` (greedy meshing is the default, dramatically cuts shape count for typical level data).
+- `buildTilemapBody(grid, options)` — wraps `meshTilemap` and produces a static (or kinematic / dynamic) `Body` with one `Polygon` per merged rect. Supports custom `tileSize` (square or `{w,h}`), `position`, `material`, `filter`, `cbTypes`, custom `solid` predicate, and appending shapes to an existing `body`.
+- `tiledLayerToGrid(layer)` / `ldtkLayerToGrid(layer)` — zero-dep parsers for Tiled tile layers and LDtk IntGrid layers (only read the `data` / `intGridCsv` + dimension fields).
+- 54 unit tests + an interactive demo (`docs/demos/tilemap.js`) — 36×20 platformer level driven by `CharacterController`, click-to-toggle tiles with live body rebuild, overlay showing the greedy-merged rectangles.
 
 ---
 
@@ -36,7 +45,6 @@ merge via the independent per-package auto-release pipeline
 | --- | ---------------------------- | ------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P58 | **Phaser plugin/adapter**    | M      | :fire: adoption | Phaser is the #1 JS game framework — direct integration = massive reach. Phaser Box2D exists but lacks fluid sim, character controller, serialization |
 | P59 | **React/R3F integration**    | M      | :fire: adoption | `@react-three/rapier`-style package for the React gamedev community. Growing market segment                                                           |
-| P60 | **Tilemap collision helper** | S      | DX              | Tiled/LDtk map -> physics body conversion. Common gamedev need, low effort, high utility                                                              |
 
 ### Developer Experience & Onboarding
 
@@ -74,8 +82,7 @@ merge via the independent per-package auto-release pipeline
 
 ### Phase 3 — Ecosystem expand
 
-5. **P60** — Tilemap collision helper (low effort, high gamedev utility)
-6. **P59** — React/R3F integration (growing market)
+5. **P59** — React/R3F integration (growing market)
 
 ### Phase 4 — Polish & tooling
 
