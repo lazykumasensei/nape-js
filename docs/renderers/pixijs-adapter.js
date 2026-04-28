@@ -29,8 +29,8 @@ export function getPixi() {
 import {
   BODY_COLORS_HEX, STATIC_COLOR_HEX, CONSTRAINT_COLOR_HEX,
   bodyColorHex, bodyFillAlpha,
-} from "./shared-colors.js?v=3.30.0";
-import { PixiDebugDraw } from "../nape-pixi.esm.js?v=3.30.0";
+} from "./shared-colors.js?v=3.30.4";
+import { PixiDebugDraw } from "../nape-pixi.esm.js?v=3.30.4";
 
 // Aliases for backward compatibility
 const FILL_COLORS = BODY_COLORS_HEX;
@@ -211,6 +211,9 @@ export class PixiJSAdapter {
       if (this.#debug && this.#debug.showOutlines !== showOutlines) {
         this.#debug.showOutlines = showOutlines;
       }
+      // Apply camera offset to the stage so all world-space content (grid +
+      // debug bodies) shifts together with the follow target.
+      this.#app.stage.position.set(-camX, -camY);
       this.#debug?.render(space);
       this.#app.render();
     }

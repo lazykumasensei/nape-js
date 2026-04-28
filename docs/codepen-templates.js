@@ -9,7 +9,7 @@
  *  2. Auto-generation from demo hooks (setup/step/click/drag/release) via .toString()
  */
 
-const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js@3.30.0/dist/index.js";
+const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js@3.30.4/dist/index.js";
 const NAPE_PIXI_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-pixi@0.1.0/dist/index.js";
 const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
 
@@ -290,20 +290,11 @@ function addBodyMesh(body) {
     if (shape.isCircle()) {
       geom = new THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
     } else if (shape.isCapsule()) {
-      const cap = shape.castCapsule, hl = cap.halfLength, r = cap.radius;
-      const pts = [];
-      for (let i = -12; i <= 12; i++) {
-        const a = (i / 12) * Math.PI / 2;
-        pts.push(new THREE.Vector2(hl + Math.cos(a) * r, Math.sin(a) * r));
-      }
-      for (let i = -12; i <= 12; i++) {
-        const a = Math.PI + (i / 12) * Math.PI / 2;
-        pts.push(new THREE.Vector2(-hl + Math.cos(a) * r, Math.sin(a) * r));
-      }
-      geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts),
-        { depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2 });
-      geom.applyMatrix4(new THREE.Matrix4().makeScale(1, -1, 1));
-      geom.computeVertexNormals(); geom.translate(0, 0, -15);
+      // True 3D capsule. Three's CapsuleGeometry builds along +Y; nape's
+      // capsule spine is +X, so rotate 90° around Z to align.
+      const cap = shape.castCapsule;
+      geom = new THREE.CapsuleGeometry(cap.radius, cap.halfLength * 2, 8, 16);
+      geom.rotateZ(Math.PI / 2);
     } else if (shape.isPolygon()) {
       const verts = shape.castPolygon.localVerts;
       if (verts.length < 3) continue;
@@ -738,6 +729,7 @@ const NAPE_IMPORTS = `import {
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
   CharacterController, fractureBody, UserConstraint, TriggerZone,
   Ray, RayResult,
+  buildTilemapBody, meshTilemap, RadialGravityField,
 } from "${NAPE_CDN}";`;
 
 /**

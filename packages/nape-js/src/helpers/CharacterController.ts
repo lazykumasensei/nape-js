@@ -60,6 +60,21 @@ export interface CharacterControllerOptions {
    * @default null
    */
   filter?: InteractionFilter | null;
+
+  /**
+   * World-space "down" direction used for ground / wall raycasts.
+   *
+   * Default `Vec2(0, 1)` matches a standard top-down-Y platformer (gravity
+   * points along +Y). Override for radial-gravity / planet-platformer
+   * scenarios — set `cc.down` each frame to the unit vector pointing from
+   * the character toward whatever you treat as "down" (e.g. the nearest
+   * planet's centre). Walls are detected perpendicular to this direction.
+   *
+   * The vector is normalized internally; magnitude is ignored.
+   *
+   * @default Vec2(0, 1)
+   */
+  down?: Vec2;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +129,8 @@ export class CharacterController {
   private _maxSlopeAngle: number;
   private _maxSlopeCos: number;
   private _filter: InteractionFilter | null;
+  private _downX = 0;
+  private _downY = 1;
 
   // One-way platform support
   private _oneWayListener: PreListener | null = null;
@@ -134,6 +151,8 @@ export class CharacterController {
 
     this._maxSlopeAngle = options.maxSlopeAngle ?? Math.PI / 4;
     this._maxSlopeCos = Math.cos(this._maxSlopeAngle);
+
+    if (options.down) this._setDown(options.down.x, options.down.y);
 
     // Auto-setup raycast filter to exclude the character's own shapes.
     const CHAR_GROUP = 1 << 8;
@@ -182,6 +201,32 @@ export class CharacterController {
   set maxSlopeAngle(v: number) {
     this._maxSlopeAngle = v;
     this._maxSlopeCos = Math.cos(v);
+  }
+
+  /**
+   * Current world-space "down" direction used for ground / wall raycasts.
+   * Returns a fresh `Vec2` each call; mutate via {@link setDown} or by
+   * assigning a new `Vec2` to this property.
+   */
+  get down(): Vec2 {
+    return new Vec2(this._downX, this._downY);
+  }
+
+  set down(value: Vec2) {
+    this._setDown(value.x, value.y);
+  }
+
+  /** Update the down direction from raw components (normalized internally). */
+  setDown(x: number, y: number): void {
+    this._setDown(x, y);
+  }
+
+  private _setDown(x: number, y: number): void {
+    const len = Math.sqrt(x * x + y * y);
+    if (len > 1e-6) {
+      this._downX = x / len;
+      this._downY = y / len;
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -259,25 +304,26 @@ export class CharacterController {
   // -----------------------------------------------------------------------
 
   private _detectGround(px: number, py: number): void {
-    const charRadius = this._getCharacterRadius(0, 1);
+    const dx = this._downX;
+    const dy = this._downY;
+    const charRadius = this._getCharacterRadius(dx, dy);
     const castDist = charRadius + 4; // small tolerance
 
-    const ray = new Ray(new Vec2(px, py), new Vec2(0, 1));
+    const ray = new Ray(new Vec2(px, py), new Vec2(dx, dy));
     ray.maxDistance = castDist;
 
     const hit = this.space.rayCast(ray, false, this._filter);
 
     if (hit && hit.distance <= castDist) {
-      const ny = hit.normal.y;
-      if (ny < 0) {
-        const cosAngle = -ny;
-        if (cosAngle >= this._maxSlopeCos) {
-          this._grounded = true;
-          this._groundNormal = new Vec2(hit.normal.x, hit.normal.y);
-          this._groundBody = hit.shape?.body ?? null;
-          this._slopeAngle = Math.acos(Math.min(1, cosAngle));
-          return;
-        }
+      // Surface is "ground" when its normal points opposite to down (i.e.
+      // dot(normal, -down) >= cos(maxSlopeAngle)).
+      const cosAngle = -(hit.normal.x * dx + hit.normal.y * dy);
+      if (cosAngle > 0 && cosAngle >= this._maxSlopeCos) {
+        this._grounded = true;
+        this._groundNormal = new Vec2(hit.normal.x, hit.normal.y);
+        this._groundBody = hit.shape?.body ?? null;
+        this._slopeAngle = Math.acos(Math.min(1, cosAngle));
+        return;
       }
     }
 
@@ -292,23 +338,33 @@ export class CharacterController {
   // -----------------------------------------------------------------------
 
   private _detectWalls(px: number, py: number): void {
-    const charRadius = this._getCharacterRadius(1, 0);
+    // Wall directions are perpendicular to "down" (so "right" is down rotated
+    // 90° CCW = (down.y, -down.x); "left" is the negation). With the default
+    // down = (0, 1) this reduces to the original (±1, 0).
+    const dx = this._downX;
+    const dy = this._downY;
+    const rightX = dy;
+    const rightY = -dx;
+    const charRadius = this._getCharacterRadius(rightX, rightY);
     const castDist = charRadius + 2;
 
     // Left
-    const leftRay = new Ray(new Vec2(px, py), new Vec2(-1, 0));
+    const leftRay = new Ray(new Vec2(px, py), new Vec2(-rightX, -rightY));
     leftRay.maxDistance = castDist;
     const leftHit = this.space.rayCast(leftRay, false, this._filter);
-    if (leftHit && leftHit.distance <= castDist && Math.abs(leftHit.normal.x) > 0.7) {
-      this._wallLeft = true;
+    if (leftHit && leftHit.distance <= castDist) {
+      // Wall normal should be opposite to ray direction (i.e. point right).
+      const dot = leftHit.normal.x * rightX + leftHit.normal.y * rightY;
+      if (Math.abs(dot) > 0.7) this._wallLeft = true;
     }
 
     // Right
-    const rightRay = new Ray(new Vec2(px, py), new Vec2(1, 0));
+    const rightRay = new Ray(new Vec2(px, py), new Vec2(rightX, rightY));
     rightRay.maxDistance = castDist;
     const rightHit = this.space.rayCast(rightRay, false, this._filter);
-    if (rightHit && rightHit.distance <= castDist && Math.abs(rightHit.normal.x) > 0.7) {
-      this._wallRight = true;
+    if (rightHit && rightHit.distance <= castDist) {
+      const dot = rightHit.normal.x * rightX + rightHit.normal.y * rightY;
+      if (Math.abs(dot) > 0.7) this._wallRight = true;
     }
   }
 

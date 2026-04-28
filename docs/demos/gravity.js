@@ -1,31 +1,40 @@
-import { Body, BodyType, Vec2, Circle, Polygon } from "../nape-js.esm.js";
+import { Body, BodyType, Vec2, Circle, RadialGravityField } from "../nape-js.esm.js";
 import { spawnRandomShape } from "../demo-runner.js";
 
-// Module-level planet position (reset in setup)
-let _planetX = 0;
-let _planetY = 0;
+// Module-level field & planet refs (reset in setup)
+let _planet = null;
+let _field = null;
 
 export default {
   id: "gravity",
   label: "Orbital Gravity",
-  tags: ["Zero Gravity", "Custom Force", "Orbital", "Click"],
+  tags: ["Zero Gravity", "RadialGravityField", "Orbital", "Click"],
   featured: true,
   featuredOrder: 5,
-  desc: 'Mario Galaxy-style gravity: bodies are pulled toward a central planet. <b>Click</b> to spawn orbiting bodies.',
+  desc: 'Mario Galaxy-style gravity: bodies are pulled toward a central planet via <b>RadialGravityField</b>. <b>Click</b> to spawn orbiting bodies.',
   walls: false,
-  moduleState: `let _planetX = 0;
-let _planetY = 0;`,
+  moduleState: `let _planet = null;
+let _field = null;`,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 0); // no global gravity
 
-    _planetX = W / 2;
-    _planetY = H / 2;
+    // Central "planet" — anchor for the radial field
+    _planet = new Body(BodyType.STATIC, new Vec2(W / 2, H / 2));
+    _planet.shapes.add(new Circle(40));
+    _planet.space = space;
 
-    // Central "planet"
-    const planet = new Body(BodyType.STATIC, new Vec2(W / 2, H / 2));
-    planet.shapes.add(new Circle(40));
-    planet.space = space;
+    // One radial gravity field replaces the per-frame body.force loop.
+    // The original demo used `force = G / d²` (no mass scaling), so we set
+    // scaleByMass: false to keep the same arcade-orbital feel — otherwise
+    // the field would multiply every body's force by its mass and orbits
+    // would collapse into the planet.
+    _field = new RadialGravityField({
+      source: _planet,
+      strength: 800000,
+      minRadius: 40,
+      scaleByMass: false,
+    });
 
     // Orbiting bodies
     for (let i = 0; i < 50; i++) {
@@ -36,36 +45,28 @@ let _planetY = 0;`,
         W / 2 + Math.cos(angle) * dist,
         H / 2 + Math.sin(angle) * dist,
       );
-      // Give tangential velocity for orbit
+      // Tangential velocity for orbit
       const speed = 80 + Math.random() * 60;
-      b.velocity = new Vec2(
-        -Math.sin(angle) * speed,
-        Math.cos(angle) * speed,
-      );
+      b.velocity = new Vec2(-Math.sin(angle) * speed, Math.cos(angle) * speed);
     }
   },
 
   step(space, W, H) {
-    // Apply gravity toward center for all dynamic bodies
-    const cx = _planetX;
-    const cy = _planetY;
-    const G = 800000;
+    // body.force is persistent across step()s — clear every dynamic body's
+    // force first, otherwise apply() (which adds to existing force) would
+    // accumulate unbounded across frames and collapse the orbits.
     for (const body of space.bodies) {
-      if (body.isStatic()) continue;
-      const dx = cx - body.position.x;
-      const dy = cy - body.position.y;
-      const distSq = dx * dx + dy * dy;
-      if (distSq < 100) continue;
-      const dist = Math.sqrt(distSq);
-      const force = G / distSq;
-      body.force = new Vec2(dx / dist * force, dy / dist * force);
+      if (body.isDynamic()) body.force = new Vec2(0, 0);
     }
+    _field.apply(space);
   },
 
   click(x, y, space, W, H) {
     const b = spawnRandomShape(space, x, y);
-    const dx = _planetX - x;
-    const dy = _planetY - y;
+    const cx = _planet.position.x;
+    const cy = _planet.position.y;
+    const dx = cx - x;
+    const dy = cy - y;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
     const speed = 100;
     b.velocity = new Vec2(-dy / dist * speed, dx / dist * speed);

@@ -478,26 +478,15 @@ export class ThreeJSAdapter {
       if (shape.isCircle()) {
         geom = new _THREE.SphereGeometry(shape.castCircle.radius, 16, 16);
       } else if (shape.isCapsule()) {
+        // True 3D capsule (cylinder + 2 hemispheres). Three's CapsuleGeometry
+        // is built along the +Y axis; nape's capsule spine runs along +X, so
+        // we rotate the geometry 90° around Z to match. Body rotation is
+        // applied per-frame in the render loop (mesh.rotation.z).
         const cap = shape.castCapsule;
-        const hl = cap.halfLength;
         const r = cap.radius;
-        const pts = [];
-        const segs = 12;
-        for (let i = -segs; i <= segs; i++) {
-          const a = (i / segs) * Math.PI / 2;
-          pts.push(new _THREE.Vector2(hl + Math.cos(a) * r, Math.sin(a) * r));
-        }
-        for (let i = -segs; i <= segs; i++) {
-          const a = Math.PI + (i / segs) * Math.PI / 2;
-          pts.push(new _THREE.Vector2(-hl + Math.cos(a) * r, Math.sin(a) * r));
-        }
-        geom = new _THREE.ExtrudeGeometry(
-          new _THREE.Shape(pts),
-          { depth: 30, bevelEnabled: true, bevelSize: 2, bevelThickness: 2, bevelSegments: 2 },
-        );
-        geom.applyMatrix4(new _THREE.Matrix4().makeScale(1, -1, 1));
-        geom.computeVertexNormals();
-        geom.translate(0, 0, -15);
+        const length = cap.halfLength * 2; // cylinder portion only
+        geom = new _THREE.CapsuleGeometry(r, length, 8, 16);
+        geom.rotateZ(Math.PI / 2);
       } else if (shape.isPolygon()) {
         const verts = shape.castPolygon.localVerts;
         const len = verts.length;

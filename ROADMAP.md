@@ -2,7 +2,7 @@
 
 ## Completed Items
 
-Done: P21-P28, P30-P33, P35, P37-P43, P44, P45-P48, P50-P55, P57, P63, P64, P66-P68.
+Done: P21-P28, P30-P33, P35, P37-P43, P44, P45-P48, P50-P55, P57, P60, P63, P64, P66-P68, P70.
 Cancelled: P34 (tree shaking — architectural limit), P36 (server demos — superseded by P52), P49 (ECS adapter — trivial pattern).
 
 ### P44 — PixiJS integration (`@newkrok/nape-pixi` 0.1.0)
@@ -16,6 +16,26 @@ merge via the independent per-package auto-release pipeline
 - `PixiDebugDraw` — on-demand shape + constraint overlay. Per-body Graphics cache with togglable layers. Zero `pixi.js` build coupling (structural `GraphicsLike` / `ContainerLike` with user-injected PIXI factory).
 - `WorkerBridge` + transform protocol — off-thread physics helper. `SharedArrayBuffer` when available, `postMessage` fallback otherwise. Doesn't prescribe the worker script — provides the wire format + the main-thread glue.
 - 71 tests, ~10 KB minified ESM, 17 KB d.ts, PIXI v8 peer-dep.
+
+### P60 — Tilemap collision helper
+
+Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/tilemap.ts`).
+
+- `meshTilemap(grid, options)` — pure geometry: turns a 2D tile grid into the minimal set of axis-aligned rectangles using `merge: "none" | "rows" | "greedy"` (greedy meshing is the default, dramatically cuts shape count for typical level data).
+- `buildTilemapBody(grid, options)` — wraps `meshTilemap` and produces a static (or kinematic / dynamic) `Body` with one `Polygon` per merged rect. Supports custom `tileSize` (square or `{w,h}`), `position`, `material`, `filter`, `cbTypes`, custom `solid` predicate, and appending shapes to an existing `body`.
+- `tiledLayerToGrid(layer)` / `ldtkLayerToGrid(layer)` — zero-dep parsers for Tiled tile layers and LDtk IntGrid layers (only read the `data` / `intGridCsv` + dimension fields).
+- 54 unit tests + an interactive demo (`docs/demos/tilemap.js`) — 36×20 platformer level driven by `CharacterController`, click-to-toggle tiles with live body rebuild, overlay showing the greedy-merged rectangles.
+
+### P70 — RadialGravityField helper
+
+Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/RadialGravityField.ts`).
+
+- `RadialGravityField` — point-source gravity field with configurable falloff (`"inverse-square"` default, plus `"inverse"`, `"constant"`, and custom `(d) => number` functions). Anchor can be a fixed `Vec2` or a `Body` (auto-tracking). Supports `maxRadius` cutoff, `minRadius` clamp (singularity protection), `softening` epsilon, `bodyFilter` predicate, and `scaleByMass` toggle for Newtonian vs constant-acceleration use.
+- `RadialGravityFieldGroup` — composable container; one `apply(space)` runs all member fields. Forces accumulate additively, preserving any userland `body.force` writes.
+- 33 unit tests covering all four falloff laws, edge cases (singularity, zero distance, disabled, filter, static/kinematic), accumulation semantics, and physics integration.
+- **Refactored** `gravity.js` and `three-body.js` demos to use the new helper — three-body's pairwise N² loop becomes one `RadialGravityField` per body with self-exclusion `bodyFilter`.
+- **New demo** `planet-platformer.js` — Mario-Galaxy-style: walk around three planetoids with their own gravity wells, jump between them, collect coins + a star.
+- **Side fix**: `CharacterController` now exposes a runtime-mutable `down: Vec2` direction (default `(0, 1)`) — ground / wall raycasts and slope detection follow it. Makes radial-gravity walking work natively. Default behaviour unchanged.
 
 ---
 
@@ -36,7 +56,6 @@ merge via the independent per-package auto-release pipeline
 | --- | ---------------------------- | ------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P58 | **Phaser plugin/adapter**    | M      | :fire: adoption | Phaser is the #1 JS game framework — direct integration = massive reach. Phaser Box2D exists but lacks fluid sim, character controller, serialization |
 | P59 | **React/R3F integration**    | M      | :fire: adoption | `@react-three/rapier`-style package for the React gamedev community. Growing market segment                                                           |
-| P60 | **Tilemap collision helper** | S      | DX              | Tiled/LDtk map -> physics body conversion. Common gamedev need, low effort, high utility                                                              |
 
 ### Developer Experience & Onboarding
 
@@ -49,7 +68,6 @@ merge via the independent per-package auto-release pipeline
 | #   | Priority                        | Effort | Impact            | Why                                                                                                                                                                                                                                               |
 | --- | ------------------------------- | ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P62 | **Particle system**             | S-M    | features          | Physics-aware particle emitter — a frequently requested feature by gamedevs                                                                                                                                                                       |
-| P70 | **RadialGravityField helper**   | S      | features          | Point-source gravity (1/r², 1/r, custom falloff) auto-applied each step. Replaces the userland `body.force` loops the orbital-gravity + three-body demos both hand-roll today. Composable: multiple fields, body-anchored or fixed, dynamic-only mask |
 
 ### Tooling & Infrastructure
 
@@ -74,8 +92,7 @@ merge via the independent per-package auto-release pipeline
 
 ### Phase 3 — Ecosystem expand
 
-5. **P60** — Tilemap collision helper (low effort, high gamedev utility)
-6. **P59** — React/R3F integration (growing market)
+5. **P59** — React/R3F integration (growing market)
 
 ### Phase 4 — Polish & tooling
 

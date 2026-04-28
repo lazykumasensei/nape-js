@@ -1,10 +1,13 @@
-import { Body, BodyType, Vec2, Circle } from "../nape-js.esm.js";
+import {
+  Body, BodyType, Vec2, Circle, RadialGravityField, RadialGravityFieldGroup,
+} from "../nape-js.esm.js";
 import { drawBody, drawGrid, drawConstraints } from "../renderer.js";
 import { loadThree } from "../renderers/threejs-adapter.js";
 
 // ===== module state =====
 let _bodies = [];
 let _trails = [];
+let _fields = new RadialGravityFieldGroup();
 let _G = 5000;
 let _currentPreset = "figure8";
 let _W = 900, _H = 500;
@@ -170,6 +173,7 @@ function spawnPreset(space, W, H, name, { removeOld = false } = {}) {
   }
   _bodies = [];
   _trails = [];
+  _fields.clear();
   _stepCount = 0;
 
   const preset = PRESETS[name](W, H);
@@ -190,6 +194,19 @@ function spawnPreset(space, W, H, name, { removeOld = false } = {}) {
       idx: 0,
       count: 0,
     });
+  }
+
+  // Each body becomes a gravity source for the OTHER bodies. Newton's law
+  // F = G·m_i·m_j/r² emerges naturally: strength = G·mass[i] and the default
+  // scaleByMass: true contributes the m_j factor. The bodyFilter excludes
+  // each body from being pulled by its own field.
+  for (const source of _bodies) {
+    _fields.add(new RadialGravityField({
+      source,
+      strength: _G * source.mass,
+      softening: 25, // matches the original eps² to keep close passes stable
+      bodyFilter: (b) => b !== source,
+    }));
   }
 }
 
@@ -265,26 +282,15 @@ const TRAIL_LEN = 80;`,
   step(space, W, H) {
     _stepCount++;
 
-    // Pairwise gravity with a small softening term to avoid singularities
-    // when two bodies pass extremely close (the chaotic preset can do this).
-    const eps2 = 25;
+    // Pairwise gravity — one RadialGravityField per body, each pulling the
+    // OTHERS toward itself. The field's softening prevents singularities in
+    // close passes (chaotic preset). Replaces the manual N² force loop.
+    // body.force is persistent across step()s — apply() *adds* to it, so
+    // we have to clear each dynamic body's force first or it accumulates
+    // unbounded and the orbits collapse.
     const n = _bodies.length;
-    const fx = [0, 0, 0, 0], fy = [0, 0, 0, 0];
-
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const a = _bodies[i], b = _bodies[j];
-        const dx = b.position.x - a.position.x;
-        const dy = b.position.y - a.position.y;
-        const d2 = dx * dx + dy * dy + eps2;
-        const d = Math.sqrt(d2);
-        const f = _G * a.mass * b.mass / d2;
-        const ix = f * dx / d, iy = f * dy / d;
-        fx[i] += ix;  fy[i] += iy;
-        fx[j] -= ix;  fy[j] -= iy;
-      }
-    }
-    for (let i = 0; i < n; i++) _bodies[i].force = new Vec2(fx[i], fy[i]);
+    for (let i = 0; i < n; i++) _bodies[i].force = new Vec2(0, 0);
+    _fields.apply(space);
 
     // Trail sampling — every other frame keeps the buffer covering more time.
     if (_stepCount % 2 === 0) {
