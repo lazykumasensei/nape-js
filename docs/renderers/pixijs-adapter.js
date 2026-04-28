@@ -211,6 +211,9 @@ export class PixiJSAdapter {
       if (this.#debug && this.#debug.showOutlines !== showOutlines) {
         this.#debug.showOutlines = showOutlines;
       }
+      // Apply camera offset to the stage so all world-space content (grid +
+      // debug bodies) shifts together with the follow target.
+      this.#app.stage.position.set(-camX, -camY);
       this.#debug?.render(space);
       this.#app.render();
     }

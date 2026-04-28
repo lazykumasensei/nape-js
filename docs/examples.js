@@ -4,10 +4,10 @@
  */
 import { VERSION } from "./nape-js.esm.js?v=3.30.4";
 import { installErrorOverlay } from "./renderer.js?v=3.30.4";
-import { DemoRunner } from "./demo-runner.js?v=3.30.4";
+import { DemoRunner } from "./demo-runner.js?v=3.30.9";
 import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.30.4";
 import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.30.4";
-import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.30.4";
+import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.30.7";
 import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.30.4";
 
 // All demos
@@ -58,7 +58,7 @@ import mobaLite            from "./demos/moba-lite.js?v=3.30.4";
 import plinko              from "./demos/plinko.js?v=3.30.4";
 import threeBody           from "./demos/three-body.js?v=3.30.4";
 import tilemap             from "./demos/tilemap.js?v=3.30.4";
-import planetPlatformer    from "./demos/planet-platformer.js?v=3.30.4";
+import planetPlatformer    from "./demos/planet-platformer.js?v=3.30.9";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,

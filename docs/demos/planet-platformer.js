@@ -11,8 +11,8 @@ import { drawBody, drawGrid } from "../renderer.js";
 
 const PLAYER_W = 14;
 const PLAYER_H = 26;
-const MOVE_SPEED = 130;
-const JUMP_SPEED = 280;
+const MOVE_SPEED = 160;
+const JUMP_SPEED = 380;
 const COYOTE_MS = 100;
 const JUMP_BUFFER_MS = 100;
 const DT = 1 / 60;
@@ -21,9 +21,9 @@ const NEAREST_HYSTERESIS = 0.9;  // new planet must be < 0.9× current distance 
 
 // Planet definitions — pos, radius, field strength + maxRadius
 const PLANETS = [
-  { x: 220, y: 360, r: 60, strength:  900, maxRadius: 200 },  // A — start
-  { x: 470, y: 150, r: 50, strength:  650, maxRadius: 180 },  // B — top, holds the star
-  { x: 720, y: 340, r: 42, strength:  500, maxRadius: 160 },  // C — right
+  { x: 220, y: 360, r: 60, strength:  320, maxRadius: 220 },  // A — start
+  { x: 470, y: 150, r: 50, strength:  260, maxRadius: 200 },  // B — top, holds the star
+  { x: 720, y: 340, r: 42, strength:  220, maxRadius: 180 },  // C — right
 ];
 
 // Coin / star positions (world space). type: 1 = coin, 5 = star
@@ -118,6 +118,8 @@ export default {
   desc:
     "Walk around three planetoids — each with its own <b>RadialGravityField</b>. Gravity points toward the nearest planet, the <b>CharacterController.down</b> direction is updated each frame, so jumping, slope-walking and ground detection all work in any orientation. Collect coins and reach the <b>★ star</b> on top of the middle planet. <b>WASD/Arrows</b> + <b>Space</b>.",
   walls: false,
+
+  camera: null,
 
   setup(space, W, H) {
     space.gravity = new Vec2(0, 0); // only the radial fields
@@ -214,6 +216,14 @@ export default {
 
     _currentPlanet = startPlanet;
 
+    this.camera = {
+      follow: _player,
+      offsetX: 0,
+      offsetY: 0,
+      lerp: 1,                            // direct follow — no lerp jitter
+      deadzone: { halfW: 80, halfH: 60 },
+    };
+
     // ---- Reset transient state ----
     _keys = {};
     _prevJumpKey = false;
@@ -242,6 +252,10 @@ export default {
     if (!_cc || !_player) return;
 
     // ---- 1) Apply gravity fields ----
+    // body.force persists across steps in nape, and RadialGravityField.apply()
+    // adds to the existing force — so we must clear it each frame, otherwise
+    // the field force accumulates unbounded and pins the player to the surface.
+    _player.force = new Vec2(0, 0);
     _fields.apply(space);
 
     // ---- 2) Choose nearest planet → derive "down" direction ----
@@ -333,8 +347,12 @@ export default {
     if (_winTimer > 0) _winTimer = Math.max(0, _winTimer - DT);
   },
 
-  render(ctx, space, W, H, showOutlines) {
-    drawGrid(ctx, W, H);
+  render(ctx, space, W, H, showOutlines, camX = 0, camY = 0) {
+    // World-space rendering — translate by camera offset.
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    drawGrid(ctx, W, H, camX, camY);
 
     // ---- maxRadius rings (so the player sees gravity-well boundaries) ----
     ctx.lineWidth = 1;
@@ -363,7 +381,7 @@ export default {
       drawBody(ctx, body, showOutlines);
     }
 
-    // ---- Coin popups ----
+    // ---- Coin popups (world space) ----
     ctx.font = "bold 12px ui-monospace, monospace";
     for (const p of _coinPopups) {
       const alpha = Math.min(1, p.timer);
@@ -371,7 +389,9 @@ export default {
       ctx.fillText("+" + p.value, p.x, p.y);
     }
 
-    // ---- HUD ----
+    ctx.restore();
+
+    // ---- HUD (screen space, no camera) ----
     ctx.fillStyle = "rgba(13,17,23,0.7)";
     ctx.fillRect(8, 8, 200, 26);
     ctx.fillStyle = "#e6edf3";

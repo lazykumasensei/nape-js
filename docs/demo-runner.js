@@ -593,8 +593,11 @@ export class DemoRunner {
           stepped = true;
         }
 
-        // Update camera (opt-in — only when demo.camera is configured)
-        if (stepped) this.#updateCamera();
+        // Update camera every frame (not just on physics steps) so that on
+        // displays where the physics rate differs from the refresh rate (e.g.
+        // 120 Hz monitor + 60 Hz physics), the camera lerp stays smooth
+        // instead of stepping in chunks.
+        this.#updateCamera();
 
         const renderStart = performance.now();
         this.#activeAdapter.renderFrame(this.#space, this.#W, this.#H, {
@@ -669,18 +672,24 @@ export class DemoRunner {
       goalY = Math.max(bounds.minY, Math.min(goalY, bounds.maxY - this.#H));
     }
 
-    // Deadzone — only move camera if target leaves deadzone area
+    // Deadzone — only move camera if target leaves deadzone area on each
+    // axis. Independently per axis so vertical motion isn't ignored when
+    // horizontal sits inside the deadzone (and vice versa).
     const dz = cfg.deadzone;
     if (dz) {
       const dcx = this.#camX + this.#W / 2;
       const dcy = this.#camY + this.#H / 2;
       const dx = tx + offsetX - dcx;
       const dy = ty + offsetY - dcy;
-      if (Math.abs(dx) <= dz.halfW && Math.abs(dy) <= dz.halfH) return;
-      // Push goal just enough to keep target at deadzone edge
-      if (Math.abs(dx) > dz.halfW) {
-        goalX = tx + offsetX - this.#W / 2 - Math.sign(dx) * (dz.halfW - Math.abs(dx));
-      }
+      const outX = Math.abs(dx) > dz.halfW;
+      const outY = Math.abs(dy) > dz.halfH;
+      if (!outX && !outY) return;
+      // Inside the deadzone on an axis → keep that axis where it is.
+      // Outside → only catch up by the overshoot, not by the full distance.
+      if (!outX) goalX = this.#camX;
+      else       goalX = this.#camX + Math.sign(dx) * (Math.abs(dx) - dz.halfW);
+      if (!outY) goalY = this.#camY;
+      else       goalY = this.#camY + Math.sign(dy) * (Math.abs(dy) - dz.halfH);
     }
 
     // Lerp

@@ -5,10 +5,10 @@ import {
   Space, Body, BodyType, Vec2, Circle, Polygon, VERSION,
 } from "./nape-js.esm.js?v=3.30.4";
 import { installErrorOverlay } from "./renderer.js?v=3.30.4";
-import { DemoRunner } from "./demo-runner.js?v=3.30.4";
+import { DemoRunner } from "./demo-runner.js?v=3.30.9";
 import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.30.4";
 import { ThreeJSAdapter, loadThree } from "./renderers/threejs-adapter.js?v=3.30.4";
-import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.30.4";
+import { PixiJSAdapter, loadPixi } from "./renderers/pixijs-adapter.js?v=3.30.7";
 import { openInCodePen as _openInCodePen, getPreviewCode } from "./codepen-templates.js?v=3.30.4";
 
 // Demo definitions — one file each
