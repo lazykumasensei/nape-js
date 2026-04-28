@@ -16,7 +16,7 @@ import pyramid     from "./demos/pyramid.js?v=3.30.4";
 import chain       from "./demos/chain.js?v=3.30.4";
 import explosion   from "./demos/explosion.js?v=3.30.4";
 import constraints from "./demos/constraints.js?v=3.30.4";
-import gravity     from "./demos/gravity.js?v=3.30.4";
+import gravity     from "./demos/gravity.js?v=3.30.17";
 import stacking    from "./demos/stacking.js?v=3.30.4";
 import ragdoll     from "./demos/ragdoll.js?v=3.30.4";
 import strandbeast from "./demos/strandbeast.js?v=3.30.4";
@@ -56,7 +56,7 @@ import towerDefense        from "./demos/tower-defense.js?v=3.30.4";
 import topDownShooter      from "./demos/top-down-shooter.js?v=3.30.4";
 import mobaLite            from "./demos/moba-lite.js?v=3.30.4";
 import plinko              from "./demos/plinko.js?v=3.30.4";
-import threeBody           from "./demos/three-body.js?v=3.30.4";
+import threeBody           from "./demos/three-body.js?v=3.30.17";
 import tilemap             from "./demos/tilemap.js?v=3.30.4";
 import planetPlatformer    from "./demos/planet-platformer.js?v=3.30.17";
 

@@ -25,12 +25,15 @@ let _field = null;`,
     _planet.space = space;
 
     // One radial gravity field replaces the per-frame body.force loop.
-    // strength = G·M baked into a single number; with scaleByMass=true (default)
-    // the per-body force is G·M·m / d² — Newtonian gravity.
+    // The original demo used `force = G / d²` (no mass scaling), so we set
+    // scaleByMass: false to keep the same arcade-orbital feel — otherwise
+    // the field would multiply every body's force by its mass and orbits
+    // would collapse into the planet.
     _field = new RadialGravityField({
       source: _planet,
       strength: 800000,
       minRadius: 40,
+      scaleByMass: false,
     });
 
     // Orbiting bodies
@@ -49,6 +52,12 @@ let _field = null;`,
   },
 
   step(space, W, H) {
+    // body.force is persistent across step()s — clear every dynamic body's
+    // force first, otherwise apply() (which adds to existing force) would
+    // accumulate unbounded across frames and collapse the orbits.
+    for (const body of space.bodies) {
+      if (body.isDynamic()) body.force = new Vec2(0, 0);
+    }
     _field.apply(space);
   },
 

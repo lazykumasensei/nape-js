@@ -1517,6 +1517,180 @@ Generate random points inside a polygon for use as Voronoi sites.
 
 ---
 
+## Helpers
+
+Higher-level building blocks layered on top of the core engine. Each is a thin, optional module — import only what you need.
+
+### CharacterController
+
+Velocity-based 2D platformer controller. Wraps a dynamic body and provides ground/slope/wall raycasts, coyote-time tracking, one-way platform support, and moving-platform inheritance.
+
+```typescript
+import { CharacterController, Body, BodyType, Vec2, Capsule } from "@newkrok/nape-js";
+
+const player = new Body(BodyType.DYNAMIC, new Vec2(100, 100));
+player.shapes.add(new Capsule(36, 18));
+player.allowRotation = false;
+player.isBullet = true;
+player.space = space;
+
+const cc = new CharacterController(space, player, {
+  maxSlopeAngle: Math.PI / 4,        // walkable slope cap (default: PI/4)
+  oneWayPlatformTag: platformCbType, // optional — auto-creates a PreListener
+  characterTag: playerCbType,        // required if oneWayPlatformTag set
+  filter: customFilter,              // raycast InteractionFilter (default: auto-excludes player shapes)
+  down: new Vec2(0, 1),              // override "down" — see planet platformer
+});
+
+// Each frame, AFTER space.step():
+const result = cc.update();
+result.grounded;          // boolean
+result.groundNormal;      // Vec2 | null
+result.groundBody;        // Body | null
+result.onMovingPlatform;  // boolean
+result.slopeAngle;        // radians
+result.wallLeft;          // boolean
+result.wallRight;         // boolean
+result.timeSinceGrounded; // seconds (for coyote-time)
+
+// Override "down" each frame for radial-gravity worlds:
+cc.setDown(downX, downY);
+```
+
+**Gotchas:**
+- The controller does **not** set velocity itself — your code does (typical pattern: read input, compute target velocity, write `body.velocity`). The controller only provides raycast queries and the auto-PreListener for one-way platforms.
+- `oneWayPlatformTag` requires `characterTag` — without it the auto-listener can't tell which body is the character.
+- For radial-gravity / planet-platformer scenarios, set `down` to the unit vector from player to "ground" each frame; walls are detected perpendicular to it.
+
+### RadialGravityField
+
+Point-source gravity field — pulls bodies toward an anchor with a chosen falloff law. Replaces the manual `for (body of space.bodies) body.force = ...` loops common in orbital / planet / multi-body gravity scenarios.
+
+```typescript
+import { RadialGravityField, RadialGravityFieldGroup } from "@newkrok/nape-js";
+
+// Mario-Galaxy-style planet pulling everything toward its center.
+const field = new RadialGravityField({
+  source: planetBody,         // Vec2 (fixed point) or Body (auto-tracking)
+  strength: 800000,
+  falloff: "inverse-square",  // "inverse-square" (default) | "inverse" | "constant" | (d) => number
+  scaleByMass: true,          // default true → Newtonian; false → constant accel
+  maxRadius: 250,             // hard cutoff — bodies farther than this get 0 force
+  minRadius: 1,               // clamp distance for falloff calc (singularity guard)
+  softening: 100,             // adds to d² in inverse-square (smooths near-source)
+  bodyFilter: (body) => body !== sun,  // optional per-body predicate
+  enabled: true,
+});
+
+// Each frame, BEFORE space.step():
+field.apply(space);   // adds force to every eligible dynamic body in space
+space.step(1 / 60);
+
+// Compose multiple fields:
+const group = new RadialGravityFieldGroup();
+group.add(field);
+group.add(new RadialGravityField({ source: moon, strength: 50000 }));
+group.apply(space);   // runs all member fields once
+
+// Compute the force on a specific body without applying it:
+const f = field.forceOn(body);  // Vec2
+
+// Move the field at runtime (Vec2 source — Body sources auto-track):
+field.getPosition();  // { x, y }
+field.enabled = false;
+field.strength = 1200000;
+```
+
+**Gotchas:**
+- `body.force` is **persistent** across `space.step()` — nape never zeroes it. `apply()` *adds* to existing force, so per-frame field application accumulates unbounded if you don't clear `body.force` yourself each frame. Pattern: `body.force = new Vec2(0, 0)` before `field.apply()`.
+- `scaleByMass: true` produces real Newtonian behavior; switch to `false` for direct acceleration (simpler tuning for arcade games).
+- Set `softening` (inverse-square only) to avoid extreme accelerations when bodies pass close to the source.
+- Static and kinematic bodies are always skipped (they don't respond to force anyway).
+- For planet platformers where multiple wells overlap and the player should only feel one at a time, use `bodyFilter` to gate the player against `_currentPlanet` while letting other dynamic bodies feel every well they're inside.
+
+### Tilemap (`buildTilemapBody`, `meshTilemap`)
+
+Turns a 2D tile grid into a physics body using greedy meshing — collapses adjacent solid tiles into the minimal set of axis-aligned rectangles. Cuts shape count by 5–50× on typical level data, which directly speeds up broadphase + narrowphase.
+
+```typescript
+import {
+  buildTilemapBody, meshTilemap, tiledLayerToGrid, ldtkLayerToGrid,
+} from "@newkrok/nape-js";
+
+// Hand-authored grid (1 = solid, 0 = empty)
+const grid = [
+  [1, 1, 1, 1, 1],
+  [1, 0, 0, 0, 1],
+  [1, 0, 0, 0, 1],
+  [1, 1, 1, 1, 1],
+];
+
+const body = buildTilemapBody(grid, {
+  tileSize: 32,                // square — or { w: 32, h: 24 } for non-square
+  position: new Vec2(0, 0),    // top-left of the map in world space
+  merge: "greedy",             // "none" | "rows" | "greedy" (default: greedy)
+  solid: (v, x, y) => v !== 0, // default: any non-zero is solid
+  material: customMaterial,    // applied to every generated polygon
+  filter: customFilter,
+  cbTypes: [groundCbType],
+  bodyType: BodyType.STATIC,   // default STATIC — also accepts KINEMATIC for moving levels
+  body: existingBody,          // optional: append shapes to a body that already exists
+});
+body.space = space;
+
+// Pure geometry (no Body) — useful for streaming chunks or precomputing meshes:
+const rects = meshTilemap(grid, { tileSize: 32, merge: "greedy" });
+// rects: Array<{ x, y, w, h }> in tile coordinates
+
+// Parse external level editors:
+const grid1 = tiledLayerToGrid(tiledJson.layers[0]);  // Tiled JSON tile layer
+const grid2 = ldtkLayerToGrid(ldtkJson.levels[0].layerInstances[0]); // LDtk IntGrid
+```
+
+**Gotchas:**
+- The generated polygons are axis-aligned boxes — no slopes. For sloped terrain combine with hand-authored polygons or use marching squares.
+- Greedy merging is the right default; only use `merge: "rows"` if you need to preserve per-row stripes (e.g. for per-tile properties stored on shapes), or `"none"` for one polygon per cell when you intend to replace cells dynamically.
+- `tiledLayerToGrid` / `ldtkLayerToGrid` only consume the data + dimension fields — they don't depend on the full Tiled/LDtk JSON shape, so you can pass a hand-shaped subset.
+- For destructible terrain, rebuild the body when the grid changes (`body.shapes.clear()` then call `buildTilemapBody(grid, { ..., body })`).
+
+### TriggerZone
+
+Sensor-based zone with `onEnter` / `onExit` callbacks — wraps the BEGIN/END `InteractionListener` plumbing so you don't have to wire it up by hand.
+
+```typescript
+import { TriggerZone } from "@newkrok/nape-js";
+
+const zone = new TriggerZone(space, body, {
+  type: InteractionType.SENSOR,         // default — also accepts COLLISION
+  onEnter: (interactor) => { /* ... */ },
+  onExit:  (interactor) => { /* ... */ },
+  filter: filterCbType,                 // optional CbType filter
+});
+
+zone.destroy();   // remove the listeners
+```
+
+### createConcaveBody
+
+Decomposes a concave polygon outline into convex pieces and adds them all to a single body — needed because nape's `Polygon` shape is convex-only.
+
+```typescript
+import { createConcaveBody, Vec2 } from "@newkrok/nape-js";
+
+const body = createConcaveBody(
+  [new Vec2(0, 0), new Vec2(100, 0), /* ... */],  // CCW outline (or GeomPoly)
+  {
+    bodyType: BodyType.DYNAMIC,   // default
+    position: new Vec2(200, 100), // body's world position (vertices are local)
+    material: customMaterial,
+    filter: customFilter,
+  },
+);
+body.space = space;
+```
+
+---
+
 ## Common Patterns
 
 ### Adding Bodies to Space

@@ -285,7 +285,11 @@ const TRAIL_LEN = 80;`,
     // Pairwise gravity — one RadialGravityField per body, each pulling the
     // OTHERS toward itself. The field's softening prevents singularities in
     // close passes (chaotic preset). Replaces the manual N² force loop.
+    // body.force is persistent across step()s — apply() *adds* to it, so
+    // we have to clear each dynamic body's force first or it accumulates
+    // unbounded and the orbits collapse.
     const n = _bodies.length;
+    for (let i = 0; i < n; i++) _bodies[i].force = new Vec2(0, 0);
     _fields.apply(space);
 
     // Trail sampling — every other frame keeps the buffer covering more time.
