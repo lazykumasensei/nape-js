@@ -58,7 +58,7 @@ import mobaLite            from "./demos/moba-lite.js?v=3.30.4";
 import plinko              from "./demos/plinko.js?v=3.30.4";
 import threeBody           from "./demos/three-body.js?v=3.30.4";
 import tilemap             from "./demos/tilemap.js?v=3.30.4";
-import planetPlatformer    from "./demos/planet-platformer.js?v=3.30.9";
+import planetPlatformer    from "./demos/planet-platformer.js?v=3.30.17";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
