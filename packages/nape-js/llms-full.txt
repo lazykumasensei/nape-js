@@ -1424,8 +1424,9 @@ interactionType(shape1: Shape, shape2: Shape): InteractionType | null
 
 | Value | Description |
 |-------|-------------|
+| `Broadphase.DYNAMIC_AABB_TREE` | Default. Good for dynamic scenes with varied object sizes |
 | `Broadphase.SWEEP_AND_PRUNE` | Good for many objects with little movement |
-| `Broadphase.DYNAMIC_AABB_TREE` | Good for dynamic scenes with varied object sizes |
+| `Broadphase.SPATIAL_HASH` | Best for dense, uniform-size scenes |
 
 ---
 
@@ -1652,6 +1653,97 @@ const grid2 = ldtkLayerToGrid(ldtkJson.levels[0].layerInstances[0]); // LDtk Int
 - Greedy merging is the right default; only use `merge: "rows"` if you need to preserve per-row stripes (e.g. for per-tile properties stored on shapes), or `"none"` for one polygon per cell when you intend to replace cells dynamically.
 - `tiledLayerToGrid` / `ldtkLayerToGrid` only consume the data + dimension fields — they don't depend on the full Tiled/LDtk JSON shape, so you can pass a hand-shaped subset.
 - For destructible terrain, rebuild the body when the grid changes (`body.shapes.clear()` then call `buildTilemapBody(grid, { ..., body })`).
+
+### ParticleEmitter
+
+Physics-aware particle emitter — a pooled, lifecycle-managed swarm of dynamic bodies. Each particle is a real `Body` with a `Circle` or `Polygon` shape, so it collides with the world, reacts to forces / gravity / fluids, and triggers callbacks like any other body. Body pool is reused across spawns — zero allocation in the steady state.
+
+```typescript
+import { ParticleEmitter, ParticleEmitterGroup, Body, Vec2 } from "@newkrok/nape-js";
+
+// Volcano: continuous lava cone.
+const volcano = new ParticleEmitter({
+  space,
+  origin: new Vec2(400, 100),       // Vec2 OR Body (auto-tracking)
+  spawn: { kind: "arc", radius: 6, angleStart: -Math.PI, angleEnd: 0 },
+  velocity: {
+    kind: "cone",                    // "fixed" | "cone" | "radial" | custom
+    direction: -Math.PI / 2,
+    spread: Math.PI / 5,
+    speedMin: 320,
+    speedMax: 520,
+  },
+  rate: 90,                          // particles/sec — fractional rates work
+  maxParticles: 600,
+  lifetimeMin: 4,
+  lifetimeMax: 7,
+  particleRadius: 2.5,
+  selfCollision: false,              // particles don't collide with each other
+});
+
+// Each frame, BEFORE space.step():
+volcano.update(1 / 60);
+space.step(1 / 60);
+
+// Manual burst:
+volcano.emit(40);                    // returns Body[]
+
+// Periodic burst (5 particles every 0.5s):
+const fireworks = new ParticleEmitter({
+  space, origin: pad,
+  velocity: { kind: "radial", speedMin: 200, speedMax: 480 },
+  burstCount: 30,
+  burstInterval: 0.5,
+});
+
+// Bullet emitter with collision callback (for shooter / damage logic):
+const bulletCb = new CbType();
+const bullets = new ParticleEmitter({
+  space,
+  origin: playerBody,
+  velocity: { kind: "fixed", value: new Vec2(700, 0) },  // mutated per-shot
+  particleRadius: 2,
+  particleCbType: bulletCb,
+  onCollide: (bullet, other) => {
+    // Damage `other`, then defer the bullet's death (we're inside a
+    // collision callback — never mutate the space synchronously).
+    bullets.requestKill(bullet);
+  },
+});
+
+// Compose multiple emitters:
+const group = new ParticleEmitterGroup();
+group.add(volcano);
+group.add(fireworks);
+group.update(1 / 60);   // runs every member
+```
+
+**Spawn patterns** (positions are sampled in emitter-local space, then translated by `origin`):
+- `{ kind: "point" }` — always at origin
+- `{ kind: "rect", width, height }` — uniform inside an axis-aligned box
+- `{ kind: "circle", radius, hollow? }` — uniform inside a disk; `hollow: true` samples the rim only
+- `{ kind: "arc", radius, angleStart, angleEnd }` — points on a circular arc
+- `{ kind: "custom", sample: (rng) => Vec2 }` — user-supplied sampler
+
+**Velocity patterns:**
+- `{ kind: "fixed", value }` — every particle gets the same vector (mutate `value` for aimed shooting)
+- `{ kind: "cone", direction, spread, speedMin, speedMax }` — uniformly random direction inside a cone of half-width `spread` rad
+- `{ kind: "radial", speedMin, speedMax }` — outward from the spawn point relative to `origin`
+- `{ kind: "custom", sample: (rng, localPos) => Vec2 }` — user-supplied sampler
+
+**Lifecycle hooks:**
+- `onSpawn(state, body)` — fired after the body is in the space
+- `onUpdate(body, age, dt)` — every `update()` for each live particle
+- `onDeath(body, reason)` — `reason` is `"lifetime" | "manual" | "bounds"`
+- `onCollide(body, other)` — requires `particleCbType`. Use `requestKill(body)` to defer death until the next `update()`
+
+**Gotchas:**
+- Call `update(dt)` **before** `space.step(dt)`, with the same `dt`. The pattern matches `RadialGravityField.apply()`.
+- `space.gravity` and `body.force` still apply — particles are normal dynamic bodies. Clear `body.force` per-frame if you stack a custom field on top.
+- `overflowPolicy: "drop-oldest"` (default) kills the oldest live particle to make room for a new spawn — bullets always come out. Set to `"drop-new"` to protect already-visible particles instead.
+- `selfCollision: false` (default) generates a self-excluding `InteractionFilter` so particles don't waste cycles colliding with each other. Override by passing your own `particleFilter`.
+- `requestKill(body)` is the only safe way to kill a particle from inside a collision callback. Direct `body.space = null` mid-step is undefined behaviour.
+- `destroy()` removes every body (live + pooled) from the space and unregisters the collision listener; subsequent `update()` / `emit()` calls throw.
 
 ### TriggerZone
 

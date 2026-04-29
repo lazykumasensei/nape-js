@@ -7,7 +7,7 @@
 [![npm version](https://img.shields.io/npm/v/@newkrok/nape-js.svg)](https://www.npmjs.com/package/@newkrok/nape-js)
 [![npm downloads](https://img.shields.io/npm/dm/@newkrok/nape-js.svg)](https://www.npmjs.com/package/@newkrok/nape-js)
 [![CI](https://github.com/NewKrok/nape-js/actions/workflows/ci.yml/badge.svg)](https://github.com/NewKrok/nape-js/actions/workflows/ci.yml)
-[![bundle size](https://img.shields.io/badge/gzip-16%20KB-blue.svg)](https://github.com/NewKrok/nape-js)
+[![bundle size](https://img.shields.io/badge/gzip-27%20KB-blue.svg)](https://github.com/NewKrok/nape-js)
 [![license](https://img.shields.io/npm/l/@newkrok/nape-js.svg)](https://github.com/NewKrok/nape-js/blob/master/LICENSE)
 [![docs](https://img.shields.io/badge/docs-online-blue.svg)](https://newkrok.github.io/nape-js/)
 
@@ -135,6 +135,20 @@ function update() {
 | `NapeList<T>` | Iterable list with `for...of` support |
 | `MatMN` | Variable-sized M×N matrix — `clone()`, `equals()`, multiply, transpose |
 
+### Helpers
+
+Higher-level building blocks layered on top of the engine — opt-in modules.
+
+| Helper | Description |
+|--------|-------------|
+| `CharacterController` | Velocity-based 2D platformer controller — ground / slope / wall raycasts, coyote-time, one-way platforms, moving-platform inheritance, runtime-mutable `down` for radial-gravity worlds |
+| `RadialGravityField` / `RadialGravityFieldGroup` | Point-source gravity well — `inverse-square` / `inverse` / `constant` / custom falloff, `maxRadius` / `softening`, body filter, mass scaling. Replaces hand-rolled `body.force = ...` loops |
+| `ParticleEmitter` / `ParticleEmitterGroup` | Physics-aware particle emitter — pooled bodies, continuous / periodic / manual spawning, configurable spawn / velocity patterns, deterministic RNG, lifecycle hooks (`onSpawn` / `onUpdate` / `onDeath` / `onCollide`), self-excluding filter generation |
+| `buildTilemapBody` / `meshTilemap` | Greedy-meshed collision body from a 2D tile grid. 5–50× fewer shapes than one-polygon-per-cell. Includes `tiledLayerToGrid` and `ldtkLayerToGrid` parsers |
+| `TriggerZone` | Sensor zone with `onEnter` / `onStay` / `onExit` callbacks — wraps the BEGIN/ONGOING/END `InteractionListener` plumbing |
+| `fractureBody` | Voronoi-based polygon shatter — `fragmentCount`, `explosionImpulse`, deterministic via `random` |
+| `createConcaveBody` | Decompose a concave outline into convex polygons and pack them into a single body |
+
 ### Serialization
 
 Full physics state snapshot/restore — suitable for save/load, replay, and multiplayer
@@ -195,7 +209,7 @@ present, with automatic `postMessage` fallback otherwise.
 ```bash
 npm install
 npm run build      # tsup → packages/*/dist/ (ESM + CJS + DTS)
-npm test           # vitest — 5275 engine tests + 71 pixi-adapter tests
+npm test           # vitest — 5632 engine tests + 71 pixi-adapter tests
 npm run benchmark  # Performance benchmarks
 ```
 

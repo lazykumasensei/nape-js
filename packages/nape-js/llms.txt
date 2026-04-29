@@ -101,6 +101,7 @@ Higher-level building blocks layered on top of the engine — opt-in modules.
 
 - [CharacterController](https://newkrok.github.io/nape-js/api/classes/CharacterController.html): Velocity-based 2D platformer controller with ground/slope/wall raycasts, coyote-time, one-way platforms, moving-platform inheritance, and an overridable `down` direction (radial-gravity worlds)
 - [RadialGravityField](https://newkrok.github.io/nape-js/api/classes/RadialGravityField.html) / [RadialGravityFieldGroup](https://newkrok.github.io/nape-js/api/classes/RadialGravityFieldGroup.html): Point-source gravity field with `inverse-square` / `inverse` / `constant` / custom falloff, `maxRadius` / `softening` / `minRadius`, body filter, mass scaling — replaces hand-rolled `body.force = ...` loops for orbital, planet, and multi-body scenarios
+- [ParticleEmitter](https://newkrok.github.io/nape-js/api/classes/ParticleEmitter.html) / [ParticleEmitterGroup](https://newkrok.github.io/nape-js/api/classes/ParticleEmitterGroup.html): Physics-aware particle emitter — pooled `Body` swarm with continuous (`rate`) / periodic (`burstCount` + `burstInterval`) / manual (`emit(n)`) spawning, configurable spawn (`point` / `rect` / `circle` / `arc` / custom) and velocity (`fixed` / `cone` / `radial` / custom) patterns, deterministic RNG, world-space `bounds`, `selfCollision` toggle, lifecycle hooks (`onSpawn` / `onUpdate` / `onDeath` / `onCollide` with `requestKill`)
 - `buildTilemapBody` / `meshTilemap` / `tiledLayerToGrid` / `ldtkLayerToGrid`: Greedy-meshed collision body from a 2D tile grid (5–50× fewer shapes vs one-polygon-per-cell), with built-in parsers for Tiled JSON tile layers and LDtk IntGrid layers
 - [TriggerZone](https://newkrok.github.io/nape-js/api/classes/TriggerZone.html): Sensor zone with `onEnter` / `onExit` callbacks — wraps the BEGIN/END `InteractionListener` plumbing
 - [createConcaveBody](https://newkrok.github.io/nape-js/api/functions/createConcaveBody.html): Decomposes a concave outline into convex polygons and packs them into a single body
@@ -109,7 +110,7 @@ Higher-level building blocks layered on top of the engine — opt-in modules.
 
 - [BodyType](https://newkrok.github.io/nape-js/api/classes/BodyType.html): STATIC, DYNAMIC, KINEMATIC
 - [ShapeType](https://newkrok.github.io/nape-js/api/classes/ShapeType.html): CIRCLE, POLYGON
-- [Broadphase](https://newkrok.github.io/nape-js/api/classes/Broadphase.html): SWEEP_AND_PRUNE, DYNAMIC_AABB_TREE
+- [Broadphase](https://newkrok.github.io/nape-js/api/classes/Broadphase.html): DYNAMIC_AABB_TREE (default), SWEEP_AND_PRUNE, SPATIAL_HASH
 - [InteractionType](https://newkrok.github.io/nape-js/api/classes/InteractionType.html): COLLISION, SENSOR, FLUID, ANY
 - [ArbiterType](https://newkrok.github.io/nape-js/api/classes/ArbiterType.html): COLLISION, SENSOR, FLUID
 

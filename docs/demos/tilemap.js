@@ -370,6 +370,12 @@ function hasGrassTop(x, y) {
   return !grid[y - 1][x];
 }
 
+function countSolid(g) {
+  let n = 0;
+  for (const row of g) for (const v of row) if (v) n++;
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 // Demo
 // ---------------------------------------------------------------------------
@@ -894,9 +900,3 @@ export default {
     ctx.restore();
   },
 };
-
-function countSolid(g) {
-  let n = 0;
-  for (const row of g) for (const v of row) if (v) n++;
-  return n;
-}

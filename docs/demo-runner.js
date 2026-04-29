@@ -118,6 +118,14 @@ export class DemoRunner {
   #camY = 0;
   #cameraConfig = null;  // { follow, offsetX, offsetY, bounds, lerp, deadzone }
 
+  // Camera shake — superimposes a decaying random offset on top of the
+  // smoothed camera position. Use shakeCamera(amplitude, duration) to trigger.
+  #shakeAmp = 0;       // current peak amplitude in px
+  #shakeRemaining = 0; // seconds left
+  #shakeTotal = 0;     // duration of current shake (for decay normalisation)
+  #shakeOffX = 0;      // last applied offset (so we can undo before next update)
+  #shakeOffY = 0;
+
   // Worker bridge
   #workerBridge = null;
   #workerMode = false;
@@ -329,6 +337,13 @@ export class DemoRunner {
     this.#camX = 0;
     this.#camY = 0;
     this.#cameraConfig = null;
+    this.#shakeAmp = 0;
+    this.#shakeRemaining = 0;
+    this.#shakeTotal = 0;
+    this.#shakeOffX = 0;
+    this.#shakeOffY = 0;
+    // Expose self to the demo so it can call shakeCamera() etc.
+    demoDef._runner = this;
 
     // Create walls from demo config (before setup).
     // Only auto-create walls if the demo explicitly defines a `walls` property.
@@ -598,13 +613,16 @@ export class DemoRunner {
         // 120 Hz monitor + 60 Hz physics), the camera lerp stays smooth
         // instead of stepping in chunks.
         this.#updateCamera();
+        // Compute shake offset for this frame (decoupled from the smoothed
+        // camera position so lerp doesn't fight the shake).
+        this.#updateShake(Math.min(dt / 1000, DemoRunner.MAX_FRAME_TIME));
 
         const renderStart = performance.now();
         this.#activeAdapter.renderFrame(this.#space, this.#W, this.#H, {
           showOutlines: this.#debugDraw,
           overrides: this.#demo?.renderOverrides ?? null,
-          camX: this.#camX,
-          camY: this.#camY,
+          camX: this.#camX + this.#shakeOffX,
+          camY: this.#camY + this.#shakeOffY,
         });
         const renderMs = performance.now() - renderStart;
 
@@ -723,6 +741,38 @@ export class DemoRunner {
     if (this.#cameraConfig) this.#cameraConfig.lerp = 1;
     this.#updateCamera();
     if (this.#cameraConfig) this.#cameraConfig.lerp = lerp;
+  }
+
+  /**
+   * Trigger a camera shake — superimposes a decaying random offset on top of
+   * the smoothed follow position. If a shake is already active, the new one
+   * replaces it when its peak amplitude is greater (keeps small shakes from
+   * cutting off bigger ones).
+   *
+   * @param {number} amplitude — peak offset in px (typical 4–20).
+   * @param {number} duration  — seconds of shake (typical 0.15–0.5).
+   */
+  shakeCamera(amplitude, duration = 0.25) {
+    if (!(amplitude > 0) || !(duration > 0)) return;
+    if (amplitude < this.#shakeAmp && this.#shakeRemaining > 0) return;
+    this.#shakeAmp = amplitude;
+    this.#shakeRemaining = duration;
+    this.#shakeTotal = duration;
+  }
+
+  #updateShake(frameSec) {
+    if (this.#shakeRemaining <= 0) {
+      this.#shakeOffX = 0;
+      this.#shakeOffY = 0;
+      return;
+    }
+    this.#shakeRemaining = Math.max(0, this.#shakeRemaining - frameSec);
+    // Decay quadratically so the tail fades out smoothly instead of cutting.
+    const t = this.#shakeTotal > 0 ? this.#shakeRemaining / this.#shakeTotal : 0;
+    const amp = this.#shakeAmp * t * t;
+    const ang = Math.random() * Math.PI * 2;
+    this.#shakeOffX = Math.cos(ang) * amp;
+    this.#shakeOffY = Math.sin(ang) * amp;
   }
 }
 

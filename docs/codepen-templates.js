@@ -9,7 +9,7 @@
  *  2. Auto-generation from demo hooks (setup/step/click/drag/release) via .toString()
  */
 
-const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js@3.30.4/dist/index.js";
+const NAPE_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-js@3.31.0/dist/index.js";
 const NAPE_PIXI_CDN = "https://cdn.jsdelivr.net/npm/@newkrok/nape-pixi@0.1.0/dist/index.js";
 const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
 
@@ -729,7 +729,8 @@ const NAPE_IMPORTS = `import {
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
   CharacterController, fractureBody, UserConstraint, TriggerZone,
   Ray, RayResult,
-  buildTilemapBody, meshTilemap, RadialGravityField,
+  buildTilemapBody, meshTilemap, RadialGravityField, RadialGravityFieldGroup,
+  ParticleEmitter, ParticleEmitterGroup,
 } from "${NAPE_CDN}";`;
 
 /**

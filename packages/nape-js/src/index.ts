@@ -132,6 +132,18 @@ export {
   type BodyFilter,
 } from "./helpers/RadialGravityField";
 export {
+  ParticleEmitter,
+  ParticleEmitterGroup,
+  type ParticleEmitterOptions,
+  type ParticleSpawnState,
+  type ParticleShape,
+  type SpawnPattern,
+  type VelocityPattern,
+  type ParticleOverflowPolicy,
+  type ParticleDeathReason,
+  type ParticleBounds,
+} from "./helpers/ParticleEmitter";
+export {
   computeVoronoi,
   generateFractureSites,
   type VoronoiPoint,

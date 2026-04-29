@@ -302,3 +302,27 @@ export class ZPP_SpaceArbiterList {
     return ret;
   }
 }
+
+// ---------------------------------------------------------------------------
+// `length` accessor — bridges the public `ArbiterList` (TypedListLike) shape.
+//
+// `Space.arbiters` is typed as `ArbiterList`, which has a `length: number`.
+// The runtime however returns a raw `ZPP_SpaceArbiterList`, whose internal
+// `_length` is only refreshed inside `zpp_gl()` (the lazy live-scan). Without
+// this property descriptor, `space.arbiters.length` is `undefined` at
+// runtime and any caller that compares it to a number silently does the
+// wrong thing.
+//
+// Pattern matches `ZPP_MixVec2List` / `Vec2List` / `ContactList`.
+// ---------------------------------------------------------------------------
+
+Object.defineProperty(
+  (ZPP_SpaceArbiterList as unknown as { prototype: object }).prototype,
+  "length",
+  {
+    get: function (this: ZPP_SpaceArbiterList): number {
+      return this.zpp_gl();
+    },
+    configurable: true,
+  },
+);
