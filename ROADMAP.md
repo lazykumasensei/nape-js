@@ -34,7 +34,7 @@ Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/Rad
 - `RadialGravityFieldGroup` — composable container; one `apply(space)` runs all member fields. Forces accumulate additively, preserving any userland `body.force` writes.
 - 33 unit tests covering all four falloff laws, edge cases (singularity, zero distance, disabled, filter, static/kinematic), accumulation semantics, and physics integration.
 - **Refactored** `gravity.js` and `three-body.js` demos to use the new helper — three-body's pairwise N² loop becomes one `RadialGravityField` per body with self-exclusion `bodyFilter`.
-- **New demo** `planet-platformer.js` — Mario-Galaxy-style: walk around three planetoids with their own gravity wells, jump between them, collect coins + a star.
+- **New demo** `planet-platformer.js` — Mario-Galaxy-style: walk around ten planetoids (each with its own gravity well) plus a giant **Goliath** in the east, with random debris on every surface. Jump between them, collect coins + a star.
 - **Side fix**: `CharacterController` now exposes a runtime-mutable `down: Vec2` direction (default `(0, 1)`) — ground / wall raycasts and slope detection follow it. Makes radial-gravity walking work natively. Default behaviour unchanged.
 
 ### P62 — ParticleEmitter helper
@@ -53,7 +53,7 @@ Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/Par
 
 | #   | Priority                         | Effort | Impact   | Status                                                         |
 | --- | -------------------------------- | ------ | -------- | -------------------------------------------------------------- |
-| P29 | Test coverage >= 80%             | L      | safety   | :diamonds: ~55% (4895 tests)                                   |
+| P29 | Test coverage >= 80%             | L      | safety   | :diamonds: ~71% statements (5556 tests)                        |
 | P56 | Interactive playground           | S-M    | adoption | :white_square_button: Not started                              |
 
 ---
@@ -77,7 +77,7 @@ Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/Par
 
 | #   | Priority                                 | Effort | Impact          | Why                                                                                                                                                                                                                              |
 | --- | ---------------------------------------- | ------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P61 | **Bundle size reduction**                | S-M    | competitiveness | Close the 87 KB vs Phaser Box2D 65 KB gap. Dead code audit, hot path optimization                                                                                                                                                |
+| P61 | **Bundle size reduction**                | S-M    | competitiveness | Close the 123 KB vs Phaser Box2D 65 KB gap (growing — bundle has gained ~36 KB across recent helper additions). Dead code audit, hot path optimization                                                                          |
 | P69 | **Deterministic replay system**          | M      | features        | Input recording + playback on top of existing serialization + deterministic mode. Debug bug reproduction, multiplayer rollback foundation, shareable replays, deterministic regression tests — one feature that connects many others |
 
 ---

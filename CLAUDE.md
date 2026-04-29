@@ -14,7 +14,7 @@ A fully typed TypeScript 2D physics engine — modernized rewrite of the origina
 - **Serialization** — JSON + binary for save/load/multiplayer rollback
 - **Debug draw** — abstract `DebugDraw` interface, reference impls for Canvas/Three.js/PixiJS/p5.js
 - **Character controller** — geometric collide-and-slide (`CharacterController` class)
-- **~87 KB** minified ESM bundle (~16 KB gzip), TSDoc documented, 5275 engine tests + 71 pixi-adapter tests
+- **~123 KB** minified ESM bundle (~27 KB gzip), TSDoc documented, 5556 engine tests + 71 pixi-adapter tests
 
 ## Repo Layout (npm workspaces)
 
@@ -50,7 +50,7 @@ npm run format:check # prettier across both workspaces
 
 1. `npm run format:check` — must pass (Prettier code style, both packages)
 2. `npm run lint` — must pass (ESLint, both packages)
-3. `npm test` — all tests must pass (5275 + 71)
+3. `npm test` — all tests must pass (5556 + 71)
 4. `npm run build` — DTS generation must succeed (catches type errors vitest misses)
 
 ## Release (per-package, auto)
