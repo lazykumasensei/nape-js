@@ -114,20 +114,6 @@ function runAndSnapshot(space: Space, steps: number): Array<[number, number, num
   return out;
 }
 
-/**
- * Count the active arbiters in `space.arbiters`.
- *
- * `space.arbiters` is typed as `ArbiterList` (which has `.length`), but the
- * runtime returns a `ZPP_SpaceArbiterList` directly — that class only
- * exposes `zpp_gl()` for the live-scanned count. Iterating over it via a
- * normal `.length` returns `undefined`. This shim normalises the access
- * path for the parity tests; once the public list is fixed, calls to this
- * function can be replaced with `arbiterCount(space)`.
- */
-function arbiterCount(space: Space): number {
-  return (space.arbiters as unknown as { zpp_gl(): number }).zpp_gl();
-}
-
 // ---------------------------------------------------------------------------
 // Static query helper — set up the same scene under each broadphase and
 // return the three-element tuple of query results (or whatever each test
@@ -247,7 +233,7 @@ describe("Broadphase parity — simulation outcome", () => {
     const arbCounts = BROADPHASES.map(({ bp }) => {
       const space = buildScene(bp, cfg);
       for (let i = 0; i < 30; i++) space.step(1 / 60);
-      return arbiterCount(space);
+      return space.arbiters.length;
     });
     expect(arbCounts[0]).toBe(arbCounts[1]);
     expect(arbCounts[1]).toBe(arbCounts[2]);
@@ -263,7 +249,7 @@ describe("Broadphase parity — simulation outcome", () => {
         for (let i = 0; i < 5; i++) space.step(1 / 60);
       }, `broadphase ${name}`).not.toThrow();
       expect(space.bodies.length).toBe(0);
-      expect(arbiterCount(space)).toBe(0);
+      expect(space.arbiters.length).toBe(0);
     }
   });
 
@@ -295,7 +281,7 @@ describe("Broadphase parity — simulation outcome", () => {
         b.space = space;
       }
       for (let i = 0; i < 30; i++) space.step(1 / 60);
-      expect(arbiterCount(space), `broadphase ${name}`).toBe(0);
+      expect(space.arbiters.length, `broadphase ${name}`).toBe(0);
     }
   });
 
@@ -310,11 +296,11 @@ describe("Broadphase parity — simulation outcome", () => {
       wall.shapes.add(new Polygon(Polygon.box(20, 200)));
       wall.space = space;
       space.step(1 / 60);
-      expect(arbiterCount(space), `before teleport / ${name}`).toBe(0);
+      expect(space.arbiters.length, `before teleport / ${name}`).toBe(0);
       // Teleport ball next to the wall.
       ball.position = new Vec2(485, 0);
       space.step(1 / 60);
-      expect(arbiterCount(space), `after teleport / ${name}`).toBeGreaterThan(0);
+      expect(space.arbiters.length, `after teleport / ${name}`).toBeGreaterThan(0);
     }
   });
 });
@@ -694,7 +680,7 @@ describe("Broadphase parity — stress + extreme sizes", () => {
         velocity: 60,
       });
       for (let i = 0; i < 30; i++) space.step(1 / 60);
-      return arbiterCount(space);
+      return space.arbiters.length;
     });
     expect(counts[1]).toBe(counts[0]);
     expect(counts[2]).toBe(counts[0]);
@@ -716,7 +702,7 @@ describe("Broadphase parity — stress + extreme sizes", () => {
         b.space = space;
       }
       for (let i = 0; i < 5; i++) space.step(1 / 60);
-      return arbiterCount(space);
+      return space.arbiters.length;
     });
     expect(counts[1]).toBe(counts[0]);
     expect(counts[2]).toBe(counts[0]);

@@ -53,7 +53,7 @@ Shipped as a new helper in `@newkrok/nape-js` (`packages/nape-js/src/helpers/Par
 
 | #   | Priority                         | Effort | Impact   | Status                                                         |
 | --- | -------------------------------- | ------ | -------- | -------------------------------------------------------------- |
-| P29 | Test coverage >= 80%             | L      | safety   | :diamonds: ~72% statements (5588 tests)                        |
+| P29 | Test coverage >= 80%             | L      | safety   | :diamonds: ~72% statements (5592 tests)                        |
 | P56 | Interactive playground           | S-M    | adoption | :white_square_button: Not started                              |
 
 ---
