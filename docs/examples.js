@@ -2,7 +2,7 @@
  * nape-js Examples Page — grid of interactive physics demos with play overlay,
  * per-card stats, search/tag filtering, size toggle, outline toggle, and View Code.
  */
-import { VERSION } from "./nape-js.esm.js?v=3.30.4";
+import { VERSION } from "./nape-js.esm.js?v=3.31.0";
 import { installErrorOverlay } from "./renderer.js?v=3.30.4";
 import { DemoRunner } from "./demo-runner.js?v=3.30.9";
 import { Canvas2DAdapter } from "./renderers/canvas2d-adapter.js?v=3.30.4";
@@ -59,6 +59,8 @@ import plinko              from "./demos/plinko.js?v=3.30.4";
 import threeBody           from "./demos/three-body.js?v=3.30.17";
 import tilemap             from "./demos/tilemap.js?v=3.30.4";
 import planetPlatformer    from "./demos/planet-platformer.js?v=3.30.17";
+import volcano             from "./demos/volcano.js?v=3.31.0";
+import destructibleArena   from "./demos/destructible-arena.js?v=3.31.0";
 
 const ALL_DEMOS = [
   falling, pyramid, chain, explosion, constraints, gravity, stacking, ragdoll, strandbeast,
@@ -85,6 +87,8 @@ const ALL_DEMOS = [
   threeBody,
   tilemap,
   planetPlatformer,
+  volcano,
+  destructibleArena,
 ];
 
 const gtag = window.gtag || function() {};
