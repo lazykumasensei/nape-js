@@ -316,9 +316,13 @@ export class ZPP_SpaceArbiterList {
 // Pattern matches `ZPP_MixVec2List` / `Vec2List` / `ContactList`.
 // ---------------------------------------------------------------------------
 
-Object.defineProperty((ZPP_SpaceArbiterList as unknown as { prototype: object }).prototype, "length", {
-  get: function (this: ZPP_SpaceArbiterList): number {
-    return this.zpp_gl();
+Object.defineProperty(
+  (ZPP_SpaceArbiterList as unknown as { prototype: object }).prototype,
+  "length",
+  {
+    get: function (this: ZPP_SpaceArbiterList): number {
+      return this.zpp_gl();
+    },
+    configurable: true,
   },
-  configurable: true,
-});
+);

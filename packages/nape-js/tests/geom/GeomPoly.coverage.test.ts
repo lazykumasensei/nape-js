@@ -433,12 +433,7 @@ describe("GeomPoly.simplify — edge cases", () => {
 describe("MarchingSquares.run — extra coverage", () => {
   it("circle iso function yields a closed polygon", () => {
     const iso = (x: number, y: number) => Math.sqrt(x * x + y * y) - 20;
-    const out = MarchingSquares.run(
-      iso,
-      new AABB(-30, -30, 60, 60),
-      new Vec2(2, 2),
-      2,
-    );
+    const out = MarchingSquares.run(iso, new AABB(-30, -30, 60, 60), new Vec2(2, 2), 2);
     expect(listSize(out)).toBeGreaterThanOrEqual(1);
     expect(polyArea(listAt(out, 0))).toBeGreaterThan(800);
     expect(polyArea(listAt(out, 0))).toBeLessThan(1500);
@@ -450,12 +445,7 @@ describe("MarchingSquares.run — extra coverage", () => {
       const d2 = Math.sqrt((x + 20) * (x + 20) + y * y) - 8;
       return Math.min(d1, d2);
     };
-    const out = MarchingSquares.run(
-      iso,
-      new AABB(-40, -20, 80, 40),
-      new Vec2(2, 2),
-      2,
-    );
+    const out = MarchingSquares.run(iso, new AABB(-40, -20, 80, 40), new Vec2(2, 2), 2);
     expect(listSize(out)).toBe(2);
   });
 
@@ -528,19 +518,13 @@ describe("MarchingSquares.run — extra coverage", () => {
     expect(() =>
       MarchingSquares.run(null as unknown as (x: number, y: number) => number, aabb, cs),
     ).toThrow();
-    expect(() =>
-      MarchingSquares.run(() => 0, null as unknown as AABB, cs),
-    ).toThrow();
-    expect(() =>
-      MarchingSquares.run(() => 0, aabb, null as unknown as Vec2),
-    ).toThrow();
+    expect(() => MarchingSquares.run(() => 0, null as unknown as AABB, cs)).toThrow();
+    expect(() => MarchingSquares.run(() => 0, aabb, null as unknown as Vec2)).toThrow();
   });
 
   it("throws on non-positive cellsize or negative quality", () => {
     const aabb = new AABB(0, 0, 10, 10);
     expect(() => MarchingSquares.run(() => 0, aabb, new Vec2(0, 1))).toThrow();
-    expect(() =>
-      MarchingSquares.run(() => 0, aabb, new Vec2(1, 1), -1),
-    ).toThrow();
+    expect(() => MarchingSquares.run(() => 0, aabb, new Vec2(1, 1), -1)).toThrow();
   });
 });
