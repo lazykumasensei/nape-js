@@ -1,8 +1,10 @@
 import {
-  Body, BodyType, Vec2, Circle, Material,
+  Body, BodyType, Vec2, Circle, Polygon, Material,
   RadialGravityField, ParticleEmitter,
 } from "../nape-js.esm.js";
 import { drawBody } from "../renderer.js";
+
+// (Polygon is used for the volcano cone shape on top of the planet.)
 
 // Physics-aware particle showcase: a planet with its own gravity well, a
 // volcano emitting lava drops upward in a 40-degree cone — the radial
@@ -16,19 +18,24 @@ const PLANET_R = 90;
 const FIELD_STRENGTH = 1100;
 const FIELD_MAX = 380;
 
-const VENT_OFFSET = -PLANET_R - 4; // a hair above the surface
+const VENT_OFFSET = -PLANET_R - 18; // sits just above the volcano cone opening
 const VENT_DIR = -Math.PI / 2;     // straight up
 const VENT_HALF_CONE = Math.PI / 5; // ±36°
+// Volcano cone (decorative + collidable) — sits on top of the planet.
+const CONE_BASE_HALF = 26;
+const CONE_TOP_HALF = 10;
+const CONE_BASE_Y = -PLANET_R * 0.95; // slightly inside planet so they merge
+const CONE_TOP_Y = -PLANET_R - 16;    // tip just below the vent emit point
 
 const DT = 1 / 60;
 
 let _planet = null;
+let _coneVerts = null;   // local-space vertices for the volcano cone trapezoid
 let _field = null;
 let _emitter = null;
 let _burstEmitter = null;
 let _debris = [];
-let _onMouseDown = null;
-let _mouseEvent = null;
+let _pendingBurst = null;
 
 function lavaColor(age, lifetime) {
   // Yellow → orange → red → black-red, roughly mapped to age/lifetime.
@@ -47,20 +54,29 @@ function lavaColor(age, lifetime) {
 
 export default {
   id: "volcano",
-  label: "Volcano (P62)",
+  label: "Volcano",
   featured: true,
   featuredOrder: 8,
-  tags: ["ParticleEmitter", "RadialGravityField", "Particles", "P62"],
+  tags: ["ParticleEmitter", "RadialGravityField", "Particles"],
   desc:
     "Physics-aware particles. A vent fires lava drops upward in a 40-degree cone; a <b>RadialGravityField</b> pulls every drop back to the planet, where it collides with the rocky debris on the surface. <b>Click</b> to detonate a 60-particle burst at the cursor — sparks bounce off the world like any other dynamic body. ~600 live particles at 60 FPS.",
   walls: false,
 
   setup(space, _W, _H) {
     space.gravity = new Vec2(0, 0); // only the radial field matters
+    _pendingBurst = null;
 
-    // ---- Planet ----
+    // ---- Planet + volcano cone (single static body, two shapes) ----
     _planet = new Body(BodyType.STATIC, new Vec2(PLANET_X, PLANET_Y));
     _planet.shapes.add(new Circle(PLANET_R, undefined, new Material(0.1, 0.7, 0.9, 1)));
+    // Volcano cone — convex trapezoid on top of the planet.
+    _coneVerts = [
+      new Vec2(-CONE_BASE_HALF, CONE_BASE_Y),
+      new Vec2(-CONE_TOP_HALF, CONE_TOP_Y),
+      new Vec2(CONE_TOP_HALF, CONE_TOP_Y),
+      new Vec2(CONE_BASE_HALF, CONE_BASE_Y),
+    ];
+    _planet.shapes.add(new Polygon(_coneVerts, new Material(0.05, 0.7, 0.9, 1)));
     try { _planet.userData._colorIdx = 4; } catch (_) {}
     _planet.space = space;
 
@@ -142,37 +158,27 @@ export default {
       selfCollision: false,
     });
 
-    // Mouse capture — store relative to the demo canvas.
-    _mouseEvent = null;
-    this._onMouseDown = (e) => {
-      const target = e.target;
-      if (!target || !target.getBoundingClientRect) return;
-      const rect = target.getBoundingClientRect();
-      // Map client coords to logical canvas coords.
-      const cx = ((e.clientX - rect.left) / rect.width) * 900;
-      const cy = ((e.clientY - rect.top) / rect.height) * 500;
-      _mouseEvent = { x: cx, y: cy };
-    };
-    window.addEventListener("mousedown", this._onMouseDown);
-    _onMouseDown = this._onMouseDown;
+  },
+
+  click(x, y) {
+    _pendingBurst = { x, y };
   },
 
   cleanup() {
     if (_emitter) { _emitter.destroy(); _emitter = null; }
     if (_burstEmitter) { _burstEmitter.destroy(); _burstEmitter = null; }
-    if (_onMouseDown) window.removeEventListener("mousedown", _onMouseDown);
-    _onMouseDown = null;
+    _pendingBurst = null;
     _planet = null;
+    _coneVerts = null;
     _field = null;
     _debris = [];
   },
 
   step(space, _W, _H) {
     // ---- 1) Click burst ----
-    if (_mouseEvent && _burstEmitter) {
-      const { x, y } = _mouseEvent;
-      _mouseEvent = null;
-      // Move the burst emitter origin to the click and fire 60 sparks.
+    if (_pendingBurst && _burstEmitter) {
+      const { x, y } = _pendingBurst;
+      _pendingBurst = null;
       if (_burstEmitter.origin instanceof Vec2) {
         _burstEmitter.origin.x = x;
         _burstEmitter.origin.y = y;
@@ -206,8 +212,20 @@ export default {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Planet.
+    // Planet (circle + volcano cone, both rendered as one body).
     drawBody(ctx, _planet, false);
+
+    // Glowing crater opening at the cone's tip.
+    const craterX = PLANET_X;
+    const craterY = PLANET_Y + CONE_TOP_Y;
+    const grad = ctx.createRadialGradient(craterX, craterY, 0, craterX, craterY, CONE_TOP_HALF * 2.2);
+    grad.addColorStop(0, "rgba(255, 200, 80, 0.95)");
+    grad.addColorStop(0.4, "rgba(230, 90, 30, 0.55)");
+    grad.addColorStop(1, "rgba(140, 30, 10, 0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(craterX, craterY, CONE_TOP_HALF * 2.2, 0, Math.PI * 2);
+    ctx.fill();
 
     // Debris.
     for (const d of _debris) drawBody(ctx, d, false);

@@ -1,6 +1,6 @@
 # nape-js Cookbook
 
-<!-- Last verified: v3.21.4 -->
+<!-- Last verified: v3.31.0 -->
 
 Practical, copy-paste-ready recipes for common game physics tasks.
 Each recipe shows the minimal working code and explains the "why" behind key decisions.
@@ -21,6 +21,7 @@ Each recipe shows the minimal working code and explains the "why" behind key dec
 - [Collision Filtering](#collision-filtering)
 - [Explosion Impulse](#explosion-impulse)
 - [Voronoi Fracture (Destruction)](#voronoi-fracture-destruction)
+- [Particle Emitter (Bullets, Sparks, Debris)](#particle-emitter-bullets-sparks-debris)
 - [Conveyor Belt](#conveyor-belt)
 - [Breakable Constraint](#breakable-constraint)
 - [Soft Constraint (Spring-Like)](#soft-constraint-spring-like)
@@ -502,6 +503,156 @@ space.listeners.add(new InteractionListener(
 - Always `setTimeout` the fracture call inside listeners — modifying the space during a collision callback throws.
 - Fragments inherit the original body's velocity and rotation. Set `explosionImpulse` > 0 for a blast effect.
 - For deterministic results (multiplayer), pass a seeded `random: () => number` function in options.
+
+---
+
+## Particle Emitter (Bullets, Sparks, Debris)
+
+`ParticleEmitter` is a physics-aware particle system: every "particle" is a real `Body` (with shape, mass, friction, collisions), but the emitter pools/recycles bodies, samples spawn positions and velocities from configurable patterns, ages them, and tears them down for you. Use it any time you would otherwise hand-roll a body pool with a per-frame `for`-loop.
+
+It replaces the typical "make N small bodies and track them in an array" snippet with one config object.
+
+### Three flavours: continuous, manual burst, projectile-with-callback
+
+```typescript
+import {
+  ParticleEmitter, Body, BodyType, Vec2, Material, InteractionFilter, CbType,
+} from "@newkrok/nape-js";
+
+// 1) CONTINUOUS — emits at `rate` particles/sec for as long as it exists.
+//    Spawn pattern, velocity pattern, lifetime, and origin (Vec2 OR Body)
+//    are all sampled each spawn. Bodies are pooled internally up to
+//    `maxParticles`; older particles get recycled (`overflowPolicy`).
+const lava = new ParticleEmitter({
+  space,
+  origin: new Vec2(450, 230),                // can also be a Body — tracked each spawn
+  spawn: { kind: "arc", radius: 6, angleStart: -Math.PI, angleEnd: 0 },
+  velocity: { kind: "cone", direction: -Math.PI / 2, spread: Math.PI / 5,
+              speedMin: 320, speedMax: 520 },
+  rate: 90,
+  maxParticles: 600,
+  lifetimeMin: 4, lifetimeMax: 7,
+  particleRadius: 2.5,
+  particleMaterial: new Material(0.05, 0.4, 0.6, 0.6),
+  selfCollision: false,                       // particles don't collide with each other
+});
+
+// 2) MANUAL BURST — `rate: 0`, fire with `.emit(n)` whenever you want.
+const debris = new ParticleEmitter({
+  space,
+  origin: new Vec2(0, 0),                     // moved on each burst
+  velocity: { kind: "radial", speedMin: 130, speedMax: 420 },
+  maxParticles: 400,
+  lifetimeMin: 0.5, lifetimeMax: 1.4,
+  particleRadius: 1.7,
+  selfCollision: false,
+});
+
+function explodeAt(x: number, y: number) {
+  // origin is a Vec2 — mutate in place; the emitter reads it on the next emit().
+  (debris.origin as Vec2).setxy(x, y);
+  debris.emit(40);
+}
+
+// 3) PROJECTILES WITH COLLISION CALLBACK — bullets that die on first contact.
+//    `particleCbType` + `onCollide` wires up the InteractionListener for you;
+//    `requestKill` is a deferred kill that's safe to call from inside the
+//    callback (modifying the space during a collision callback throws).
+const bulletCb = new CbType();
+const bullets = new ParticleEmitter({
+  space,
+  origin: player,                             // bullets spawn from the player's centre
+  velocity: { kind: "fixed", value: new Vec2(700, 0) }, // mutated per shot
+  maxParticles: 64,
+  lifetimeMin: 1.7, lifetimeMax: 1.7,
+  particleRadius: 2,
+  particleCbType: bulletCb,
+  onCollide: (bullet, other) => {
+    other.userData?._hp != null && (other.userData._hp -= 1);
+    bullets.requestKill(bullet);              // safe — runs at the start of next update()
+  },
+  selfCollision: false,
+});
+
+// Shoot toward an aim point: mutate the velocity pattern in place, then emit().
+function fire(aim: Vec2) {
+  const dx = aim.x - player.position.x, dy = aim.y - player.position.y;
+  const len = Math.hypot(dx, dy) || 1;
+  (bullets.velocity as { kind: "fixed"; value: Vec2 }).value =
+    new Vec2(dx / len * 700, dy / len * 700);
+  bullets.emit(1);
+}
+```
+
+### Wire it into the loop
+
+```typescript
+function update(dt: number) {
+  lava.update(dt);
+  debris.update(dt);
+  bullets.update(dt);
+  space.step(dt);
+}
+
+// Render: walk live particles + their parallel age/lifetime arrays.
+for (let i = 0; i < lava.active.length; i++) {
+  const b = lava.active[i];
+  const t = lava.ages[i] / lava.lifetimes[i];
+  // ... fade colour by t, draw a circle at b.position
+}
+```
+
+### Filter gotcha — emitters need their own collision group
+
+Particles are real bodies, so they show up in **every** collision check, including:
+
+- **Other particle emitters** — bullets fired through a debris cloud will deflect off floating sparks unless you mask them out.
+- **`CharacterController` ground-/wall-detection raycasts** — the auto-generated CC raycast filter only excludes the character itself. If you fire bullets from the player's centre, the player can stand on their own bullets and "fly" by spamming the fire button.
+
+Solution: put every emitter into a dedicated collision group, and have projectile/character filters mask that group out.
+
+```typescript
+const PARTICLE_GROUP = 1 << 10;
+const CHAR_GROUP     = 1 << 8;   // CharacterController already uses this internally
+
+// Bullets: in PARTICLE_GROUP, but mask it out of THEIR mask too — so bullets
+// don't deflect off other particles, and the CC ray-cast skips them.
+new ParticleEmitter({
+  /* ... */
+  particleFilter: new InteractionFilter(PARTICLE_GROUP, ~(CHAR_GROUP | PARTICLE_GROUP)),
+});
+
+// Debris/sparks: same group, but only need to skip the player.
+new ParticleEmitter({
+  /* ... */
+  particleFilter: new InteractionFilter(PARTICLE_GROUP, ~CHAR_GROUP),
+});
+
+// CharacterController: pass an explicit filter that skips both the character
+// AND every particle. Otherwise its default filter keeps PARTICLE_GROUP in
+// scope and the player can stand on their own shots.
+new CharacterController(space, player, {
+  /* ... */,
+  filter: new InteractionFilter(1, ~(CHAR_GROUP | PARTICLE_GROUP)),
+});
+```
+
+### Lifecycle hooks
+
+All hooks are optional:
+
+- `onSpawn(state)` — set per-particle `userData` (color, damage, frame index).
+- `onUpdate(body, age, dt)` — per-frame mutation (e.g. shrink radius, apply custom drag).
+- `onDeath(body, reason)` — `"lifetime"` / `"manual"` / `"bounds"`. Trigger a death-burst here.
+- `onCollide(particle, other)` — collision-driven death; pair with `requestKill`.
+
+### Gotchas
+
+- `update(dt)` must run **before** `space.step(dt)` (so deferred kills land before the next physics tick).
+- `origin` as a `Vec2` is captured by reference — mutate it in place to move the emitter; don't reassign with `=`.
+- `origin` as a `Body` is tracked each spawn — handy for muzzle-attached emitters; the body doesn't even need to be in the same space.
+- `selfCollision: false` (default) gives every particle a self-excluding filter. If you provide an explicit `particleFilter`, set `selfCollision: true` if you want particles to collide with each other.
+- For deterministic results (multiplayer), pass a seeded `random: () => number` in the options.
 
 ---
 

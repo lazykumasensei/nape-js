@@ -1,6 +1,6 @@
 # Anti-Patterns
 
-<!-- Last verified: v3.21.4 -->
+<!-- Last verified: v3.31.0 -->
 
 Common mistakes that cause bugs, poor performance, or confusion in nape-js.
 Each section shows the wrong approach, explains why it's a problem, and gives
@@ -218,6 +218,36 @@ space.rayCast(ray); // null — broadphase hasn't indexed yet
 space.step(1 / 60);
 space.rayCast(ray); // works
 ```
+
+### Forgetting that `ParticleEmitter` particles are real bodies
+
+Every particle is a full `Body` with shape, mass, and collisions, so it shows up in **every** filter check — including the `CharacterController` ground/wall raycasts. With the default auto-generated CC filter, the player can stand on their own bullets/sparks/debris and "fly" by spamming fire.
+
+```typescript
+// BAD — bullets emitted from the player's centre count as ground.
+//   Default CC filter only excludes the character itself; particles still
+//   intersect the downward ground-detection ray, so cc.grounded stays true
+//   above a floating bullet and Space-spam → infinite jumps.
+new ParticleEmitter({ origin: player, /* ... */ });
+new CharacterController(space, player, { /* no `filter` */ });
+
+// GOOD — pick a dedicated bit for particles, mask it out of the CC filter.
+const PARTICLE_GROUP = 1 << 10;
+const CHAR_GROUP     = 1 << 8;
+
+new ParticleEmitter({
+  origin: player,
+  particleFilter: new InteractionFilter(PARTICLE_GROUP, ~(CHAR_GROUP | PARTICLE_GROUP)),
+  /* ... */
+});
+
+new CharacterController(space, player, {
+  filter: new InteractionFilter(1, ~(CHAR_GROUP | PARTICLE_GROUP)), // skip self + particles
+  /* ... */
+});
+```
+
+The same fix prevents bullets from deflecting off floating debris/spark clouds left by previous shots — give every emitter the same `PARTICLE_GROUP` and have projectiles mask it out of their own mask. See the [Particle Emitter cookbook recipe](./cookbook.md#particle-emitter-bullets-sparks-debris) for a complete setup.
 
 ---
 
