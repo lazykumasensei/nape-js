@@ -729,7 +729,8 @@ const NAPE_IMPORTS = `import {
   CbType, CbEvent, InteractionType, InteractionListener, PreListener, PreFlag,
   CharacterController, fractureBody, UserConstraint, TriggerZone,
   Ray, RayResult,
-  buildTilemapBody, meshTilemap, RadialGravityField,
+  buildTilemapBody, meshTilemap, RadialGravityField, RadialGravityFieldGroup,
+  ParticleEmitter, ParticleEmitterGroup,
 } from "${NAPE_CDN}";`;
 
 /**
